@@ -36,6 +36,3 @@ Thumbs.db
 
 # Vercel
 .vercel/
-
-# Firebase config gerado localmente — tem credentials reais
-env-config.js
