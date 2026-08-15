@@ -1,126 +1,216 @@
-# 🔐 Guia de Segurança — Study Life Control
+// security.js — Rate limiting, sanitização e proteção de dados sensíveis
+// Carregue antes de app.js no index.html
 
-## O que foi corrigido (4 fases)
+(function () {
+  'use strict';
 
-| Fase | Problema | Solução |
-|------|----------|---------|
-| 1 | API Key exposta no código | Variáveis de ambiente via `window.__ENV` |
-| 2 | Sem Content Security Policy | CSP completo no `vercel.json` |
-| 3 | Firestore sem limite de payload | Rules com validação de tamanho e schema |
-| 4 | Sem rate limiting + console exposto | `security.js` com proteções em camadas |
+  // ─── 1. Rate Limiting para operações de escrita no Firestore ─────────────
+  //
+  // Impede que um bug ou usuário malicioso dispare centenas de writes/segundo,
+  // evitando custo inesperado e esgotamento de cota do Firebase gratuito.
 
----
+  const RATE_LIMITS = {
+    saveData:    { max: 60,  windowMs: 60_000  },  // 60 saves por minuto
+    saveAllData: { max: 10,  windowMs: 60_000  },  // 10 saves completos por minuto
+    aiAsk:       { max: 40,  windowMs: 60_000  },  // 40 perguntas à IA por minuto
+    addItem:     { max: 120, windowMs: 60_000  },  // 120 itens adicionados por minuto
+  };
 
-## ✅ Fase 1 — Configurar variáveis de ambiente no Vercel
+  const _rateLimitCounters = {};
 
-### Passo a passo:
+  function checkRateLimit(operation) {
+    const rule = RATE_LIMITS[operation];
+    if (!rule) return true;
 
-1. Acesse [vercel.com](https://vercel.com) → seu projeto → **Settings → Environment Variables**
+    const now = Date.now();
+    if (!_rateLimitCounters[operation]) {
+      _rateLimitCounters[operation] = { count: 0, windowStart: now };
+    }
 
-2. Adicione cada variável com o valor do seu Firebase Console
-   (`Firebase Console → Project Settings → Your apps → SDK setup`):
+    const c = _rateLimitCounters[operation];
 
-   | Nome da variável | Onde encontrar |
-   |---|---|
-   | `FIREBASE_API_KEY` | `apiKey` |
-   | `FIREBASE_AUTH_DOMAIN` | `authDomain` |
-   | `FIREBASE_PROJECT_ID` | `projectId` |
-   | `FIREBASE_STORAGE_BUCKET` | `storageBucket` |
-   | `FIREBASE_MESSAGING_SENDER_ID` | `messagingSenderId` |
-   | `FIREBASE_APP_ID` | `appId` |
+    if (now - c.windowStart > rule.windowMs) {
+      c.count = 0;
+      c.windowStart = now;
+    }
 
-3. Selecione os ambientes: ✅ Production ✅ Preview ✅ Development
+    c.count++;
 
-4. Adicione no seu `package.json`:
-   ```json
-   {
-     "scripts": {
-       "build": "node inject-env.js",
-       "vercel-build": "node inject-env.js"
-     }
-   }
-   ```
+    if (c.count > rule.max) {
+      console.warn(`[SLC Security] Rate limit atingido para "${operation}": ${c.count}/${rule.max} em ${rule.windowMs / 1000}s`);
+      if (window.showToast) {
+        window.showToast('Muitas operações em pouco tempo. Aguarde um momento.', 'warning');
+      }
+      return false;
+    }
 
-5. **Revogar a API Key antiga** (importante!):
-   - Firebase Console → Project Settings → Service accounts
-   - Google Cloud Console → APIs & Services → Credentials → Delete a key antiga
-   - Gere uma nova e configure no Vercel
+    return true;
+  }
 
-### Para desenvolvimento local:
+  window.checkRateLimit = checkRateLimit;
 
-```bash
-cp env-config.example.js env-config.js
-# Edite env-config.js com suas credenciais reais
-# O arquivo já está no .gitignore — não será commitado
-```
+  // ─── 2. Sanitização de inputs (previne XSS via innerHTML) ────────────────
 
----
+  function sanitizeString(value) {
+    if (typeof value !== 'string') return value;
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#x27;')
+      .replace(/\//g, '&#x2F;');
+  }
 
-## ✅ Fase 2 — Content Security Policy
+  // Sanitiza recursivamente um objeto antes de salvar no Firestore
+  function sanitizeData(obj) {
+    if (obj === null || obj === undefined) return obj;
+    if (typeof obj === 'string') return sanitizeString(obj);
+    if (Array.isArray(obj)) return obj.map(sanitizeData);
+    if (typeof obj === 'object') {
+      const clean = {};
+      for (const [key, value] of Object.entries(obj)) {
+        clean[key] = sanitizeData(value);
+      }
+      return clean;
+    }
+    return obj;
+  }
 
-O `vercel.json` agora inclui:
+  window.sanitizeData   = sanitizeData;
+  window.sanitizeString = sanitizeString;
 
-- **CSP** — permite scripts apenas de origens confiáveis (Firebase, Google Fonts, cdnjs)
-- **HSTS** — força HTTPS por 2 anos com preload
-- **Permissions-Policy** — bloqueia acesso a câmera, microfone, geolocalização e pagamentos
-- **X-Frame-Options** — previne clickjacking
-- **X-Content-Type-Options** — previne MIME sniffing
+  // ─── 3. Patch no dbService para aplicar rate limiting automaticamente ────
+  //
+  // Aguarda o dbService ser criado e aplica os patches de forma transparente.
 
-Não é necessário nenhuma configuração adicional — o Vercel aplica automaticamente no deploy.
+  function patchDbService() {
+    if (!window.dbService) return;
+    if (window.dbService.__securityPatched) return;
 
----
+    const original = {
+      saveData:    window.dbService.saveData.bind(window.dbService),
+      saveAllData: window.dbService.saveAllData.bind(window.dbService),
+      addItem:     window.dbService.addItem.bind(window.dbService),
+    };
 
-## ✅ Fase 3 — Regras do Firestore
+    window.dbService.saveData = function (field, data) {
+      if (!checkRateLimit('saveData')) return Promise.resolve(false);
+      return original.saveData(field, data);
+    };
 
-### Como fazer deploy das regras:
+    window.dbService.saveAllData = function (dataOverride) {
+      if (!checkRateLimit('saveAllData')) return Promise.resolve(false);
+      return original.saveAllData(dataOverride);
+    };
 
-**Opção A — Firebase Console (mais fácil):**
-1. Firebase Console → Firestore Database → Rules
-2. Cole o conteúdo do arquivo `firestore.rules`
-3. Clique em "Publish"
+    window.dbService.addItem = function (collection, item) {
+      if (!checkRateLimit('addItem')) return Promise.resolve(false);
+      return original.addItem(collection, item);
+    };
 
-**Opção B — Firebase CLI:**
-```bash
-npm install -g firebase-tools
-firebase login
-firebase deploy --only firestore:rules
-```
+    window.dbService.__securityPatched = true;
+    console.info('[SLC Security] dbService protegido com rate limiting.');
+  }
 
-### O que foi adicionado:
+  // ─── 4. Patch na IA para rate limiting de perguntas ─────────────────────
 
-- Limite de **200 matérias** por catálogo comunitário
-- Limite de tamanho em **todos os campos de texto** (120 chars)
-- Limite de itens nos arrays do usuário (ex: máx 5.000 sessões)
-- **Proteção padrão `deny`** — qualquer coleção não listada é bloqueada por padrão
+  function patchAIAssistant() {
+    if (!window.aiAssistant) return;
+    if (window.aiAssistant.__securityPatched) return;
 
----
+    const originalAsk = window.aiAssistant.ask.bind(window.aiAssistant);
+    const originalAskRich = window.aiAssistant.askRich
+      ? window.aiAssistant.askRich.bind(window.aiAssistant)
+      : null;
 
-## ✅ Fase 4 — security.js
+    window.aiAssistant.ask = function (pergunta) {
+      if (!checkRateLimit('aiAsk')) {
+        return Promise.resolve('Muitas perguntas em pouco tempo. Aguarde alguns segundos e tente novamente.');
+      }
+      return originalAsk(pergunta);
+    };
 
-O arquivo `security.js` é carregado no `<head>` e aplica automaticamente:
+    if (originalAskRich) {
+      window.aiAssistant.askRich = function (pergunta) {
+        if (!checkRateLimit('aiAsk')) {
+          return Promise.resolve({
+            text: 'Muitas perguntas em pouco tempo. Aguarde alguns segundos.',
+            actions: [],
+            memory: []
+          });
+        }
+        return originalAskRich(pergunta);
+      };
+    }
 
-### Rate Limiting
-| Operação | Limite |
-|----------|--------|
-| `saveData` (salvar campo) | 60/min |
-| `saveAllData` (salvar tudo) | 10/min |
-| Perguntas à IA | 40/min |
-| `addItem` (adicionar item) | 120/min |
+    window.aiAssistant.__securityPatched = true;
+    console.info('[SLC Security] aiAssistant protegido com rate limiting.');
+  }
 
-### Proteções adicionais
-- **Anti-iframe**: detecta e bloqueia embed em iframes externos
-- **Sanitização XSS**: funções `sanitizeString()` e `sanitizeData()` disponíveis globalmente
-- **Console silenciado em produção**: `console.log/info/debug` desabilitados; `warn/error` limitados a 200 chars para não vazar dados
+  // ─── 5. Proteção contra clickjacking via JS (complementa o X-Frame-Options) ──
 
----
+  if (window.top !== window.self) {
+    console.warn('[SLC Security] Tentativa de embed em iframe detectada. Redirecionando.');
+    window.top.location = window.self.location;
+  }
 
-## 🔄 Checklist de deploy seguro
+  // ─── 6. Proteção de console em produção ─────────────────────────────────
+  //
+  // Evita que usuários vejam dados sensíveis de outros usuários em erros de console
+  // (ainda imprime warnings de segurança do próprio SLC).
 
-- [ ] API Keys removidas do código fonte
-- [ ] Variáveis configuradas no Vercel
-- [ ] API Key antiga revogada no Firebase/GCP
-- [ ] `env-config.js` está no `.gitignore`
-- [ ] Regras do Firestore publicadas
-- [ ] Deploy feito e testado com login Google
-- [ ] Verificar no DevTools → Network → Headers que o CSP está presente
+  const isProduction = !['localhost', '127.0.0.1'].includes(location.hostname);
 
+  if (isProduction) {
+    const _warn  = console.warn.bind(console);
+    const _error = console.error.bind(console);
+
+    console.log   = () => {};
+    console.info  = () => {};
+    console.debug = () => {};
+
+    // Mantém warn e error mas remove dados de usuário de mensagens longas
+    console.warn = (...args) => {
+      const msg = args.map(a => (typeof a === 'object' ? '[object]' : a)).join(' ');
+      _warn('[SLC]', msg.slice(0, 200));
+    };
+
+    console.error = (...args) => {
+      const msg = args.map(a => (typeof a === 'object' ? '[object]' : a)).join(' ');
+      _error('[SLC]', msg.slice(0, 200));
+    };
+  }
+
+  // ─── 7. Aplicar patches após carregamento dos módulos ───────────────────
+
+  // Tenta aplicar imediatamente; se os módulos ainda não carregaram,
+  // aguarda o evento DOMContentLoaded e tenta novamente com polling.
+  function tryPatch() {
+    patchDbService();
+    patchAIAssistant();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      tryPatch();
+      // Polling por até 5s para garantir que módulos carregados assincronamente sejam patcheados
+      let attempts = 0;
+      const interval = setInterval(() => {
+        tryPatch();
+        attempts++;
+        if (attempts >= 10) clearInterval(interval);
+      }, 500);
+    });
+  } else {
+    tryPatch();
+    let attempts = 0;
+    const interval = setInterval(() => {
+      tryPatch();
+      attempts++;
+      if (attempts >= 10) clearInterval(interval);
+    }, 500);
+  }
+
+  console.info('[SLC Security] Módulo de segurança carregado.');
+})();
