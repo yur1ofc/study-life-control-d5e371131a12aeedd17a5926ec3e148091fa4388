@@ -1,8 +1,12 @@
 // feedback-widget.js
-// Botão flutuante "Sugestão / Bug" — abre um mini formulário e salva a
-// mensagem na coleção "feedback" do Firestore (regra correspondente em
-// firestore.rules). Não depende de nenhum serviço de e-mail externo.
+// Formulário "Sugestão / Bug / Elogio" — salva a mensagem na coleção
+// "feedback" do Firestore (regra correspondente em firestore.rules).
+// Não depende de nenhum serviço de e-mail externo.
 // Para ver os feedbacks: Firebase Console → Firestore Database → feedback.
+//
+// Não cria um botão flutuante próprio — expõe window.openFeedbackModal(),
+// chamado a partir do menu "+" (quick add) que já existe em
+// ux-improvements.js, pra não empilhar mais um botão fixo na tela.
 
 (function () {
   'use strict';
@@ -14,28 +18,6 @@
   ];
 
   let selectedType = 'sugestao';
-
-  function injectButton() {
-    if (document.getElementById('feedback-fab')) return;
-
-    const btn = document.createElement('button');
-    btn.id = 'feedback-fab';
-    btn.innerHTML = '<i class="fas fa-comment-dots"></i>';
-    btn.title = 'Enviar sugestão ou reportar um problema';
-    btn.style.cssText = `
-      position: fixed; bottom: 24px; left: 24px; z-index: 900;
-      width: 46px; height: 46px; border-radius: 50%;
-      background: #4f46e5; color: #fff; border: none;
-      box-shadow: 0 4px 14px rgba(79,70,229,.4);
-      cursor: pointer; font-size: 1.1rem;
-      display: flex; align-items: center; justify-content: center;
-      transition: transform .15s;
-    `;
-    btn.addEventListener('mouseenter', () => { btn.style.transform = 'scale(1.08)'; });
-    btn.addEventListener('mouseleave', () => { btn.style.transform = 'scale(1)'; });
-    btn.addEventListener('click', openModal);
-    document.body.appendChild(btn);
-  }
 
   function openModal() {
     document.getElementById('feedback-modal')?.remove();
@@ -127,8 +109,5 @@
     }
   }
 
-  document.addEventListener('app-ready', injectButton);
-  document.addEventListener('DOMContentLoaded', () => {
-    if (window.app?.initialized) injectButton();
-  });
+  window.openFeedbackModal = openModal;
 })();

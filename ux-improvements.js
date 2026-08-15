@@ -3,6 +3,30 @@
 (function () {
   'use strict';
 
+  // ─── Visibilidade real do dashboard (não basta "window.app existir") ─────
+  function isDashboardVisible() {
+    const dash = document.getElementById('main-dashboard');
+    const login = document.getElementById('login-screen');
+    const setup = document.getElementById('setup-screen');
+    const dashVisible = !!dash && getComputedStyle(dash).display !== 'none';
+    const loginVisible = !!login && getComputedStyle(login).display !== 'none';
+    const setupVisible = !!setup && getComputedStyle(setup).display !== 'none';
+    return dashVisible && !loginVisible && !setupVisible;
+  }
+
+  function syncQuickAddVisibility() {
+    const btn = document.getElementById('slc-quick-add-btn');
+    const menu = document.getElementById('slc-quick-menu');
+    if (!btn) {
+      // Ainda não foi criado — tenta criar agora que o dashboard pode estar visível
+      if (isDashboardVisible()) injectQuickAdd();
+      return;
+    }
+    const shouldShow = isDashboardVisible();
+    btn.style.display = shouldShow ? 'flex' : 'none';
+    if (!shouldShow && menu) menu.hidden = true;
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // 1. CONFIRMAÇÃO DE DELETE BONITA (substitui window.confirm feio)
   // ═══════════════════════════════════════════════════════════════
@@ -407,6 +431,10 @@
   // ═══════════════════════════════════════════════════════════════
   function injectQuickAdd() {
     if (document.getElementById('slc-quick-add-btn')) return;
+    // Só mostra quando o dashboard está mesmo na tela — window.app existe
+    // desde o carregamento da página, então checar só isso fazia o botão
+    // aparecer até na tela de login.
+    if (!isDashboardVisible()) return;
 
     const btn = document.createElement('button');
     btn.id = 'slc-quick-add-btn';
@@ -440,6 +468,7 @@
       { icon: 'fa-tasks',        label: 'Tarefa',  action: () => goTo('tarefas'),  color: 'var(--accent-warning)' },
       { icon: 'fa-graduation-cap', label: 'Prova', action: () => goTo('provas'),   color: '#ef4444' },
       { icon: 'fa-calendar-week', label: 'Aula',   action: () => goTo('grade-horaria'), color: 'var(--accent-primary)' },
+      { icon: 'fa-comment-dots', label: 'Feedback', action: () => window.openFeedbackModal?.(), color: '#4f46e5' },
     ];
 
     items.forEach(item => {
@@ -682,14 +711,21 @@
     const interval = setInterval(() => {
       tryInit();
       onDashboardReady();
+      syncQuickAddVisibility();
       if ((window.app && window.ViewRenderer && window.StudyLifeControl) || ++attempts > 20) {
         clearInterval(interval);
       }
     }, 400);
+
+    // Observa as 3 telas e liga/desliga o botão + junto com elas
+    ['login-screen', 'setup-screen', 'main-dashboard'].forEach(id => {
+      const node = document.getElementById(id);
+      if (node) new MutationObserver(syncQuickAddVisibility).observe(node, { attributes: true, attributeFilter: ['style', 'class'] });
+    });
   });
 
   // Reexecuta quando app emite eventos
-  document.addEventListener('app-ready', () => { tryInit(); onDashboardReady(); });
+  document.addEventListener('app-ready', () => { tryInit(); onDashboardReady(); syncQuickAddVisibility(); });
   document.addEventListener('view-loaded', () => {
     if (window.app?.currentView === 'dashboard') setTimeout(injectBriefingCard, 200);
     if (window.innerWidth <= 768 && !document.getElementById('slc-bottom-nav')) injectBottomNav();
