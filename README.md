@@ -8,7 +8,7 @@ Sistema web para organização acadêmica de universitários, com foco em rotina
 - Cloud Firestore
 - Deploy na Vercel
 
-## Estrutura principal
+## Estrutura principall
 - `index.html`: estrutura do app
 - `style.css`: estilos
 - `app.js`: classe principal e fluxos do produto
