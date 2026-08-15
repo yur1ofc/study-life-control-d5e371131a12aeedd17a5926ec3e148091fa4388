@@ -591,6 +591,73 @@ class StudyLifeControl {
                 this.applyHeavyMode?.();
             });
 
+            // Aba Calendário — link .ics assinável
+            document.getElementById('btn-gerar-calendario')?.addEventListener('click', async () => {
+                const btn = document.getElementById('btn-gerar-calendario');
+                if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando...'; }
+                const token = await window.calendarFeed?.getOrCreateToken();
+                if (token) {
+                    const container = document.getElementById('view-container');
+                    if (container) {
+                        container.innerHTML = this.viewRenderer.renderConfiguracoes('calendario');
+                        this.setupViewEvents('configuracoes');
+                    }
+                    window.showToast?.('Link de calendário criado!', 'success');
+                } else {
+                    window.showToast?.('Não foi possível gerar o link agora.', 'error');
+                    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-calendar-plus"></i> Gerar meu link de calendário'; }
+                }
+            });
+
+            document.getElementById('btn-regenerar-calendario')?.addEventListener('click', async () => {
+                if (!confirm('O link antigo vai parar de funcionar. Você vai precisar assinar o novo link de novo no seu app de calendário. Continuar?')) return;
+                const token = await window.calendarFeed?.regenerateToken();
+                if (token) {
+                    const container = document.getElementById('view-container');
+                    if (container) {
+                        container.innerHTML = this.viewRenderer.renderConfiguracoes('calendario');
+                        this.setupViewEvents('configuracoes');
+                    }
+                    window.showToast?.('Novo link gerado — o antigo foi revogado.', 'success');
+                } else {
+                    window.showToast?.('Não foi possível gerar um novo link agora.', 'error');
+                }
+            });
+
+            document.getElementById('btn-copiar-calendario')?.addEventListener('click', () => {
+                const input = document.getElementById('calendario-url');
+                if (!input) return;
+                input.select();
+                navigator.clipboard?.writeText(input.value)
+                    .then(() => window.showToast?.('Link copiado!', 'success'))
+                    .catch(() => document.execCommand('copy'));
+            });
+
+            // Aba Calendário — alarmes push
+            document.getElementById('config-push-enabled')?.addEventListener('change', async e => {
+                const checkbox = e.target;
+                if (checkbox.checked) {
+                    try {
+                        await window.pushNotifications.enable();
+                        window.showToast?.('Alarmes ativados neste dispositivo!', 'success');
+                    } catch (error) {
+                        checkbox.checked = false;
+                        window.showToast?.(error.message || 'Não foi possível ativar os alarmes.', 'error');
+                    }
+                } else {
+                    await window.pushNotifications.disable();
+                    window.showToast?.('Alarmes desativados neste dispositivo.', 'success');
+                }
+            });
+
+            ['exams', 'tasks', 'sessions'].forEach(tipo => {
+                const map = { exams: 'examsHoursBefore', tasks: 'tasksHoursBefore', sessions: 'sessionsMinutesBefore' };
+                document.getElementById(`config-reminder-${tipo}`)?.addEventListener('change', async e => {
+                    await window.pushNotifications?.saveReminderPrefs({ [map[tipo]]: parseInt(e.target.value, 10) });
+                    window.showToast?.('Preferência de lembrete salva!', 'success');
+                });
+            });
+
             // Aba Perfil
             document.getElementById('btn-salvar-perfil')?.addEventListener('click', async () => {
                 const nome = document.getElementById('config-nome')?.value?.trim();

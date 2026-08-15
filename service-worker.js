@@ -5,7 +5,7 @@
 // adicione ele aqui também — senão ele só entra no cache dinâmico depois
 // do primeiro acesso online, e falha se o usuário abrir o app offline
 // (ou logo após instalar como PWA) antes disso acontecer.
-const CACHE_VERSION = 'slc-v8';
+const CACHE_VERSION = 'slc-v9';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 
@@ -51,6 +51,8 @@ const STATIC_ASSETS = [
   './setup-onboarding-enhancer.js',
   './app-enhancements.js',
   './xp-widget.js',
+  './calendar-feed.js',
+  './push-notifications.js',
   './export-data.js',
   './feedback-widget.js',
   './launch-polish.js',
@@ -131,6 +133,44 @@ self.addEventListener('fetch', event => {
       }).catch(() => null);
 
       return cached || fetchPromise || caches.match('./index.html');
+    })
+  );
+});
+
+// ── Push: recebe o alarme mandado por api/send-reminders.js e mostra a
+// notificação, mesmo com o app fechado ─────────────────────────────────────
+self.addEventListener('push', event => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch (error) {
+    payload = { title: 'Study Life Control', body: event.data ? event.data.text() : 'Você tem um lembrete de estudo.' };
+  }
+
+  const title = payload.title || 'Study Life Control';
+  const options = {
+    body: payload.body || '',
+    icon: './icon-192.png',
+    badge: './icon-192.png',
+    tag: payload.tag || 'slc-reminder',
+    renotify: !!payload.tag,
+    data: { url: payload.url || './' }
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// ── Clique na notificação: foca a aba já aberta, ou abre uma nova ──────────
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || './';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      for (const client of list) {
+        if ('focus' in client) return client.focus();
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
     })
   );
 });

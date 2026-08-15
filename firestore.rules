@@ -42,7 +42,9 @@ service cloud.firestore {
           && (!('dailyLogs'  in d) || d.dailyLogs.size()  <= 3650)  // ~10 anos
           && (!('classDiaries' in d) || d.classDiaries.size() <= 5000)
           && (!('curriculum' in d) || d.curriculum.size() <= 500)
-          && (!('extraCourses' in d) || d.extraCourses.size() <= 200);
+          && (!('extraCourses' in d) || d.extraCourses.size() <= 200)
+          && (!('pushSubscriptions' in d) || d.pushSubscriptions.size() <= 10)
+          && (!('sentReminders' in d) || d.sentReminders.size() <= 500);
     }
 
     // ─── Dados do usuário ────────────────────────────────────────────────────
@@ -110,6 +112,38 @@ service cloud.firestore {
         && request.resource.data.count is int
         && request.resource.data.count >= 0
         && request.resource.data.count <= 1000;
+    }
+
+    // ─── Feed de calendário assinável (.ics) ───────────────────────────────────
+    // Cada usuário publica uma "foto" pública (mas sem nome nem e-mail) das
+    // provas/tarefas/sessões/aulas nesse documento, identificado por um token
+    // aleatório e longo (gerado em calendar-feed.js). Leitura é pública de
+    // propósito: é assim que app de calendário (Google/Apple/Outlook) consegue
+    // buscar o .ics periodicamente sem o usuário precisar logar de novo — a
+    // segurança vem do token ser longo o bastante pra não dar pra adivinhar,
+    // igual um link "de compartilhamento" de qualquer outro serviço. Só quem
+    // tem a URL consegue ler; ninguém consegue *listar* os tokens existentes.
+    match /calendar_feeds/{token} {
+      allow read: if true;
+
+      allow create: if isSignedIn()
+        && token.size() >= 24 && token.size() <= 64
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.exams is list && request.resource.data.exams.size() <= 500
+        && request.resource.data.tasks is list && request.resource.data.tasks.size() <= 2000
+        && request.resource.data.sessions is list && request.resource.data.sessions.size() <= 500
+        && request.resource.data.classSchedule is list && request.resource.data.classSchedule.size() <= 200;
+
+      allow update: if isSignedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.exams is list && request.resource.data.exams.size() <= 500
+        && request.resource.data.tasks is list && request.resource.data.tasks.size() <= 2000
+        && request.resource.data.sessions is list && request.resource.data.sessions.size() <= 500
+        && request.resource.data.classSchedule is list && request.resource.data.classSchedule.size() <= 200;
+
+      // Apagar o token revoga a URL antiga (usado ao "gerar novo link").
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
     }
 
     // ─── Feedback in-app (feedback-widget.js) ─────────────────────────────────

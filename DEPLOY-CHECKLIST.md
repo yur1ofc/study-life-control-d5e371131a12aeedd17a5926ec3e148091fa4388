@@ -31,3 +31,12 @@
 - [ ] Mobile abre sidebar corretamente
 - [ ] Dashboard não quebra em 360px de largura
 - [ ] PWA pode ser instalada
+
+## Calendário e alarmes (opcional, ver CALENDARIO-E-LEMBRETES.md)
+- [ ] `firestore.rules` publicadas de novo (coleção `calendar_feeds` é nova)
+- [ ] Configurações → Calendário gera o link e o `.ics` abre sem erro
+- [ ] `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` configuradas
+- [ ] `FIREBASE_SERVICE_ACCOUNT_KEY` configurada (base64 do JSON da service account)
+- [ ] `CRON_SECRET` configurada
+- [ ] Cron externo (cron-job.org ou similar) apontando pra `/api/send-reminders`
+

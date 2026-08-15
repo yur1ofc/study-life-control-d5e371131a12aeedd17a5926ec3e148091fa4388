@@ -2049,6 +2049,7 @@ class ViewRenderer {
         const abas = [
             { id: 'geral',    icon: 'fa-sliders-h',  label: 'Geral' },
             { id: 'perfil',   icon: 'fa-user',        label: 'Perfil' },
+            { id: 'calendario', icon: 'fa-calendar-alt', label: 'Calendário' },
             { id: 'tema',     icon: 'fa-palette',     label: 'Tema' },
             { id: 'dados',    icon: 'fa-database',    label: 'Dados' },
             { id: 'sobre',    icon: 'fa-info-circle', label: 'Sobre' },
@@ -2110,6 +2111,111 @@ class ViewRenderer {
                     <i class="fas fa-save"></i> Salvar alterações
                 </button>
             </div>`;
+        }
+
+        if (aba === 'calendario') {
+            const token = s.calendarToken || null;
+            const urls = token && window.calendarFeed ? window.calendarFeed.feedUrls(token) : null;
+            const reminders = s.studyReminders || {};
+            const pushOk = window.pushNotifications?.isSupported?.();
+
+            conteudo = `
+            <div class="config-section-title">📅 Calendário automático</div>
+            <p style="font-size:.88rem;color:var(--text-secondary);margin-bottom:16px;">
+                Gere um link e cole ele UMA VEZ no seu app de calendário (Google, Apple ou Outlook)
+                como "assinar por URL". A partir daí, toda prova, tarefa, sessão de estudo e aula que
+                você cadastrar aqui aparece sozinha lá — sem precisar exportar nada de novo.
+            </p>
+
+            ${!token ? `
+                <button class="btn-primary" id="btn-gerar-calendario">
+                    <i class="fas fa-calendar-plus"></i> Gerar meu link de calendário
+                </button>
+            ` : `
+                <div class="wiz-field" style="margin-bottom:10px;">
+                    <label>Link de assinatura</label>
+                    <div style="display:flex;gap:8px;">
+                        <input type="text" id="calendario-url" readonly value="${this.esc(urls.https)}" style="flex:1;">
+                        <button class="btn-secondary" id="btn-copiar-calendario" title="Copiar link">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;">
+                    <a class="btn-secondary" href="${this.esc(urls.webcal)}" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">
+                        <i class="fas fa-calendar-day"></i> Abrir no app de calendário
+                    </a>
+                    <button class="btn-secondary" id="btn-regenerar-calendario">
+                        <i class="fas fa-sync-alt"></i> Gerar novo link (revoga este)
+                    </button>
+                </div>
+
+                <details style="margin-bottom:8px;">
+                    <summary style="cursor:pointer;font-weight:600;font-size:.9rem;">Como assinar no Google Agenda</summary>
+                    <p style="font-size:.85rem;color:var(--text-secondary);margin-top:8px;">
+                        No computador: Google Agenda → "Outras agendas" (+) → "A partir do URL" → cole o link acima → Adicionar agenda.
+                        O Google não permite assinar por URL pelo app do celular — assine pelo navegador e ela aparece no app depois.
+                    </p>
+                </details>
+                <details style="margin-bottom:8px;">
+                    <summary style="cursor:pointer;font-weight:600;font-size:.9rem;">Como assinar no Calendário da Apple (iPhone/Mac)</summary>
+                    <p style="font-size:.85rem;color:var(--text-secondary);margin-top:8px;">
+                        Toque no botão "Abrir no app de calendário" acima — o iOS/macOS já oferece pra assinar direto.
+                        Ou manualmente: Ajustes → Calendário → Contas → Adicionar Conta → Outra → Adicionar Assinatura de Calendário → cole o link.
+                    </p>
+                </details>
+                <details style="margin-bottom:16px;">
+                    <summary style="cursor:pointer;font-weight:600;font-size:.9rem;">Como assinar no Outlook</summary>
+                    <p style="font-size:.85rem;color:var(--text-secondary);margin-top:8px;">
+                        Outlook.com: Adicionar calendário → Assinar da web → cole o link acima.
+                    </p>
+                </details>
+                <p style="font-size:.8rem;color:var(--text-tertiary);">
+                    Os apps de calendário costumam buscar atualizações a cada 12–24h — não é instantâneo, mas não precisa
+                    fazer nada manualmente depois de assinar uma vez.
+                </p>
+            `}
+
+            <div class="config-section-title" style="margin-top:28px;">🔔 Alarmes de estudo (notificação push)</div>
+            ${!pushOk ? `
+                <p style="font-size:.88rem;color:var(--text-secondary);">
+                    Esse navegador não suporta notificações push.
+                </p>
+            ` : `
+                <div class="config-item">
+                    <div class="config-info"><h4>Ativar alarmes neste dispositivo</h4>
+                        <p>Manda uma notificação mesmo com o app fechado, perto da hora de provas, tarefas e sessões</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="config-push-enabled" ${reminders.enabled ? 'checked' : ''}>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:14px;">
+                    <div class="wiz-field">
+                        <label>Avisar prova com quantas horas de antecedência?</label>
+                        <select id="config-reminder-exams">
+                            ${[6, 12, 24, 48, 72].map(h => `<option value="${h}" ${Number(reminders.examsHoursBefore ?? 24) === h ? 'selected' : ''}>${h}h antes</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="wiz-field">
+                        <label>Avisar tarefa com quantas horas de antecedência?</label>
+                        <select id="config-reminder-tasks">
+                            ${[6, 12, 24, 48, 72].map(h => `<option value="${h}" ${Number(reminders.tasksHoursBefore ?? 24) === h ? 'selected' : ''}>${h}h antes</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="wiz-field">
+                        <label>Avisar sessão de estudo com quantos minutos de antecedência?</label>
+                        <select id="config-reminder-sessions">
+                            ${[5, 10, 15, 30, 60].map(m => `<option value="${m}" ${Number(reminders.sessionsMinutesBefore ?? 15) === m ? 'selected' : ''}>${m} min antes</option>`).join('')}
+                        </select>
+                    </div>
+                </div>
+                <p style="font-size:.8rem;color:var(--text-tertiary);margin-top:10px;">
+                    No iPhone, notificação push só funciona depois de instalar o site na tela de início
+                    (Compartilhar → Adicionar à Tela de Início) — o Safari em aba comum não recebe push do iOS.
+                </p>
+            `}`;
         }
 
         if (aba === 'tema') {

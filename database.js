@@ -17,10 +17,25 @@ const DEFAULT_APP_DATA = () => ({
     curriculum: [],
     extraCourses: [],
     attendance: {},
+    // Assinaturas de push (uma por navegador/dispositivo onde o usuário
+    // ativou "Ativar alarmes de estudo") e registro do que já foi
+    // notificado, pra api/send-reminders.js não mandar o mesmo lembrete
+    // de novo a cada vez que o cron roda. Ver push-notifications.js.
+    pushSubscriptions: [],
+    sentReminders: [],
     settings: {
         heavyMode: false,
         notifications: true,
-        autoPlan: true
+        autoPlan: true,
+        // Token do feed de calendário (.ics) assinável — ver calendar-feed.js.
+        calendarToken: null,
+        // Preferências de alarme/lembrete por push — ver push-notifications.js.
+        studyReminders: {
+            enabled: false,
+            examsHoursBefore: 24,
+            tasksHoursBefore: 24,
+            sessionsMinutesBefore: 15
+        }
     }
 });
 
@@ -50,6 +65,20 @@ function loadLocalBackup(userId) {
     } catch (error) {
         console.warn('Não foi possível ler backup local:', error);
         return null;
+    }
+}
+
+// Dispara um evento global toda vez que algo é salvo com sucesso.
+// Existia um listener disso no xp-widget.js que nunca era acionado por
+// ninguém — agora ele (e qualquer outra coisa que queira reagir a saves,
+// como o feed de calendário) tem um gancho real pra se pendurar.
+// `fields` é a lista de campos alterados nesse save (ex: ['tasks']) quando
+// souber; em saves genéricos (saveAllData/clearAllData) vai vazio.
+function notifyDataSaved(fields = []) {
+    try {
+        document.dispatchEvent(new CustomEvent('slc-data-saved', { detail: { fields } }));
+    } catch (error) {
+        console.warn('Não foi possível disparar slc-data-saved:', error);
     }
 }
 
@@ -118,6 +147,7 @@ const dbService = {
             }
 
             if (window.updateSyncStatus) window.updateSyncStatus(true);
+            notifyDataSaved(Object.keys(dataToSave));
             return true;
         } catch (error) {
             console.error('Erro ao salvar dados:', error);
@@ -144,6 +174,7 @@ const dbService = {
             }
 
             if (window.updateSyncStatus) window.updateSyncStatus(true);
+            notifyDataSaved([field]);
             return true;
         } catch (error) {
             console.error(`Erro ao salvar campo "${field}":`, error);
@@ -192,6 +223,7 @@ const dbService = {
             if (window.app) window.app.data = emptyData;
 
             if (window.updateSyncStatus) window.updateSyncStatus(true);
+            notifyDataSaved(Object.keys(emptyData));
             return true;
         } catch (error) {
             console.error('Erro ao limpar dados:', error);
