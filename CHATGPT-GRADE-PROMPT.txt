@@ -1,146 +1,194 @@
-// auth.js - autenticação e roteamento inicial
-let currentUser = null;
+(function () {
+  let deferredInstallPrompt = null;
+  let networkBannerTimer = null;
+  let networkWasOffline = !navigator.onLine;
 
-function getEl(id) {
-  return document.getElementById(id);
-}
-
-function setDisplay(id, value) {
-  const el = getEl(id);
-  if (el) el.style.display = value;
-}
-
-async function handleSignedInUser(user) {
-  currentUser = user;
-  setDisplay('login-screen', 'none');
-
-  if (!window.app) {
-    console.error('window.app ainda não existe');
-    window.showToast?.('App ainda não inicializado. Recarregue a página.', 'error');
-    return;
+  function el(id) {
+    return document.getElementById(id);
   }
 
-  const data = await window.dbService.loadUserData(user.uid);
-  const hasUserProfile = !!(data && data.user && (data.user.nome || data.user.curso || data.user.universidade));
+  function setLoadingMessage(text) {
+    const target = el('loading-text');
+    if (target) target.textContent = text;
+  }
 
-  if (!hasUserProfile) {
-    setDisplay('setup-screen', 'flex');
-    setDisplay('main-dashboard', 'none');
+  function updateNetworkBanner(forceState = null) {
+    const banner = el('network-banner');
+    const text = el('network-banner-text');
+    if (!banner || !text) return;
 
-    if (typeof window.app.renderSetupForm === 'function') {
-      window.app.renderSetupForm();
+    const isOnline = forceState == null ? navigator.onLine : forceState === 'online';
+
+    if (networkBannerTimer) {
+      clearTimeout(networkBannerTimer);
+      networkBannerTimer = null;
     }
-    document.dispatchEvent(new Event('app-ready'));
-    return;
-  }
 
-  setDisplay('setup-screen', 'none');
-  setDisplay('main-dashboard', 'block');
-  await window.app.init();
-}
-
-function handleSignedOutUser() {
-  currentUser = null;
-  setDisplay('login-screen', 'flex');
-  setDisplay('setup-screen', 'none');
-  setDisplay('main-dashboard', 'none');
-}
-
-auth.onAuthStateChanged(async (user) => {
-  try {
-    window.showLoading?.();
-
-    if (user) {
-      await handleSignedInUser(user);
-    } else {
-      handleSignedOutUser();
-    }
-  } catch (error) {
-    console.error('Erro na autenticação/inicialização:', error);
-    window.showToast?.('Erro ao inicializar aplicação. Recarregue a página.', 'error');
-  } finally {
-    window.hideLoading?.();
-  }
-});
-
-async function loginWithGoogle() {
-  const btn = getEl('login-google');
-  const errorEl = getEl('login-error-msg');
-
-  // Estado: carregando
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Entrando...';
-  }
-  if (errorEl) errorEl.style.display = 'none';
-
-  try {
-    await auth.signInWithPopup(googleProvider);
-  } catch (error) {
-    console.error('Erro no login:', error);
-    const code = error?.code || '';
-
-    // Popup fechado pelo usuário — não é erro real, só reseta o botão
-    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
-      if (btn) {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fab fa-google"></i> Entrar com Google';
-      }
+    if (!isOnline) {
+      networkWasOffline = true;
+      text.textContent = 'Você está offline. O app continua funcionando com dados locais quando possível.';
+      banner.hidden = false;
       return;
     }
 
-    // Popup bloqueado pelo navegador — tenta redirect
-    if (code === 'auth/popup-blocked') {
-      try {
-        window.showToast?.('Popup bloqueado. Abrindo em tela cheia...', 'warning');
-        await auth.signInWithRedirect(googleProvider);
-        return;
-      } catch (redirectError) {
-        console.error('Erro no redirect:', redirectError);
+    if (networkWasOffline) {
+      text.textContent = 'Conexão restabelecida. Tudo pronto para sincronizar.';
+      banner.hidden = false;
+      networkBannerTimer = setTimeout(() => {
+        if (navigator.onLine) banner.hidden = true;
+      }, 2200);
+      networkWasOffline = false;
+      return;
+    }
+
+    banner.hidden = true;
+  }
+
+  function setupInstallPrompt() {
+    const card = el('pwa-install-card');
+    const installBtn = el('pwa-install-btn');
+    const closeBtn = el('pwa-install-close');
+    if (!card || !installBtn || !closeBtn) return;
+
+    window.addEventListener('beforeinstallprompt', (event) => {
+      event.preventDefault();
+      deferredInstallPrompt = event;
+      card.hidden = false;
+    });
+
+    installBtn.addEventListener('click', async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      const choice = await deferredInstallPrompt.userChoice.catch(() => null);
+      if (choice?.outcome === 'accepted') {
+        window.showToast?.('App instalado com sucesso!', 'success');
       }
-    }
+      deferredInstallPrompt = null;
+      card.hidden = true;
+    });
 
-    // Erro real — mostrar na tela
-    const msgs = {
-      'auth/network-request-failed': 'Sem conexão com a internet. Verifique sua rede.',
-      'auth/too-many-requests': 'Muitas tentativas. Aguarde alguns minutos.',
-      'auth/user-disabled': 'Esta conta foi desativada.',
-    };
-    const friendlyMsg = msgs[code] || 'Não foi possível entrar. Tente novamente.';
+    closeBtn.addEventListener('click', () => {
+      card.hidden = true;
+    });
 
-    if (errorEl) {
-      errorEl.textContent = friendlyMsg;
-      errorEl.style.display = 'block';
-    } else {
-      window.showToast?.(friendlyMsg, 'error');
-    }
-  } finally {
-    // Resetar botão se ainda na tela de login
-    if (btn && getEl('login-screen')?.style.display !== 'none') {
-      btn.disabled = false;
-      btn.innerHTML = '<i class="fab fa-google"></i> Entrar com Google';
-    }
+    window.addEventListener('appinstalled', () => {
+      card.hidden = true;
+      deferredInstallPrompt = null;
+      window.showToast?.('Study Life Control instalado no dispositivo!', 'success');
+    });
   }
-}
 
-async function logout() {
-  try {
-    await auth.signOut();
-    window.showToast?.('Desconectado com sucesso', 'success');
-  } catch (error) {
-    console.error('Erro no logout:', error);
-    const message = error && error.message ? error.message : 'Falha ao sair';
-    window.showToast?.('Erro ao sair: ' + message, 'error');
+  function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js').catch((error) => {
+        console.error('Falha ao registrar service worker:', error);
+      });
+    });
   }
-}
 
-document.addEventListener('DOMContentLoaded', () => {
-  getEl('login-google')?.addEventListener('click', loginWithGoogle);
-  getEl('logout-btn')?.addEventListener('click', logout);
-});
+  function setupGlobalErrorHandling() {
+    window.addEventListener('error', (event) => {
+      console.error('Erro global capturado:', event.error || event.message);
+      window.showToast?.('Ocorreu um erro inesperado. Tente atualizar a página.', 'error');
+    });
 
-window.authService = {
-  getCurrentUser: () => currentUser,
-  loginWithGoogle,
-  logout
-};
+    window.addEventListener('unhandledrejection', (event) => {
+      console.error('Promise rejeitada sem tratamento:', event.reason);
+      window.showToast?.('Falha ao processar uma ação. Revise sua conexão e tente de novo.', 'error');
+    });
+  }
+
+  let scrollLockY = 0;
+
+  function closeSidebar() {
+    document.body.classList.remove('sidebar-open');
+    const overlay = el('mobile-nav-overlay');
+    if (overlay) overlay.hidden = true;
+
+    // Destrava o scroll do fundo (ver openSidebar)
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
+    document.body.style.width = '';
+    window.scrollTo(0, scrollLockY);
+  }
+
+  function openSidebar() {
+    // Trava o scroll do fundo enquanto o menu está aberto — sem isso, arrastar
+    // o dedo dentro do menu também rola a página por trás dele. Usa a técnica
+    // de "position:fixed" em vez de só overflow:hidden porque é a única forma
+    // confiável de bloquear o bounce/scroll em iOS Safari, e funciona igual em
+    // Android e desktop também (independe de marca/modelo de aparelho).
+    scrollLockY = window.scrollY || window.pageYOffset || 0;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollLockY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.width = '100%';
+
+    document.body.classList.add('sidebar-open');
+    const overlay = el('mobile-nav-overlay');
+    if (overlay) overlay.hidden = false;
+  }
+
+  window.SLCSidebar = { open: openSidebar, close: closeSidebar };
+
+  function setupMobileSidebar() {
+    const toggle = el('mobile-nav-toggle');
+    const overlay = el('mobile-nav-overlay');
+    if (!toggle || !overlay) return;
+
+    toggle.addEventListener('click', () => {
+      if (document.body.classList.contains('sidebar-open')) {
+        closeSidebar();
+      } else {
+        openSidebar();
+      }
+    });
+
+    overlay.addEventListener('click', closeSidebar);
+
+    document.addEventListener('click', (event) => {
+      const item = event.target.closest('.nav-item');
+      if (item && window.innerWidth <= 980) {
+        setTimeout(closeSidebar, 120);
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 980) closeSidebar();
+    });
+  }
+
+  function setupOfflineEvents() {
+    updateNetworkBanner(navigator.onLine ? 'online' : 'offline');
+    window.addEventListener('online', () => updateNetworkBanner('online'));
+    window.addEventListener('offline', () => updateNetworkBanner('offline'));
+  }
+
+  function improveRefreshButton() {
+    const refresh = el('refresh-data');
+    if (!refresh || refresh.dataset.enhanced) return;
+    refresh.dataset.enhanced = '1';
+    refresh.addEventListener('click', () => {
+      setLoadingMessage('Sincronizando seus dados...');
+      setTimeout(() => setLoadingMessage('Carregando seu painel acadêmico...'), 1200);
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    setLoadingMessage('Carregando seu painel acadêmico...');
+    registerServiceWorker();
+    setupInstallPrompt();
+    setupGlobalErrorHandling();
+    setupMobileSidebar();
+    setupOfflineEvents();
+    improveRefreshButton();
+  });
+
+  document.addEventListener('app-ready', () => {
+    improveRefreshButton();
+  });
+})();
