@@ -1,33 +1,13 @@
-# Checklist de deploy público - Study Life Control
-
-## Firebase
-- [ ] Firestore Rules publicadas usando o arquivo `firestore.rules`
-- [ ] Authentication > Sign-in method > Google habilitado
-- [ ] Authentication > Settings > Authorized domains contém:
-  - [ ] `study-life-control.vercel.app`
-  - [ ] seu domínio final personalizado
-  - [ ] `localhost` para testes locais
-- [ ] Firestore Database criado em modo produção
-
-## Vercel
-- [ ] Repositório conectado na Vercel
-- [ ] Projeto configurado como site estático
-- [ ] Deploy sem erro no build/output
-- [ ] HTTPS ativo no domínio final
-- [ ] Cache limpo após publicar nova versão
-
-## Fluxo funcional
-- [ ] Login com conta Google nova
-- [ ] Setup inicial salva nome/curso/universidade
-- [ ] Criar matéria
-- [ ] Criar aula
-- [ ] Recarregar a página e conferir persistência
-- [ ] Sair da conta
-- [ ] Entrar novamente e conferir dados
-- [ ] Teste offline: abrir, desligar internet, navegar, religar internet
-
-## Qualidade visual
-- [ ] Banner de conexão aparece só quando necessário
-- [ ] Mobile abre sidebar corretamente
-- [ ] Dashboard não quebra em 360px de largura
-- [ ] PWA pode ser instalada
+// env-config.js
+// Gerado manualmente — normalmente seria criado pelo build (inject-env.js),
+// mas foi commitado direto porque essas chaves do Firebase não são secretas
+// (são de uso client-side; a segurança real vem das regras do Firestore).
+ 
+window.__ENV = {
+  FIREBASE_API_KEY:             "AIzaSyA5-6zU5IbQPpegknAXefAjorFHc3A4zko",
+  FIREBASE_AUTH_DOMAIN:         "study-life-control.firebaseapp.com",
+  FIREBASE_PROJECT_ID:          "study-life-control",
+  FIREBASE_STORAGE_BUCKET:      "study-life-control.firebasestorage.app",
+  FIREBASE_MESSAGING_SENDER_ID: "42112044749",
+  FIREBASE_APP_ID:              "1:42112044749:web:52bde99cc356016832e384"
+};

@@ -1,453 +1,405 @@
-(function(){
+/**
+ * launch-ready.js
+ * Resolve tudo que faltava antes do lançamento:
+ *  1. Tela de Ajuda (view 'ajuda')
+ *  2. Tela de Situação Acadêmica (view 'situacao-academica')
+ *  3. Modal de boas-vindas pós-setup
+ *  4. Empty states do dashboard para usuário novo
+ */
+(function () {
   'use strict';
-  const DAYS=[['0','Dom'],['1','Seg'],['2','Ter'],['3','Qua'],['4','Qui'],['5','Sex'],['6','Sáb']];
-  const fullDays=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
-  const $=(s,r=document)=>r.querySelector(s);
-  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
-  const esc=v=>window.escapeHtml?window.escapeHtml(String(v??'')):String(v??'');
-  const generateIdSafe=()=>window.generateId?window.generateId():'id-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);
+  const esc = v => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
-  function hoursToday(){
-    const sessions=window.app?.data?.sessions||[];
-    const today=new Date().toISOString().slice(0,10);
-    const mins=sessions.filter(s=>(s.data||'').slice(0,10)===today && s.concluida).reduce((acc,s)=>acc+(parseInt(s.duracao,10)||0),0);
-    return mins/60;
+  /* ── Estilos ────────────────────────────────────────────────── */
+  function injectStyles() {
+    if (document.getElementById('lr-styles')) return;
+    const s = document.createElement('style');
+    s.id = 'lr-styles';
+    s.textContent = `
+#lr-welcome-modal{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)}
+.lr-welcome-card{background:var(--bg-secondary);border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:40px 32px;max-width:480px;width:100%;text-align:center;box-shadow:var(--card-shadow);animation:lr-pop .3s cubic-bezier(.34,1.56,.64,1)}
+@keyframes lr-pop{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
+.lr-welcome-emoji{font-size:3rem;margin-bottom:16px;display:block}
+.lr-welcome-card h2{font-size:1.4rem;font-weight:800;color:var(--text-primary);margin-bottom:8px}
+.lr-welcome-card p{color:var(--text-secondary);font-size:.92rem;line-height:1.6;margin-bottom:22px}
+.lr-welcome-steps{display:flex;flex-direction:column;gap:10px;text-align:left;margin-bottom:24px}
+.lr-welcome-step{display:flex;align-items:center;gap:12px;background:var(--bg-tertiary);border-radius:var(--radius-sm);padding:12px 14px;cursor:pointer;border:1.5px solid transparent;transition:border-color .2s}
+.lr-welcome-step:hover{border-color:var(--accent-primary)}
+.lr-welcome-step-icon{font-size:1.3rem;width:36px;height:36px;background:var(--bg-secondary);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.lr-welcome-step-text strong{display:block;color:var(--text-primary);font-size:.88rem}
+.lr-welcome-step-text span{color:var(--text-secondary);font-size:.8rem}
+.lr-welcome-close{width:100%;padding:13px;background:var(--accent-primary);border:none;border-radius:var(--radius-sm);color:#fff;font-weight:800;font-size:1rem;cursor:pointer;transition:opacity .2s}
+.lr-welcome-close:hover{opacity:.85}
+.lr-help-hero{background:linear-gradient(135deg,var(--bg-secondary) 0%,#1a2540 100%);border:1px solid var(--border);border-radius:var(--radius-lg);padding:28px;margin-bottom:24px;display:flex;align-items:center;gap:20px}
+.lr-help-hero-icon{font-size:2.8rem}
+.lr-help-hero h2{font-size:1.3rem;font-weight:800;color:var(--text-primary);margin-bottom:4px}
+.lr-help-hero p{color:var(--text-secondary);font-size:.9rem}
+.lr-section-title{font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent-primary);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.lr-shortcut-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:28px}
+.lr-shortcut-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;cursor:pointer;transition:border-color .2s}
+.lr-shortcut-card:hover{border-color:var(--accent-primary)}
+.lr-shortcut-card .icon{font-size:1.3rem;margin-bottom:6px;display:block}
+.lr-shortcut-card strong{display:block;color:var(--text-primary);font-size:.88rem;margin-bottom:2px}
+.lr-shortcut-card span{color:var(--text-secondary);font-size:.78rem}
+.lr-ia-prompts{display:flex;flex-direction:column;gap:8px;margin-bottom:28px}
+.lr-ia-prompt{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;cursor:pointer;font-size:.9rem;color:var(--text-secondary);transition:all .2s;display:flex;align-items:center;gap:10px}
+.lr-ia-prompt:hover{border-color:var(--accent-secondary);color:var(--text-primary)}
+.lr-ia-prompt::before{content:'💬';flex-shrink:0}
+.lr-faq-item{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px;overflow:hidden}
+.lr-faq-q{padding:14px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:.92rem;font-weight:600;color:var(--text-primary);user-select:none;transition:background .2s}
+.lr-faq-q:hover{background:var(--bg-tertiary)}
+.lr-faq-arrow{color:var(--text-tertiary);transition:transform .2s;font-size:.82rem}
+.lr-faq-item.open .lr-faq-arrow{transform:rotate(180deg)}
+.lr-faq-a{display:none;padding:0 16px 14px;color:var(--text-secondary);font-size:.88rem;line-height:1.7;border-top:1px solid var(--border)}
+.lr-faq-item.open .lr-faq-a{display:block}
+.lr-restart-btn{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;background:var(--bg-tertiary);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);font-size:.88rem;font-weight:600;cursor:pointer;transition:all .2s;text-decoration:none}
+.lr-restart-btn:hover{border-color:var(--accent-primary);color:var(--text-primary)}
+.lr-sa-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-bottom:24px}
+.lr-sa-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-md);padding:18px}
+.lr-sa-card-header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.lr-sa-card-icon{font-size:1.2rem}
+.lr-sa-card-title{font-weight:700;color:var(--text-primary);font-size:.92rem}
+.lr-sa-stat{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)}
+.lr-sa-stat:last-child{border-bottom:none}
+.lr-sa-stat-label{color:var(--text-secondary);font-size:.85rem}
+.lr-sa-stat-val{font-weight:700;color:var(--text-primary);font-size:.9rem}
+.lr-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:99px;font-size:.76rem;font-weight:700}
+.lr-badge.good{background:rgba(16,185,129,.15);color:var(--accent-success)}
+.lr-badge.warn{background:rgba(245,158,11,.15);color:var(--accent-warning)}
+.lr-badge.bad{background:rgba(239,68,68,.15);color:var(--accent-danger)}
+.lr-risk-bar{height:6px;background:var(--border);border-radius:99px;margin:8px 0}
+.lr-risk-fill{height:100%;border-radius:99px;transition:width .5s}
+.lr-risk-low .lr-risk-fill{background:var(--accent-success)}
+.lr-risk-med .lr-risk-fill{background:var(--accent-warning)}
+.lr-risk-high .lr-risk-fill{background:var(--accent-danger)}
+.lr-empty-hero{text-align:center;padding:48px 24px;background:var(--bg-secondary);border:1.5px dashed var(--border);border-radius:var(--radius-lg);margin-bottom:20px}
+.lr-empty-hero .lr-ei{font-size:3rem;margin-bottom:14px;display:block}
+.lr-empty-hero h3{font-size:1.2rem;font-weight:800;color:var(--text-primary);margin-bottom:8px}
+.lr-empty-hero p{color:var(--text-secondary);font-size:.9rem;margin-bottom:22px;max-width:340px;margin-left:auto;margin-right:auto}
+.lr-empty-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.lr-action{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:var(--radius-sm);font-size:.88rem;font-weight:700;cursor:pointer;transition:opacity .2s;border:none;text-decoration:none}
+.lr-action.primary{background:var(--accent-primary);color:#fff}
+.lr-action.secondary{background:var(--bg-tertiary);border:1.5px solid var(--border);color:var(--text-primary)}
+.lr-action:hover{opacity:.85}
+`;
+    document.head.appendChild(s);
   }
-  function progressData(){
-    const planned=parseFloat(window.app?.data?.user?.horasMaximas||6);
-    const done=hoursToday();
-    const pct=Math.max(0,Math.min(100,Math.round((done/planned)*100)||0));
-    return {planned,done,pct};
-  }
-  function getUpcomingTasks(){
-    const tasks=(window.app?.data?.tasks||[]).filter(t=>!t.concluida);
-    return tasks.sort((a,b)=>(a.dataLimite||'').localeCompare(b.dataLimite||'')).slice(0,4);
-  }
-  function getUpcomingExams(){
-    return (window.app?.getUpcomingExams?window.app.getUpcomingExams(10):(window.app?.data?.exams||[]).filter(e=>!e.concluida)).slice(0,4);
-  }
-  function getNextClass(){ return window.scheduleManager?.getProximaAula?.()||null; }
-  function getCurrentClass(){ return window.scheduleManager?.getAulaAtual?.()||null; }
-  function getUpcomingClasses(limit){
-    const sm=window.scheduleManager; if(!sm) return [];
-    sm.loadAulas?.();
-    const hoje=new Date();
-    const diaSemana=hoje.getDay();
-    const minutosAtuais=hoje.getHours()*60+hoje.getMinutes();
-    const result=[];
-    const aulasHoje=(sm.getAulasPorDia?sm.getAulasPorDia(diaSemana):[]).filter(a=>window.calcularDuracaoMinutos ? window.calcularDuracaoMinutos('00:00',a.inicio) > minutosAtuais : true);
-    aulasHoje.forEach(a=>result.push({...a,diaOffset:0}));
-    for(let i=1;i<=6 && result.length<limit;i++){
-      const proximoDia=(diaSemana+i)%7;
-      const aulas=sm.getAulasPorDia?sm.getAulasPorDia(proximoDia):[];
-      aulas.forEach(a=>result.push({...a,diaOffset:i}));
+
+  /* ── Navegação ───────────────────────────────────────────────── */
+  function navigateTo(view) {
+    if (window.app?.loadView) {
+      window.app.loadView(view);
+      document.querySelectorAll('.nav-item').forEach(n =>
+        n.classList.toggle('active', n.dataset.view === view));
     }
-    return result.slice(0,limit);
   }
-  function dueLabel(dateStr){
-    if(!dateStr) return 'Sem data';
-    const today=new Date(); today.setHours(0,0,0,0);
-    const d=new Date(dateStr+'T00:00:00'); d.setHours(0,0,0,0);
-    const diff=Math.round((d-today)/86400000);
-    if(diff<0) return `Atrasada ${Math.abs(diff)}d`;
-    if(diff===0) return 'Hoje';
-    if(diff===1) return 'Amanhã';
-    return `${diff} dias`;
-  }
-  function quickStudyPlan(){
-    const arr=window.aiAssistant?.generateDailyPlan?.()||[];
-    return arr.slice(0,4);
+  function attachGoto(container) {
+    container.querySelectorAll('[data-goto]').forEach(el =>
+      el.addEventListener('click', () => navigateTo(el.dataset.goto)));
   }
 
-  function renderSimpleDashboard(){
-    const view=this && this.app ? this : null;
-    const app=window.app; if(!app) return '<div class="card"><p class="text-secondary">Carregando dashboard...</p></div>';
-    const user=app.data?.user||{};
-    const current=getCurrentClass();
-    const next=getNextClass();
-    const proximasAulas=getUpcomingClasses(4).filter(a => !current || a.id !== current.id);
-    const tasks=getUpcomingTasks();
-    const exams=getUpcomingExams();
-    const plan=quickStudyPlan();
-    const p=progressData();
-    const alerts=(app.generateAlerts?.()||[]).slice(0,3);
-    const risk=(app.analyzeAcademicRisk?.()||[]).slice(0,3);
-    const horas=view?.getResumoHorasEstudo ? view.getResumoHorasEstudo() : {hoje:p.done,semana:0,total:0};
-    const materiasAtrasadas=view?.getMateriasAtrasadas ? view.getMateriasAtrasadas().slice(0,3) : [];
-    const todayText=new Date().toLocaleDateString('pt-BR',{weekday:'long', day:'2-digit', month:'long'});
-    const semAlertas = !alerts.length && !risk.length;
+  /* ── Tela de Ajuda ──────────────────────────────────────────── */
+  function renderHelp() {
+    const faqs = [
+      { q: 'Como adiciono minhas matérias?', a: 'Vá em <strong>Matérias</strong> no menu lateral → clique em "+ Adicionar Matéria" → preencha nome, dificuldade, peso e nota desejada. Cada matéria aparece nas sessões, tarefas e no Mentor IA.' },
+      { q: 'Como importo minha grade curricular?', a: 'Vá em <strong>Grade Curricular</strong> → clique em "Importar Grade". Use o modo IA: copie o prompt, abra o ChatGPT ou Claude, envie com o PDF ou foto da grade da faculdade, cole o JSON gerado de volta no site.' },
+      { q: 'Como registro uma sessão de estudo?', a: 'Vá em <strong>Sessões de Estudo</strong> → "+ Nova Sessão" → selecione matéria, data e duração. As sessões alimentam o Dashboard, o streak e o Mentor IA.' },
+      { q: 'O que é o Modo Foco?', a: 'Um timer Pomodoro integrado. Vá em <strong>Modo Foco</strong>, selecione a matéria, defina o tempo e comece. Ao concluir, a sessão é registrada automaticamente.' },
+      { q: 'O que é o Mapa de Aprendizado?', a: 'Mostra todos os tópicos das suas matérias com status de domínio (não iniciado, estudando, dominado). Atualize conforme revisa os conteúdos — isso melhora as sugestões do Mentor IA.' },
+      { q: 'O Mentor IA usa alguma API paga?', a: 'Não! O Mentor IA é 100% local — ele usa seus dados cadastrados (matérias, sessões, provas, tarefas) para gerar respostas inteligentes sem custo nenhum para você.' },
+      { q: 'Posso usar no celular?', a: 'Sim! É um PWA. No celular, acesse pelo navegador → toque em "Adicionar à tela inicial" para ter um ícone como app instalado, inclusive offline.' },
+      { q: 'Meus dados ficam salvos onde?', a: 'No Firebase, vinculados à sua conta Google. Sincroniza automaticamente entre dispositivos com o mesmo login. Você pode exportar um backup em Configurações.' },
+      { q: 'O site armazena minha senha?', a: 'Nunca. O login é via Google (OAuth) — o site não vê sua senha em nenhum momento.' },
+      { q: 'Encontrei um bug. Como reporto?', a: 'O projeto é open-source no GitHub. Abra uma Issue descrevendo o problema — contribuições são bem-vindas!' },
+    ];
+    const shortcuts = [
+      { icon:'📚', label:'Matérias', desc:'Adicione as disciplinas do semestre', view:'materias' },
+      { icon:'⏱️', label:'Sessões', desc:'Registre horas de estudo', view:'sessoes' },
+      { icon:'✅', label:'Tarefas', desc:'Organize pendências', view:'tarefas' },
+      { icon:'📝', label:'Provas', desc:'Nunca esqueça uma prova', view:'provas' },
+      { icon:'🎯', label:'Modo Foco', desc:'Timer Pomodoro integrado', view:'foco' },
+      { icon:'🧠', label:'Mentor IA', desc:'Pergunte o que estudar', view:'mentor-ia' },
+    ];
+    const prompts = [
+      'O que eu deveria estudar hoje?',
+      'Como estou na matéria mais difícil?',
+      'Tenho alguma prova ou tarefa atrasada?',
+      'Monte um plano de estudo para essa semana',
+      'Quais matérias estão com risco de reprovação?',
+      'Resumo da minha semana acadêmica',
+    ];
+    return `
+<div class="view-header"><h2><i class="fas fa-question-circle"></i> Central de Ajuda</h2></div>
+<div class="lr-help-hero">
+  <div class="lr-help-hero-icon">🎓</div>
+  <div><h2>Como podemos ajudar?</h2><p>Tudo que você precisa para aproveitar ao máximo o Study Life Control.</p></div>
+</div>
+<div class="lr-section-title">⚡ Atalhos rápidos</div>
+<div class="lr-shortcut-grid">
+  ${shortcuts.map(s=>`<div class="lr-shortcut-card" data-goto="${esc(s.view)}"><span class="icon">${s.icon}</span><strong>${esc(s.label)}</strong><span>${esc(s.desc)}</span></div>`).join('')}
+</div>
+<div class="lr-section-title">🧠 Perguntas sugeridas para o Mentor IA</div>
+<div class="lr-ia-prompts">
+  ${prompts.map(p=>`<div class="lr-ia-prompt" data-ia-prompt="${esc(p)}">${esc(p)}</div>`).join('')}
+</div>
+<div class="lr-section-title">❓ Perguntas frequentes</div>
+<div id="lr-faq-list">
+  ${faqs.map((f,i)=>`
+  <div class="lr-faq-item" id="lr-faq-${i}">
+    <div class="lr-faq-q" data-faq="${i}">${esc(f.q)}<i class="fas fa-chevron-down lr-faq-arrow"></i></div>
+    <div class="lr-faq-a">${f.a}</div>
+  </div>`).join('')}
+</div>
+<div style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;">
+  <button class="lr-restart-btn" id="lr-restart-tutorial"><i class="fas fa-play-circle"></i> Reiniciar tutorial</button>
+  <a class="lr-restart-btn" href="https://github.com/yur1ofc/study-life-control" target="_blank" rel="noopener"><i class="fab fa-github"></i> GitHub</a>
+</div>`;
+  }
+
+  function attachHelpEvents(c) {
+    c.querySelectorAll('.lr-faq-q').forEach(btn =>
+      btn.addEventListener('click', () => document.getElementById(`lr-faq-${btn.dataset.faq}`)?.classList.toggle('open')));
+    c.querySelectorAll('.lr-ia-prompt').forEach(el =>
+      el.addEventListener('click', () => {
+        navigateTo('mentor-ia');
+        setTimeout(() => {
+          const inp = document.querySelector('#mentor-input,textarea[placeholder*="pergunt"],.mentor-input');
+          if (inp) { inp.value = el.dataset.iaPrompt || el.textContent.trim(); inp.focus(); }
+        }, 400);
+      }));
+    c.querySelector('#lr-restart-tutorial')?.addEventListener('click', () =>
+      window.startTutorial?.() || window.tutorial?.start?.());
+    attachGoto(c);
+  }
+
+  /* ── Situação Acadêmica ──────────────────────────────────────── */
+  function renderSituacaoAcademica() {
+    const app = window.app;
+    if (!app) return '<p>Carregando...</p>';
+    const subjects = app.data?.subjects || [];
+    const sessions = app.data?.sessions || [];
+    const tasks    = app.data?.tasks    || [];
+    const exams    = app.data?.exams    || [];
+    const now = new Date();
+
+    if (!subjects.length) return `
+<div class="view-header"><h2><i class="fas fa-heartbeat"></i> Situação Acadêmica</h2></div>
+<div class="lr-empty-hero"><span class="lr-ei">📊</span><h3>Nenhuma matéria cadastrada ainda</h3>
+<p>Adicione suas matérias do semestre para ver sua situação acadêmica completa.</p>
+<div class="lr-empty-actions"><button class="lr-action primary" data-goto="materias"><i class="fas fa-plus"></i> Adicionar Matérias</button></div></div>`;
+
+    const horasPorMateria = {};
+    subjects.forEach(s => { horasPorMateria[s.nome] = 0; });
+    sessions.filter(s => s.concluida).forEach(s => {
+      if (s.materia in horasPorMateria) horasPorMateria[s.materia] += (parseInt(s.duracao)||0)/60;
+    });
+    const atrPorMateria = {};
+    tasks.filter(t => !t.concluida && t.dataLimite && new Date(t.dataLimite+'T23:59') < now).forEach(t => {
+      atrPorMateria[t.materia] = (atrPorMateria[t.materia]||0)+1;
+    });
+    const provasPorMateria = {};
+    exams.filter(e => !e.concluida && new Date(e.data) >= now).forEach(e => {
+      provasPorMateria[e.materia] = (provasPorMateria[e.materia]||0)+1;
+    });
+
+    function risk(s) {
+      const h = horasPorMateria[s.nome]||0, a = atrPorMateria[s.nome]||0;
+      return a >= 2 || h < 1 ? 'bad' : a >= 1 || h < 5 ? 'warn' : 'good';
+    }
+    const rLabel = r => r==='bad'?'⚠️ Risco':r==='warn'?'👀 Atenção':'✅ OK';
+    const totalH = Object.values(horasPorMateria).reduce((a,b)=>a+b,0);
+    const atrasadas = tasks.filter(t=>!t.concluida && t.dataLimite && new Date(t.dataLimite+'T23:59')<now).length;
+    const proxProvas = exams.filter(e=>!e.concluida && new Date(e.data)>=now).slice(0,3);
 
     return `
-      <div class="dashboard-shell">
-        <div class="dashboard-header">
-          <div>
-            <h2>Olá, ${esc(user.nome||'Estudante')} 👋</h2>
-            <p>${esc(todayText)} • visão rápida do dia</p>
-          </div>
-          <span class="setup-fast-pill"><i class="fas fa-bolt"></i> Painel rápido</span>
-        </div>
+<div class="view-header"><h2><i class="fas fa-heartbeat"></i> Situação Acadêmica</h2></div>
+<div class="lr-sa-grid">
+  <div class="lr-sa-card">
+    <div class="lr-sa-card-header"><span class="lr-sa-card-icon">📚</span><span class="lr-sa-card-title">Matérias</span></div>
+    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Cursando</span><span class="lr-sa-stat-val">${subjects.length}</span></div>
+    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Em risco</span><span class="lr-sa-stat-val" style="color:var(--accent-danger)">${subjects.filter(s=>risk(s)==='bad').length}</span></div>
+    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Em atenção</span><span class="lr-sa-stat-val" style="color:var(--accent-warning)">${subjects.filter(s=>risk(s)==='warn').length}</span></div>
+    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Em dia</span><span class="lr-sa-stat-val" style="color:var(--accent-success)">${subjects.filter(s=>risk(s)==='good').length}</span></div>
+  </div>
+  <div class="lr-sa-card">
+    <div class="lr-sa-card-header"><span class="lr-sa-card-icon">⏱️</span><span class="lr-sa-card-title">Estudo</span></div>
+    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Total de horas</span><span class="lr-sa-stat-val">${totalH.toFixed(1)}h</span></div>
+    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Sessões concluídas</span><span class="lr-sa-stat-val">${sessions.filter(s=>s.concluida).length}</span></div>
+    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Média por matéria</span><span class="lr-sa-stat-val">${(totalH/subjects.length).toFixed(1)}h</span></div>
+    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Streak</span><span class="lr-sa-stat-val">${app.data?.user?.streak||0} dias 🔥</span></div>
+  </div>
+  <div class="lr-sa-card">
+    <div class="lr-sa-card-header"><span class="lr-sa-card-icon">✅</span><span class="lr-sa-card-title">Tarefas & Provas</span></div>
+    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Tarefas pendentes</span><span class="lr-sa-stat-val">${tasks.filter(t=>!t.concluida).length}</span></div>
+    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Atrasadas</span><span class="lr-sa-stat-val" style="color:var(--accent-danger)">${atrasadas}</span></div>
+    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Tarefas concluídas</span><span class="lr-sa-stat-val" style="color:var(--accent-success)">${tasks.filter(t=>t.concluida).length}</span></div>
+    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Próximas provas</span><span class="lr-sa-stat-val">${exams.filter(e=>!e.concluida&&new Date(e.data)>=now).length}</span></div>
+  </div>
+</div>
 
-        <div class="dashboard-top-grid">
-          <section class="dashboard-hero">
-            <div class="dashboard-hero-top">
-              <div class="dashboard-hero-title">
-                <h3>${current ? `Agora: ${esc(current.materia)}` : next ? `Próxima aula: ${esc(next.materia)}` : 'Seu foco de hoje'}</h3>
-                <p>${current ? `${esc(current.inicio)} - ${esc(current.fim)}${current.sala ? ` • Sala ${esc(current.sala)}` : ''}` : next ? `${fullDays[parseInt(next.dia,10)]||''} • ${esc(next.inicio)} - ${esc(next.fim)}${next.sala ? ` • Sala ${esc(next.sala)}` : ''}` : 'Cadastre aulas, tarefas ou sessões para começar a receber prioridades automáticas.'}</p>
-              </div>
-              <div class="dashboard-goal">
-                <span>Meta do dia</span>
-                <strong>${p.done.toFixed(1)}h / ${p.planned}h</strong>
-                <small>${p.pct}% concluído</small>
-              </div>
-            </div>
-            <div class="dashboard-progress">
-              <div class="dashboard-progress-meta"><span>Progresso de estudo</span><span>${p.pct}%</span></div>
-              <div class="progress-bar"><div class="progress-fill" style="width:${p.pct}%"></div></div>
-            </div>
-            <div class="dashboard-kpi-row">
-              <div class="dashboard-kpi"><span>Horas hoje</span><strong>${horas.hoje.toFixed(1)}h</strong></div>
-              <div class="dashboard-kpi"><span>Horas semana</span><strong>${horas.semana.toFixed(1)}h</strong></div>
-              <div class="dashboard-kpi"><span>Tarefas abertas</span><strong>${(app.data?.tasks||[]).filter(t=>!t.concluida).length}</strong></div>
-              <div class="dashboard-kpi"><span>Provas chegando</span><strong>${exams.length}</strong></div>
-              <div class="dashboard-kpi"><span>Streak</span><strong>${esc(user.streak||0)} dias</strong></div>
-              <div class="dashboard-kpi"><span>Produtividade</span><strong>${esc(app.calcularProdutividade?.()||'0%')}</strong></div>
-            </div>
-            <div class="quick-actions">
-              <button class="btn-primary" id="quick-sessao"><i class="fas fa-clock"></i> Sessão</button>
-              <button class="btn-primary" id="quick-tarefa"><i class="fas fa-tasks"></i> Tarefa</button>
-              <button class="btn-primary" id="quick-prova"><i class="fas fa-graduation-cap"></i> Prova</button>
-              <button class="btn-primary" id="quick-aula"><i class="fas fa-calendar-week"></i> Aula</button>
-              <button class="btn-secondary" id="quick-foco"><i class="fas fa-bullseye"></i> Foco</button>
-            </div>
-          </section>
+<div class="lr-section-title">📋 Por matéria</div>
+<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:24px;">
+${subjects.map(s=>{
+  const h=horasPorMateria[s.nome]||0, a=atrPorMateria[s.nome]||0, p=provasPorMateria[s.nome]||0;
+  const r=risk(s), pct=Math.min(100,(h/Math.max(1,s.horasMeta||20))*100);
+  return `<div class="lr-sa-card" style="padding:14px 16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <strong style="color:var(--text-primary)">${esc(s.nome)}</strong>
+      <span class="lr-badge ${r}">${rLabel(r)}</span>
+    </div>
+    <div class="lr-risk-bar lr-risk-${r==='bad'?'high':r==='warn'?'med':'low'}"><div class="lr-risk-fill" style="width:${pct.toFixed(0)}%"></div></div>
+    <div style="display:flex;gap:14px;margin-top:6px;font-size:.8rem;color:var(--text-secondary);">
+      <span>⏱️ ${h.toFixed(1)}h</span>
+      ${a?`<span style="color:var(--accent-danger)">⚠️ ${a} atrasada${a>1?'s':''}</span>`:''}
+      ${p?`<span style="color:var(--accent-warning)">📝 ${p} prova${p>1?'s':''}</span>`:''}
+    </div>
+  </div>`;
+}).join('')}
+</div>
 
-          <section class="dashboard-side-card">
-            <div class="dashboard-section-head"><h3><i class="fas fa-list-check"></i> O que fazer hoje</h3></div>
-            <div class="focus-list">
-              ${(plan.length?plan:tasks.map(t=>({titulo:t.titulo,materia:t.materia,tipo:'tarefa'}))).slice(0,4).map(item=>`
-                <div class="focus-item">
-                  <div class="focus-item-main">
-                    <strong>${esc(item.titulo||item.materia||'Prioridade')}</strong>
-                    <small>${esc(item.materia||item.tipo||'Plano do dia')}</small>
-                  </div>
-                  <span class="tag ${item.prioridade==='alta'?'high':'medium'}">${esc(item.tipo||'hoje')}</span>
-                </div>`).join('') || '<p class="text-secondary">Sem itens para hoje</p>'}
-            </div>
-          </section>
-        </div>
-
-        <div class="dashboard-top-grid">
-          <section class="dashboard-main-card">
-            <div class="dashboard-section-head"><h3><i class="fas fa-calendar-day"></i> Próximas aulas</h3></div>
-            <div class="mini-list">
-              ${proximasAulas.map(a=>`<div class="mini-item"><div class="mini-item-main"><strong>${esc(a.materia)}</strong><small>${a.diaOffset===0?'Hoje':a.diaOffset===1?'Amanhã':(fullDays[parseInt(a.dia,10)]||'')} • ${esc(a.inicio)} - ${esc(a.fim)}${a.sala?` • Sala ${esc(a.sala)}`:''}</small></div><span class="tag ${a.diaOffset===0?'high':'medium'}">${a.diaOffset===0?'hoje':a.diaOffset===1?'amanhã':(fullDays[parseInt(a.dia,10)]||'').slice(0,3)}</span></div>`).join('') || '<p class="text-secondary">Nenhuma aula cadastrada na grade.</p>'}
-            </div>
-          </section>
-          <section class="dashboard-list-card">
-            <div class="dashboard-section-head"><h3><i class="fas fa-tasks"></i> Entregas e provas</h3></div>
-            <div class="mini-list">
-              ${tasks.map(t=>`<div class="mini-item"><div class="mini-item-main"><strong>${esc(t.titulo)}</strong><small>${esc(t.materia||'Sem matéria')}</small></div><span class="tag ${((t.prioridade||'').toLowerCase()==='alta' || dueLabel(t.dataLimite).includes('Atrasada') || dueLabel(t.dataLimite)==='Hoje') ? 'high':'warning'}">${esc(dueLabel(t.dataLimite))}</span></div>`).join('')}
-              ${exams.slice(0,3).map(e=>`<div class="mini-item"><div class="mini-item-main"><strong>${esc(e.titulo||e.tipo||'Avaliação')}</strong><small>${esc(e.materia||'Sem matéria')}</small></div><span class="tag warning">${esc(dueLabel(e.data))}</span></div>`).join('')}
-              ${(!tasks.length && !exams.length) ? '<p class="text-secondary">Nenhuma tarefa ou prova pendente</p>' : ''}
-            </div>
-          </section>
-        </div>
-
-        <section class="dashboard-list-card dashboard-attention-card">
-          <div class="dashboard-section-head"><h3><i class="fas fa-bell"></i> Atenção</h3></div>
-          <div class="mini-list">
-            ${alerts.map(a=>`<div class="mini-item"><div class="mini-item-main"><strong>${esc(a.titulo||'Alerta')}</strong><small>${esc(a.descricao||a.mensagem||'')}</small></div><span class="tag ${(a.tipo||'warning')==='danger'?'high':'warning'}">${esc(a.tipo||'alerta')}</span></div>`).join('')}
-            ${risk.map(r=>`<div class="mini-item"><div class="mini-item-main"><strong>${esc(r.materia)}</strong><small>${esc(r.motivo||'Risco acadêmico')}</small></div><span class="tag ${String(r.nivel).toLowerCase().includes('alto')?'high':'warning'}">${esc(r.nivel||'risco')}</span></div>`).join('')}
-            ${materiasAtrasadas.map(m=>`<div class="mini-item"><div class="mini-item-main"><strong>${esc(m.materia)}</strong><small>${m.nuncaEstudou?'Sem registro de estudo ainda':`${m.dias} dias sem estudar`}</small></div><span class="tag warning">${m.nuncaEstudou?'novo':`${m.dias}d`}</span></div>`).join('')}
-            ${(semAlertas && !materiasAtrasadas.length) ? '<p class="text-secondary">Tudo sob controle por enquanto.</p>' : ''}
-            </div>
-          </section>
-      </div>`;
+${proxProvas.length?`
+<div class="lr-section-title">📅 Próximas provas</div>
+<div style="display:flex;flex-direction:column;gap:8px;">
+${proxProvas.map(e=>{
+  const dias=Math.ceil((new Date(e.data)-now)/86400000);
+  return `<div class="lr-sa-card" style="padding:12px 16px;display:flex;align-items:center;justify-content:space-between;">
+    <div><strong style="color:var(--text-primary);font-size:.9rem">${esc(e.materia)}</strong>${e.titulo?`<span style="color:var(--text-secondary);font-size:.8rem;display:block">${esc(e.titulo)}</span>`:''}</div>
+    <span class="lr-badge ${dias<=3?'bad':dias<=7?'warn':'good'}">${dias===0?'Hoje':dias===1?'Amanhã':dias+' dias'}</span>
+  </div>`;
+}).join('')}
+</div>`:''}`;
   }
 
-  function patchDashboard(){
-    const wait=setInterval(()=>{
-      if(window.ViewRenderer?.prototype){
-        window.ViewRenderer.prototype.renderDashboard=renderSimpleDashboard;
-        clearInterval(wait);
+  /* ── Empty state do Dashboard ───────────────────────────────── */
+  function buildEmptyDashboard(nome) {
+    return `
+<div class="dashboard-header">
+  <h2>Olá, ${esc(nome||'Estudante')}! 👋</h2>
+  <p>${new Date().toLocaleDateString('pt-BR',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
+</div>
+<div class="lr-empty-hero">
+  <span class="lr-ei">🚀</span>
+  <h3>Tudo pronto! Agora é só começar</h3>
+  <p>Seu painel vai ganhar vida conforme você adiciona matérias, sessões e tarefas.</p>
+  <div class="lr-empty-actions">
+    <button class="lr-action primary" data-goto="materias"><i class="fas fa-book"></i> Adicionar Matérias</button>
+    <button class="lr-action secondary" data-goto="sessoes"><i class="fas fa-clock"></i> Registrar Sessão</button>
+    <button class="lr-action secondary" data-goto="grade-curricular"><i class="fas fa-sitemap"></i> Importar Grade</button>
+  </div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;">
+${[
+  {icon:'📚',title:'Matérias',desc:'Cadastre as disciplinas do semestre. O resto do sistema depende disso.',view:'materias',cta:'Adicionar'},
+  {icon:'⏱️',title:'Sessões de Estudo',desc:'Registre cada hora que estudar. O Dashboard mostra seu progresso automaticamente.',view:'sessoes',cta:'Registrar'},
+  {icon:'✅',title:'Tarefas',desc:'Organize trabalhos, listas e pendências por matéria e data limite.',view:'tarefas',cta:'Criar tarefa'},
+  {icon:'📝',title:'Provas',desc:'Cadastre provas com antecedência e receba alertas automáticos.',view:'provas',cta:'Cadastrar'},
+  {icon:'🧠',title:'Mentor IA',desc:'Pergunte o que estudar hoje, como você está em cada matéria ou peça um plano.',view:'mentor-ia',cta:'Perguntar'},
+  {icon:'🎯',title:'Modo Foco',desc:'Timer Pomodoro integrado — registra a sessão automaticamente ao concluir.',view:'foco',cta:'Iniciar foco'},
+].map(c=>`
+<div class="card" style="cursor:pointer" data-goto="${esc(c.view)}">
+  <div class="card-header"><h3>${c.icon} ${esc(c.title)}</h3></div>
+  <div class="card-body">
+    <p style="font-size:.86rem;color:var(--text-secondary);margin-bottom:12px">${esc(c.desc)}</p>
+    <button class="lr-action primary" data-goto="${esc(c.view)}" style="font-size:.82rem;padding:8px 14px">${esc(c.cta)} →</button>
+  </div>
+</div>`).join('')}
+</div>`;
+  }
+
+  /* ── Welcome Modal ──────────────────────────────────────────── */
+  function showWelcomeModal(nome) {
+    if (document.getElementById('lr-welcome-modal')) return;
+    const modal = document.createElement('div');
+    modal.id = 'lr-welcome-modal';
+    modal.innerHTML = `<div class="lr-welcome-card">
+  <span class="lr-welcome-emoji">🎉</span>
+  <h2>Bem-vindo(a), ${esc(nome||'Estudante')}!</h2>
+  <p>Configuração concluída! Quanto mais você preencher, mais inteligente o sistema fica.</p>
+  <div class="lr-welcome-steps">
+    <div class="lr-welcome-step" data-goto="materias"><div class="lr-welcome-step-icon">📚</div><div class="lr-welcome-step-text"><strong>Adicionar matérias do semestre</strong><span>Base de tudo — Mentor IA e Dashboard dependem disso</span></div></div>
+    <div class="lr-welcome-step" data-goto="grade-curricular"><div class="lr-welcome-step-icon">🗂️</div><div class="lr-welcome-step-text"><strong>Importar grade curricular</strong><span>Use PDF ou foto da faculdade + ChatGPT para importar tudo de uma vez</span></div></div>
+    <div class="lr-welcome-step" data-goto="mentor-ia"><div class="lr-welcome-step-icon">🧠</div><div class="lr-welcome-step-text"><strong>Falar com o Mentor IA</strong><span>Pergunte "o que estudar hoje?" e veja como ele responde</span></div></div>
+  </div>
+  <button class="lr-welcome-close" id="lr-welcome-close-btn">Explorar o sistema →</button>
+</div>`;
+    document.body.appendChild(modal);
+    document.getElementById('lr-welcome-close-btn')?.addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    modal.querySelectorAll('[data-goto]').forEach(el =>
+      el.addEventListener('click', () => { modal.remove(); navigateTo(el.dataset.goto); }));
+  }
+
+  /* ── Patch do App ───────────────────────────────────────────── */
+  function patchApp(app) {
+    if (app.__lrPatched) return;
+    if (!app || typeof app.loadView !== 'function') return; // guard: app ainda não pronto
+    app.__lrPatched = true;
+
+    const _orig = app.loadView.bind(app);
+    app.loadView = function (view, ...rest) {
+      const container = document.getElementById('view-container');
+
+      if (view === 'ajuda') {
+        this.currentView = 'ajuda';
+        if (container) { container.innerHTML = renderHelp(); attachHelpEvents(container); }
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === 'ajuda'));
+        return;
       }
-    },150);
-  }
+      if (view === 'situacao-academica') {
+        this.currentView = 'situacao-academica';
+        if (container) { container.innerHTML = renderSituacaoAcademica(); attachGoto(container); }
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === 'situacao-academica'));
+        return;
+      }
 
-  function ensureNotificationPanel(){
-    // Reutiliza o popover do script.js em vez de criar um segundo painel
-    let panel=$('#notification-panel');
-    if(!panel){
-      panel=document.createElement('div');
-      panel.id='notification-panel';
-      panel.className='notification-panel';
-      panel.hidden=true;
-      panel.innerHTML=`<div class="notification-panel-header"><h3>Lembretes internos</h3><button class="btn-secondary" id="mark-all-notifications-read">Marcar como visto</button></div><div class="notification-list" id="notification-list"></div>`;
-      // Injeta DENTRO do popover existente, não ao lado
-      const existingPopover=$('#notification-popover-list');
-      if(existingPopover){ existingPopover.appendChild(panel); panel.hidden=false; }
-      else { const header=$('.content-header .header-actions'); if(header) header.appendChild(panel); }
-    }
-    return panel;
+      _orig(view, ...rest);
 
-    // Evento do badge gerenciado pelo script.js — apenas o botão interno
-    $('#mark-all-notifications-read')?.addEventListener('click', ()=>{markNotificationsRead(); panel.hidden=true; renderNotifications();});
-  }
-
-  function buildNotifications(){
-    const app=window.app; if(!app) return [];
-    const notes=[];
-    const tasks=(app.data?.tasks||[]).filter(t=>!t.concluida);
-    tasks.sort((a,b)=>(a.dataLimite||'').localeCompare(b.dataLimite||''));
-    tasks.slice(0,4).forEach(t=>{
-      const label=dueLabel(t.dataLimite);
-      notes.push({id:'task-'+t.id,title:t.titulo,text:`${t.materia||'Sem matéria'} • ${label}`,level:label.includes('Atrasada')||label==='Hoje'?'danger':'warning'});
-    });
-    const exams=(app.getUpcomingExams?app.getUpcomingExams(7):(app.data?.exams||[]).filter(e=>!e.concluida)).slice(0,3);
-    exams.forEach(e=>notes.push({id:'exam-'+e.id,title:e.titulo||'Avaliação',text:`${e.materia||'Sem matéria'} • ${dueLabel(e.data)}`,level:'warning'}));
-    const next=getNextClass();
-    if(next) notes.unshift({id:'nextclass-'+next.id,title:'Próxima aula',text:`${next.materia} • ${fullDays[parseInt(next.dia,10)]||''} ${next.inicio}-${next.fim}`,level:'info'});
-    const p=progressData();
-    if(p.done < p.planned/2) notes.push({id:'goal-half',title:'Meta do dia em aberto',text:`Você estudou ${p.done.toFixed(1)}h de ${p.planned}h planejadas.`,level:'info'});
-    return notes.slice(0,8);
-  }
-
-  function notificationsKey(){
-    const notes=buildNotifications();
-    return 'slc-read-notes:'+notes.map(n=>n.id).join('|');
-  }
-  function markNotificationsRead(){ localStorage.setItem(notificationsKey(),'1'); updateNotificationBadge(); }
-  function updateNotificationBadge(){
-    const notes=buildNotifications();
-    const unread=localStorage.getItem(notificationsKey()) ? 0 : notes.length;
-    const count=$('#notification-count');
-    const badge=$('#notification-badge');
-    if(count) count.textContent=String(unread);
-    badge?.classList.toggle('has-alert', unread>0);
-  }
-  function renderNotifications(){
-    ensureNotificationPanel();
-    const list=$('#notification-list'); if(!list) return;
-    const notes=buildNotifications();
-    list.innerHTML=notes.length ? notes.map(n=>`<div class="notification-item" data-level="${esc(n.level)}"><div class="notification-item-main"><strong>${esc(n.title)}</strong><small>${esc(n.text)}</small></div><span class="tag ${n.level==='danger'?'high':n.level==='warning'?'warning':'success'}">${esc(n.level)}</span></div>`).join('') : '<div class="notification-empty">Sem lembretes agora.</div>';
-    updateNotificationBadge();
-  }
-
-  function injectAulaEnhancements(){
-    const form=$('#form-aula'); if(!form || form.dataset.launchEnhanced==='1') return; form.dataset.launchEnhanced='1';
-    const colorGroup=$('#aula-cor')?.closest('.form-group');
-    if(colorGroup){
-      const block=document.createElement('div');
-      block.className='aula-smart-section';
-      block.innerHTML=`
-        <h3><i class="fas fa-magic"></i> Cadastro rápido de aulas</h3>
-        <p class="text-secondary" style="text-align:left;padding:0;margin-top:6px">Use vários dias de uma vez ou cole sua grade em lote.</p>
-        <div class="form-group">
-          <label>Repetir nos dias</label>
-          <div class="aula-days-grid" id="aula-repeat-days">
-            ${DAYS.slice(1,6).map(([v,l])=>`<label class="aula-day-pill"><input type="checkbox" value="${v}"> ${l}</label>`).join('')}
-            <label class="aula-day-pill"><input type="checkbox" value="6"> Sáb</label>
-            <label class="aula-day-pill"><input type="checkbox" value="0"> Dom</label>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Cadastro em lote por texto</label>
-          <textarea id="aula-batch-text" class="aula-batch-text" placeholder="Um por linha. Ex:\nCálculo I; seg qua; 08:00; 10:00; Sala 12; Prof. Ana; Bloco A\nFísica I; ter qui; 10:00; 12:00; Lab 2; Prof. Carlos"></textarea>
-          <div class="aula-inline-actions">
-            <button type="button" class="btn-secondary" id="btn-aula-batch-exemplo"><i class="fas fa-copy"></i> Exemplo</button>
-            <button type="button" class="btn-secondary" id="btn-aula-clear-batch"><i class="fas fa-eraser"></i> Limpar lote</button>
-          </div>
-          <div class="batch-help-card" style="margin-top:10px"><div class="notification-item-main"><strong>Dica</strong><small>Separadores aceitos: ponto e vírgula ou barra vertical. Dias aceitos: seg, ter, qua, qui, sex, sab, dom.</small></div></div>
-        </div>`;
-      colorGroup.insertAdjacentElement('beforebegin', block);
-    }
-    $('#btn-aula-batch-exemplo')?.addEventListener('click',()=>{
-      $('#aula-batch-text').value='Cálculo I; seg qua; 08:00; 10:00; Sala 12; Prof. Ana; Bloco A\nFísica I; ter qui; 10:00; 12:00; Lab 2; Prof. Carlos';
-    });
-    $('#btn-aula-clear-batch')?.addEventListener('click',()=>{ $('#aula-batch-text').value=''; });
-    $('#aula-materia')?.addEventListener('change',prefillAulaFromHistory);
-  }
-
-  function parseDays(raw){
-    const map={seg:'1',segunda:'1',ter:'2',terça:'2',terca:'2',qua:'3',quarta:'3',qui:'4',quinta:'4',sex:'5',sexta:'5',sab:'6',sábado:'6',sabado:'6',dom:'0',domingo:'0'};
-    const matches=(raw||'').toLowerCase().match(/seg(?:unda)?|ter(?:ça|ca)?|qua(?:rta)?|qui(?:nta)?|sex(?:ta)?|s[áa]b(?:ado)?|dom(?:ingo)?/g)||[];
-    const vals=[...new Set(matches.map(m=>map[m]).filter(Boolean))];
-    return vals;
-  }
-  function prefillAulaFromHistory(){
-    const materia=$('#aula-materia')?.value; if(!materia||!window.app) return;
-    const list=(window.app.data?.classSchedule||[]).filter(a=>a.materia===materia);
-    const last=list[list.length-1];
-    if(!last) return;
-    if($('#aula-professor') && !$('#aula-professor').value) $('#aula-professor').value=last.professor||'';
-    if($('#aula-sala') && !$('#aula-sala').value) $('#aula-sala').value=last.sala||'';
-    if($('#aula-bloco') && !$('#aula-bloco').value) $('#aula-bloco').value=last.bloco||'';
-    if($('#aula-cor') && (!$('#aula-cor').value || $('#aula-cor').value==='#3b82f6')) $('#aula-cor').value=last.cor||'#3b82f6';
-  }
-
-  function patchAulaSubmit(){
-    const wait=setInterval(()=>{
-      if(!window.StudyLifeControl?.prototype?.handleAulaSubmit) return;
-      clearInterval(wait);
-      const proto=window.StudyLifeControl.prototype;
-      proto.handleAulaSubmit=async function(e){
-        e.preventDefault();
-        const base={
-          materia: $('#aula-materia')?.value || '',
-          dia: $('#aula-dia')?.value || '1',
-          inicio: $('#aula-inicio')?.value || '',
-          fim: $('#aula-fim')?.value || '',
-          sala: $('#aula-sala')?.value || '',
-          professor: $('#aula-professor')?.value || '',
-          bloco: $('#aula-bloco')?.value || '',
-          cor: $('#aula-cor')?.value || '#3b82f6'
-        };
-        const batchText=($('#aula-batch-text')?.value||'').trim();
-        let items=[];
-        if(batchText){
-          batchText.split(/\n+/).map(l=>l.trim()).filter(Boolean).forEach(line=>{
-            const parts=line.split(/[;|]+/).map(s=>s.trim());
-            if(parts.length<4) return;
-            const [materia, dayRaw, inicio, fim, sala='', professor='', bloco='']=parts;
-            const dias=parseDays(dayRaw);
-            dias.forEach(d=>items.push({id:generateIdSafe(), materia, dia:d, inicio, fim, sala, professor, bloco, cor:base.cor}));
-          });
-          if(!items.length){ window.showToast?.('Não consegui entender o lote. Use uma linha por aula no formato matéria; dias; início; fim; sala; professor; bloco', 'warning'); return; }
-        } else {
-          const checked=$$('#aula-repeat-days input:checked').map(i=>i.value);
-          const dias=[...new Set([base.dia, ...checked])];
-          if(this.editingAulaId){
-            const success=await window.scheduleManager?.editAula(this.editingAulaId, base);
-            if(success){ document.getElementById('modal-aula').style.display='none'; this.editingAulaId=null; this.resetModalStates(); document.dispatchEvent(new Event('aulas-atualizadas')); this.loadView('grade-horaria'); window.showToast?.('Aula atualizada com sucesso!','success'); }
-            return;
+      // Empty state para dashboard de usuário novo
+      if (view === 'dashboard') {
+        setTimeout(() => {
+          const s = this.data?.subjects||[], se = this.data?.sessions||[];
+          if (!s.length && !se.length && container) {
+            container.innerHTML = buildEmptyDashboard(this.data?.user?.nome);
+            attachGoto(container);
           }
-          items=dias.map(d=>({id:generateIdSafe(), ...base, dia:d}));
-        }
-        let ok=0, fail=0;
-        for(const item of items){
-          const success=await window.scheduleManager?.addAula(item);
-          success ? ok++ : fail++;
-        }
-        if(ok){
-          document.getElementById('modal-aula').style.display='none';
-          this.editingAulaId=null; this.resetModalStates(); document.dispatchEvent(new Event('aulas-atualizadas')); this.loadView('grade-horaria');
-          window.showToast?.(fail?`${ok} aula(s) salvas e ${fail} com conflito.`:`${ok} aula(s) salvas com sucesso!`,'success');
-        }
-      };
-    },150);
+        }, 60);
+      }
+    };
+
+    // Patch pós-setup: mostrar welcome
+    const _origPost = app.ensurePostSetupReady.bind(app);
+    app.ensurePostSetupReady = async function (...args) {
+      const isNew = !(this.data?.subjects?.length);
+      await _origPost(...args);
+      if (isNew) {
+        setTimeout(() => showWelcomeModal(this.data?.user?.nome), 900);
+        localStorage.setItem('slc_welcomed', '1');
+      }
+    };
   }
 
-  function patchOpenModalAndDetail(){
-    const wait=setInterval(()=>{
-      if(!window.StudyLifeControl?.prototype?.openModal || !window.StudyLifeControl?.prototype?.openAulaModal) return;
-      clearInterval(wait);
-      const proto=window.StudyLifeControl.prototype;
-      const originalOpenModal=proto.openModal;
-      proto.openModal=function(type,data={}){
-        originalOpenModal.call(this,type,data);
-        if(type==='aula'){
-          injectAulaEnhancements();
-          $$('#aula-repeat-days input').forEach(i=>i.checked=false);
-          const title=$('#modal-aula .modal-header h2');
-          if(title) title.innerHTML=`<i class="fas fa-calendar-week"></i> ${this.editingAulaId?'Editar Aula':'Nova Aula'}`;
-          if(!this.editingAulaId) $('#aula-batch-text') && ($('#aula-batch-text').value='');
-          if(data?.dia && !this.editingAulaId){
-            $(`#aula-repeat-days input[value="${data.dia}"]`)?.setAttribute('data-same-day','1');
-          }
-        }
-      };
-      const originalOpenAulaModal=proto.openAulaModal;
-      proto.openAulaModal=function(aulaId){
-        originalOpenAulaModal.call(this,aulaId);
-        const aula=window.scheduleManager?.aulas?.find(a=>a.id===aulaId); if(!aula) return;
-        const box=$('#modal-aula-detail .aula-detail-info'); if(!box) return;
-        let actions=$('#modal-aula-detail .aula-detail-actions');
-        if(!actions){
-          actions=document.createElement('div');
-          actions.className='aula-detail-actions';
-          box.appendChild(actions);
-        }
-        actions.innerHTML=`<button class="btn-secondary" id="detail-duplicate-aula"><i class="fas fa-copy"></i> Duplicar horário</button><button class="btn-secondary" id="detail-edit-aula"><i class="fas fa-pen"></i> Editar aula</button>`;
-        $('#detail-duplicate-aula')?.addEventListener('click',()=>{ document.getElementById('modal-aula-detail').style.display='none'; this.editingAulaId=null; this.openModal('aula',{...aula}); const title=$('#modal-aula .modal-header h2'); if(title) title.innerHTML='<i class="fas fa-copy"></i> Duplicar Aula'; });
-        $('#detail-edit-aula')?.addEventListener('click',()=>{ document.getElementById('modal-aula-detail').style.display='none'; this.editarAula(aulaId); });
-      };
-      const originalSetupViewEvents=proto.setupViewEvents;
-      proto.setupViewEvents=function(view,...rest){
-        originalSetupViewEvents.call(this,view,...rest);
-        if(view==='dashboard'){
-          $('#quick-aula')?.addEventListener('click',()=>this.openModal('aula'));
-        }
-        setTimeout(()=>{ renderNotifications(); ensureMobileQuickbar(); },50);
-      };
-    },150);
-  }
+  /* ── Init ───────────────────────────────────────────────────── */
+  function init() {
+    injectStyles();
+    if (window.app) {
+      patchApp(window.app);
+    } else {
+      document.addEventListener('app-ready', () => { if (window.app) patchApp(window.app); });
+      let t = 0;
+      const p = setInterval(() => { if (window.app) { clearInterval(p); patchApp(window.app); } if (++t > 50) clearInterval(p); }, 200);
+    }
 
-  function ensureMobileQuickbar(){
-    if($('#mobile-quickbar') || !window.app) return;
-    const bar=document.createElement('div');
-    bar.id='mobile-quickbar';
-    bar.className='mobile-quickbar';
-    bar.innerHTML=`<button data-action="dashboard"><i class="fas fa-house"></i><br>Início</button><button data-action="tarefa"><i class="fas fa-plus"></i><br>Tarefa</button><button data-action="sessao"><i class="fas fa-clock"></i><br>Sessão</button><button data-action="aula"><i class="fas fa-calendar"></i><br>Aula</button>`;
-    document.body.appendChild(bar);
-    bar.addEventListener('click',(e)=>{
-      const btn=e.target.closest('button'); if(!btn) return;
-      const action=btn.dataset.action;
-      if(action==='dashboard') window.app.loadView('dashboard');
-      if(action==='tarefa') window.app.openModal('tarefa');
-      if(action==='sessao') window.app.openModal('sessao');
-      if(action==='aula') window.app.openModal('aula');
+    // Welcome para usuário que é novo mas já tem conta (recarregou)
+    document.addEventListener('app-ready', () => {
+      const app = window.app; if (!app) return;
+      const isNew = !app.data?.subjects?.length && !app.data?.sessions?.length;
+      if (isNew && !localStorage.getItem('slc_welcomed') && app.data?.user?.nome) {
+        setTimeout(() => showWelcomeModal(app.data.user.nome), 1200);
+        localStorage.setItem('slc_welcomed', '1');
+      }
     });
   }
 
-  function improveOnboarding(){
-    const screen=$('#setup-screen'); const form=$('#setup-form'); if(!screen||!form||$('#quick-onboarding-card')) return;
-    const card=document.createElement('div');
-    card.id='quick-onboarding-card'; card.className='quick-onboarding-card';
-    card.innerHTML=`<div class="dashboard-section-head"><h3><i class="fas fa-rocket"></i> Setup mais rápido</h3></div><p>Use o modo rápido para preencher só o essencial agora e ajustar o resto depois em Configurações.</p><div class="quick-onboarding-actions"><button type="button" class="btn-primary" id="setup-fast-mode">Usar configuração rápida</button><button type="button" class="btn-secondary" id="setup-toggle-advanced">Ocultar opções avançadas</button><button type="button" class="btn-secondary" id="setup-fill-student-night">Perfil estudante à noite</button></div>`;
-    form.prepend(card);
-    const sections=$$('.form-section',form);
-    const advancedSections=sections.slice(1,3);
-    const setAdvanced=(hide)=>advancedSections.forEach(s=>s.classList.toggle('setup-advanced-hidden',hide));
-    $('#setup-toggle-advanced')?.addEventListener('click',()=>{
-      const hide=!advancedSections[0]?.classList.contains('setup-advanced-hidden');
-      setAdvanced(hide);
-      $('#setup-toggle-advanced').textContent=hide?'Mostrar opções avançadas':'Ocultar opções avançadas';
-    });
-    $('#setup-fast-mode')?.addEventListener('click',()=>{
-      setAdvanced(true);
-      const semester=$('#semestre'); if(semester && !semester.value) semester.value='1';
-      const turno=$('#turno-principal'); if(turno) turno.value='noite';
-      const horas=$('#horas-maximas'); if(horas && !horas.value) horas.value='4';
-      const sono=$('#horario-sono'); if(sono && !sono.value) sono.value='23:30 - 07:00';
-      const desloc=$('#tempo-deslocamento'); if(desloc && !desloc.value) desloc.value='30';
-      const rotina=$('#tipo-rotina'); if(rotina) rotina.value='so-estuda';
-      window.showToast?.('Modo rápido aplicado. Preencha nome, curso, universidade e suas matérias.', 'success');
-    });
-    $('#setup-fill-student-night')?.addEventListener('click',()=>{
-      const turno=$('#turno-principal'); if(turno) turno.value='noite';
-      const horas=$('#horas-maximas'); if(horas) horas.value='5';
-      const rotina=$('#tipo-rotina'); if(rotina) rotina.value='so-estuda';
-      window.showToast?.('Perfil noturno aplicado.', 'success');
-    });
-  }
-
-  function patchLoadViewHooks(){
-    const wait=setInterval(()=>{
-      if(!window.StudyLifeControl?.prototype?.loadView) return;
-      clearInterval(wait);
-      const proto=window.StudyLifeControl.prototype;
-      const original=proto.loadView;
-      proto.loadView=function(view,...rest){
-        const res=original.call(this,view,...rest);
-        setTimeout(()=>{ renderNotifications(); ensureNotificationPanel(); ensureMobileQuickbar(); if($('#setup-screen') && getComputedStyle($('#setup-screen')).display !== 'none') improveOnboarding(); },80);
-        return res;
-      };
-    },150);
-  }
-
-  document.addEventListener('DOMContentLoaded',()=>{
-    patchDashboard(); patchAulaSubmit(); patchOpenModalAndDetail(); patchLoadViewHooks();
-    setTimeout(()=>{ ensureNotificationPanel(); renderNotifications(); injectAulaEnhancements(); improveOnboarding(); ensureMobileQuickbar(); },700);
-  });
-  document.addEventListener('app-ready',()=>{ setTimeout(()=>{ ensureNotificationPanel(); renderNotifications(); improveOnboarding(); ensureMobileQuickbar(); },120); });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
 })();

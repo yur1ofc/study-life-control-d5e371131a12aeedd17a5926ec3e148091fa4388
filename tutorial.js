@@ -1,448 +1,378 @@
-// theme-engine.js — Motor de personalização de tema completo
 (function () {
-  'use strict';
+  function el(id) { return document.getElementById(id); }
+  function wait(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
-  const STORAGE_KEY = 'slc-theme-config';
+  const HELP_SECTIONS = [
+    { icon: '🚀', title: 'Primeiros passos', body: 'Comece cadastrando suas matérias, depois adicione tarefas, provas e sessões de estudo. O Dashboard vai ficando cada vez mais útil conforme você alimenta o sistema.' },
+    { icon: '🧠', title: 'Mentor IA', body: 'O Mentor IA usa seus dados reais do site para responder melhor. Perguntas boas: “o que estudar hoje?”, “como estou em física?”, “o que está atrasado?” e “organiza meu dia agora”.' },
+    { icon: '📊', title: 'Dashboard', body: 'Mostra progresso, horas estudadas, matérias em risco, próximas provas e visão geral da semana. É a tela principal para entender sua situação acadêmica.' },
+    { icon: '✅', title: 'Tarefas, provas e materiais', body: 'Registre tudo por matéria. Quanto mais completo estiver, melhores ficam os alertas, o plano de estudo e a ajuda da IA.' },
+    { icon: '🎮', title: 'Gamificação', body: 'Você ganha XP ao concluir tarefas, revisões e sessões. Também desbloqueia conquistas. A aba de Gamificação mostra seu nível, histórico e conquistas bloqueadas e desbloqueadas.' },
+    { icon: '🔔', title: 'Notificações', body: 'Use o sino no topo para ver alertas de tarefas atrasadas, provas chegando, pendências e recomendações importantes.' },
+    { icon: '⚙️', title: 'Configuração inteligente', body: 'Cadastre sua grade horária, frequência, notas e metas. Isso permite análises mais avançadas, risco acadêmico mais preciso e respostas melhores do Mentor IA.' }
+  ];
 
-  // ── Presets de tema ────────────────────────────────────────────────────────
-  const PRESETS = {
-    dark: {
-      label: 'Escuro (padrão)', icon: '🌑',
-      vars: {
-        '--bg-primary':    '#0a0f1f',
-        '--bg-secondary':  '#151f2f',
-        '--bg-tertiary':   '#1e2b3a',
-        '--accent-primary':'#3b82f6',
-        '--accent-secondary':'#8b5cf6',
-        '--accent-success':'#10b981',
-        '--accent-warning':'#f59e0b',
-        '--accent-danger': '#ef4444',
-        '--text-primary':  '#f8fafc',
-        '--text-secondary':'#94a3b8',
-        '--text-tertiary': '#64748b',
-        '--border':        '#2d3a4f',
-        '--font-size-base':'15px',
-        '--radius-lg':     '24px',
-        '--radius-md':     '16px',
-        '--radius-sm':     '12px',
+  const steps = [
+    { id: 'dashboard', view: 'dashboard', title: 'Bem-vindo ao Study Life Control', text: 'Esse é o seu painel principal. Aqui você acompanha horas estudadas, risco acadêmico, provas e o que precisa de atenção primeiro.', selector: '[data-tutorial="nav-dashboard"]' },
+    { id: 'mentor', view: 'mentor-ia', title: 'Mentor IA', text: 'Aqui fica o seu assistente inteligente. Ele responde com base nos seus dados reais do site e ajuda a decidir o que estudar e onde você está pior.', selector: '[data-tutorial="nav-mentor"]' },
+    { id: 'tarefas', view: 'tarefas', title: 'Tarefas e organização', text: 'Cadastre tarefas, trabalhos e pendências aqui. Isso alimenta as notificações, o plano de estudo e a visão de prioridade.', selector: '[data-tutorial="nav-tarefas"]' },
+    { id: 'gamificacao', view: 'gamificacao', title: 'Nível, XP e conquistas', text: 'A gamificação transforma seu progresso em algo visível. Concluir tarefas, revisões e sessões gera XP e pode desbloquear conquistas.', selector: '[data-tutorial="nav-gamificacao"]' },
+    { id: 'notificacoes', title: 'Central de notificações', text: 'O sino do topo concentra seus alertas importantes. Quando você entrar no site com pendências, ele pode abrir automaticamente para chamar sua atenção.', selector: '[data-tutorial="notification-button"]' },
+    { id: 'ajuda', view: 'ajuda', title: 'Central de ajuda', text: 'Essa aba reúne o manual do sistema, perguntas que valem a pena fazer para a IA e um botão para reabrir este tutorial quando quiser.', selector: '[data-tutorial="nav-ajuda"]' }
+  ];
+
+  function assignTutorialTargets() {
+    const mapping = [
+      ['[data-view="dashboard"]', 'nav-dashboard'],
+      ['[data-view="mentor-ia"]', 'nav-mentor'],
+      ['[data-view="tarefas"]', 'nav-tarefas'],
+      ['[data-view="gamificacao"]', 'nav-gamificacao'],
+      ['[data-view="ajuda"]', 'nav-ajuda'],
+      ['#notification-badge', 'notification-button'],
+      ['#user-info', 'user-profile'],
+      ['[data-view="foco"]', 'nav-foco'],
+      ['[data-view="mapa-aprendizado"]', 'nav-mapa']
+    ];
+    mapping.forEach(([selector, name]) => {
+      const node = document.querySelector(selector);
+      if (node) node.setAttribute('data-tutorial', name);
+    });
+  }
+
+  function ensureOverlay() {
+    let overlay = el('tutorial-overlay');
+    if (overlay) return overlay;
+    overlay = document.createElement('div');
+    overlay.id = 'tutorial-overlay';
+    overlay.className = 'tutorial-overlay';
+    overlay.innerHTML = `
+      <div class="tutorial-backdrop"></div>
+      <div class="tutorial-spotlight"></div>
+      <div class="tutorial-card" id="tutorial-card" role="dialog" aria-modal="true" aria-live="polite">
+        <div class="tutorial-progress">
+          <span id="tutorial-progress-text"></span>
+          <button class="tutorial-skip" id="tutorial-skip" type="button">Pular</button>
+        </div>
+        <div class="tutorial-card-arrow" id="tutorial-card-arrow"></div>
+        <h3 id="tutorial-title"></h3>
+        <p id="tutorial-text"></p>
+        <div class="tutorial-actions">
+          <button class="btn-secondary" id="tutorial-prev" type="button">Voltar</button>
+          <button class="btn-primary" id="tutorial-next" type="button">Próximo</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    return overlay;
+  }
+
+  function markNavActive(view) {
+    document.querySelectorAll('.nav-item').forEach(item => item.classList.toggle('active', item.dataset.view === view));
+    const pageTitle = el('page-title');
+    if (pageTitle) {
+      const map = { ajuda: 'Ajuda', 'mentor-ia': 'Mentor IA', dashboard: 'Dashboard', tarefas: 'Tarefas', gamificacao: 'Gamificação' };
+      pageTitle.textContent = map[view] || pageTitle.textContent;
+    }
+  }
+
+  function renderHelpPage() {
+    const suggestions = ['o que estudar hoje?', 'quais matérias estão em risco?', 'organiza meu dia agora', 'como estou em física?', 'o que está atrasado?', 'me dá um raio-x completo'];
+    return `
+      <div class="view-header">
+        <h2><i class="fas fa-question-circle"></i> Central de Ajuda</h2>
+        <div class="help-header-actions">
+          <button class="btn-primary" id="btn-start-tutorial"><i class="fas fa-wand-magic-sparkles"></i> Ver tutorial guiado</button>
+        </div>
+      </div>
+      <div class="help-hero-card">
+        <div>
+          <span class="tag">Tutorial interativo</span>
+          <h3>Aprenda tudo que dá para fazer no site</h3>
+          <p>Use esta área para entender o fluxo completo do sistema, descobrir recursos escondidos e ver exemplos de perguntas que funcionam muito bem com o Mentor IA.</p>
+        </div>
+        <div class="help-hero-actions">
+          <button class="btn-secondary" id="btn-open-tutorial-inline">Começar agora</button>
+        </div>
+      </div>
+      <div class="help-grid">
+        ${HELP_SECTIONS.map(section => `
+          <article class="help-card-pro">
+            <div class="help-card-icon">${section.icon}</div>
+            <div>
+              <h3>${section.title}</h3>
+              <p>${section.body}</p>
+            </div>
+          </article>
+        `).join('')}
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3><i class="fas fa-robot"></i> Perguntas que chamam atenção no Mentor IA</h3>
+        </div>
+        <div class="card-body">
+          <div class="help-chip-list">
+            ${suggestions.map(text => `<button class="help-chip" data-help-question="${text.replace(/"/g, '&quot;')}">${text}</button>`).join('')}
+          </div>
+          <p class="text-secondary" style="margin-top:12px;">Ao clicar, a pergunta abre na aba do Mentor IA para você testar direto.</p>
+        </div>
+      </div>
+    `;
+  }
+
+  const SiteTutorial = {
+    index: 0,
+    running: false,
+    pendingAutostart: false,
+
+    hasCompleted() { return localStorage.getItem('slc_tutorial_completed') === '1'; },
+    markCompleted() { localStorage.setItem('slc_tutorial_completed', '1'); },
+    reset() { localStorage.removeItem('slc_tutorial_completed'); },
+
+    maybeStart() {
+      if (this.running || this.hasCompleted() || !window.app || !document.getElementById('app-screen') || document.getElementById('app-screen').classList.contains('hidden')) return;
+      if (this.pendingAutostart) return;
+      this.pendingAutostart = true;
+      setTimeout(() => {
+        this.pendingAutostart = false;
+        assignTutorialTargets();
+        if (!this.hasCompleted() && !this.running) this.start();
+      }, 700);
+    },
+
+    start(startIndex = 0) {
+      assignTutorialTargets();
+      this.index = Math.max(0, Math.min(startIndex, steps.length - 1));
+      this.running = true;
+      ensureOverlay().classList.add('open');
+      this.bindControls();
+      this.showStep();
+      window.addEventListener('resize', this.handleViewportChange);
+      window.addEventListener('scroll', this.handleViewportChange, true);
+    },
+
+    stop(markDone = false) {
+      this.running = false;
+      ensureOverlay().classList.remove('open');
+      document.querySelectorAll('.tutorial-target-active').forEach(node => node.classList.remove('tutorial-target-active'));
+      window.removeEventListener('resize', this.handleViewportChange);
+      window.removeEventListener('scroll', this.handleViewportChange, true);
+      if (markDone) this.markCompleted();
+    },
+
+    handleViewportChange: () => {
+      if (window.SiteTutorial && window.SiteTutorial.running) {
+        window.SiteTutorial.positionCurrentStep();
       }
     },
-    light: {
-      label: 'Claro', icon: '☀️',
-      vars: {
-        '--bg-primary':    '#f0f4f8',
-        '--bg-secondary':  '#ffffff',
-        '--bg-tertiary':   '#e8edf3',
-        '--accent-primary':'#2563eb',
-        '--accent-secondary':'#7c3aed',
-        '--accent-success':'#059669',
-        '--accent-warning':'#d97706',
-        '--accent-danger': '#dc2626',
-        '--text-primary':  '#0f172a',
-        '--text-secondary':'#475569',
-        '--text-tertiary': '#94a3b8',
-        '--border':        '#cbd5e1',
-        '--font-size-base':'15px',
-        '--radius-lg':     '24px',
-        '--radius-md':     '16px',
-        '--radius-sm':     '12px',
+
+    bindControls() {
+      const overlay = ensureOverlay();
+      const nextBtn = el('tutorial-next');
+      const prevBtn = el('tutorial-prev');
+      const skipBtn = el('tutorial-skip');
+      const backdrop = overlay.querySelector('.tutorial-backdrop');
+      if (nextBtn) nextBtn.onclick = () => this.next();
+      if (prevBtn) prevBtn.onclick = () => this.prev();
+      if (skipBtn) skipBtn.onclick = () => this.stop(true);
+      if (backdrop) backdrop.onclick = () => this.stop(true);
+    },
+
+    next() {
+      if (this.index >= steps.length - 1) {
+        this.stop(true);
+        if (window.app && window.app.loadView) window.app.loadView('dashboard');
+        markNavActive('dashboard');
+        return;
+      }
+      this.index += 1;
+      this.showStep();
+    },
+
+    prev() {
+      if (this.index <= 0) return this.showStep();
+      this.index -= 1;
+      this.showStep();
+    },
+
+    async ensureView(step) {
+      if (step.view && window.app && window.app.loadView) {
+        window.app.loadView(step.view);
+        markNavActive(step.view);
+      }
+      assignTutorialTargets();
+      await wait(200);
+      assignTutorialTargets();
+      await wait(180);
+    },
+
+    async getTarget(step) {
+      let target = null;
+      for (let i = 0; i < 12; i += 1) {
+        assignTutorialTargets();
+        target = document.querySelector(step.selector);
+        if (target) {
+          const rect = target.getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0) return target;
+        }
+        await wait(120);
+      }
+      return target;
+    },
+
+    positionCard(target) {
+      const overlay = ensureOverlay();
+      const card = overlay.querySelector('#tutorial-card');
+      const arrow = overlay.querySelector('#tutorial-card-arrow');
+      if (!card || !arrow || !target) return;
+
+      const rect = target.getBoundingClientRect();
+      const margin = 16;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+
+      card.style.left = '';
+      card.style.right = '';
+      card.style.top = '';
+      card.style.bottom = '';
+      arrow.style.left = '';
+      arrow.style.right = '';
+      arrow.style.top = '';
+      arrow.style.bottom = '';
+      card.classList.remove('arrow-left', 'arrow-right', 'arrow-top', 'arrow-bottom', 'mobile');
+
+      const isMobile = vw <= 820;
+      if (isMobile) {
+        card.classList.add('mobile', 'arrow-bottom');
+        card.style.left = `${margin}px`;
+        card.style.right = `${margin}px`;
+        card.style.bottom = `${margin}px`;
+        arrow.style.left = `${Math.max(26, Math.min(vw - margin * 2 - 28, rect.left + rect.width / 2 - margin - 10))}px`;
+        arrow.style.top = '-10px';
+        return;
+      }
+
+      const cardWidth = Math.min(420, vw - margin * 2);
+      const cardHeight = card.offsetHeight || 240;
+      const spaceRight = vw - rect.right;
+      const spaceLeft = rect.left;
+      const spaceBottom = vh - rect.bottom;
+
+      if (spaceRight >= cardWidth + 32) {
+        const top = Math.max(margin, Math.min(vh - cardHeight - margin, rect.top + rect.height / 2 - cardHeight / 2));
+        card.classList.add('arrow-left');
+        card.style.left = `${Math.min(vw - cardWidth - margin, rect.right + 20)}px`;
+        card.style.top = `${top}px`;
+        arrow.style.left = '-10px';
+        arrow.style.top = `${Math.max(22, Math.min(cardHeight - 30, rect.top + rect.height / 2 - top - 10))}px`;
+      } else if (spaceLeft >= cardWidth + 32) {
+        const top = Math.max(margin, Math.min(vh - cardHeight - margin, rect.top + rect.height / 2 - cardHeight / 2));
+        card.classList.add('arrow-right');
+        card.style.left = `${Math.max(margin, rect.left - cardWidth - 20)}px`;
+        card.style.top = `${top}px`;
+        arrow.style.right = '-10px';
+        arrow.style.top = `${Math.max(22, Math.min(cardHeight - 30, rect.top + rect.height / 2 - top - 10))}px`;
+      } else if (spaceBottom >= cardHeight + 30) {
+        const left = Math.max(margin, Math.min(vw - cardWidth - margin, rect.left + rect.width / 2 - cardWidth / 2));
+        const top = Math.min(vh - cardHeight - margin, rect.bottom + 18);
+        card.classList.add('arrow-top');
+        card.style.left = `${left}px`;
+        card.style.top = `${top}px`;
+        arrow.style.top = '-10px';
+        arrow.style.left = `${Math.max(24, Math.min(cardWidth - 30, rect.left + rect.width / 2 - left - 10))}px`;
+      } else {
+        const left = Math.max(margin, Math.min(vw - cardWidth - margin, rect.left + rect.width / 2 - cardWidth / 2));
+        const top = Math.max(margin, rect.top - cardHeight - 18);
+        card.classList.add('arrow-bottom');
+        card.style.left = `${left}px`;
+        card.style.top = `${top}px`;
+        arrow.style.bottom = '-10px';
+        arrow.style.left = `${Math.max(24, Math.min(cardWidth - 30, rect.left + rect.width / 2 - left - 10))}px`;
       }
     },
-    midnight: {
-      label: 'Midnight Blue', icon: '🌊',
-      vars: {
-        '--bg-primary':    '#060d1a',
-        '--bg-secondary':  '#0d1b2e',
-        '--bg-tertiary':   '#142338',
-        '--accent-primary':'#38bdf8',
-        '--accent-secondary':'#818cf8',
-        '--accent-success':'#34d399',
-        '--accent-warning':'#fbbf24',
-        '--accent-danger': '#f87171',
-        '--text-primary':  '#e0f2fe',
-        '--text-secondary':'#7dd3fc',
-        '--text-tertiary': '#38bdf8',
-        '--border':        '#1e3a5f',
-        '--font-size-base':'15px',
-        '--radius-lg':     '24px',
-        '--radius-md':     '16px',
-        '--radius-sm':     '12px',
-      }
+
+    updateSpotlight(target) {
+      const spotlight = ensureOverlay().querySelector('.tutorial-spotlight');
+      if (!spotlight || !target) return;
+      const rect = target.getBoundingClientRect();
+      const padX = window.innerWidth <= 820 ? 8 : 12;
+      const padY = window.innerWidth <= 820 ? 8 : 10;
+      spotlight.style.top = `${Math.max(8, rect.top - padY)}px`;
+      spotlight.style.left = `${Math.max(8, rect.left - padX)}px`;
+      spotlight.style.width = `${Math.max(72, rect.width + padX * 2)}px`;
+      spotlight.style.height = `${Math.max(36, rect.height + padY * 2)}px`;
     },
-    forest: {
-      label: 'Floresta', icon: '🌿',
-      vars: {
-        '--bg-primary':    '#0a1a0f',
-        '--bg-secondary':  '#112318',
-        '--bg-tertiary':   '#1a3324',
-        '--accent-primary':'#4ade80',
-        '--accent-secondary':'#a3e635',
-        '--accent-success':'#86efac',
-        '--accent-warning':'#fde68a',
-        '--accent-danger': '#fca5a5',
-        '--text-primary':  '#f0fdf4',
-        '--text-secondary':'#86efac',
-        '--text-tertiary': '#4ade80',
-        '--border':        '#1f4428',
-        '--font-size-base':'15px',
-        '--radius-lg':     '24px',
-        '--radius-md':     '16px',
-        '--radius-sm':     '12px',
-      }
+
+    positionCurrentStep() {
+      const step = steps[this.index];
+      if (!step) return;
+      const target = document.querySelector(step.selector);
+      if (!target) return;
+      this.updateSpotlight(target);
+      this.positionCard(target);
     },
-    rose: {
-      label: 'Rose Gold', icon: '🌸',
-      vars: {
-        '--bg-primary':    '#1a0f14',
-        '--bg-secondary':  '#2a1520',
-        '--bg-tertiary':   '#3d1f2e',
-        '--accent-primary':'#fb7185',
-        '--accent-secondary':'#f472b6',
-        '--accent-success':'#34d399',
-        '--accent-warning':'#fbbf24',
-        '--accent-danger': '#f87171',
-        '--text-primary':  '#fff1f2',
-        '--text-secondary':'#fda4af',
-        '--text-tertiary': '#fb7185',
-        '--border':        '#4d2235',
-        '--font-size-base':'15px',
-        '--radius-lg':     '24px',
-        '--radius-md':     '16px',
-        '--radius-sm':     '12px',
+
+    async showStep() {
+      const step = steps[this.index];
+      if (!step) return;
+
+      await this.ensureView(step);
+      document.querySelectorAll('.tutorial-target-active').forEach(node => node.classList.remove('tutorial-target-active'));
+
+      const target = await this.getTarget(step);
+      if (!target) {
+        if (this.index < steps.length - 1) {
+          this.index += 1;
+          return this.showStep();
+        }
+        return;
       }
-    },
-    slate: {
-      label: 'Slate Pro', icon: '🪨',
-      vars: {
-        '--bg-primary':    '#f8fafc',
-        '--bg-secondary':  '#ffffff',
-        '--bg-tertiary':   '#f1f5f9',
-        '--accent-primary':'#0f172a',
-        '--accent-secondary':'#334155',
-        '--accent-success':'#059669',
-        '--accent-warning':'#d97706',
-        '--accent-danger': '#dc2626',
-        '--text-primary':  '#0f172a',
-        '--text-secondary':'#475569',
-        '--text-tertiary': '#94a3b8',
-        '--border':        '#e2e8f0',
-        '--font-size-base':'15px',
-        '--radius-lg':     '8px',
-        '--radius-md':     '6px',
-        '--radius-sm':     '4px',
-      }
-    },
+
+      target.classList.add('tutorial-target-active');
+      target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      await wait(280);
+
+      this.updateSpotlight(target);
+      this.positionCard(target);
+
+      el('tutorial-title').textContent = step.title;
+      el('tutorial-text').textContent = step.text;
+      el('tutorial-progress-text').textContent = `Passo ${this.index + 1} de ${steps.length}`;
+      const nextBtn = el('tutorial-next');
+      if (nextBtn) nextBtn.textContent = this.index === steps.length - 1 ? 'Finalizar' : 'Próximo';
+    }
   };
 
-  // ── Carrega / salva config ─────────────────────────────────────────────────
-  function loadConfig() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : { preset: 'dark', custom: {} };
-    } catch { return { preset: 'dark', custom: {} }; }
-  }
+  function bindHelpActions(root = document) {
+    root.querySelectorAll('#btn-start-tutorial,#btn-open-tutorial-inline').forEach(btn => {
+      if (btn.dataset.bound) return;
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', () => SiteTutorial.start(0));
+    });
 
-  function saveConfig(cfg) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
-  }
-
-  // ── Aplica vars no :root ───────────────────────────────────────────────────
-  function applyVars(vars) {
-    const root = document.documentElement;
-    Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, v));
-    // Garante legibilidade: ajusta card-shadow baseado no bg
-    const bg = vars['--bg-primary'] || '';
-    const isDark = isColorDark(bg);
-    root.style.setProperty('--card-shadow',
-      isDark
-        ? '0 20px 25px -5px rgba(0,0,0,0.5), 0 10px 10px -5px rgba(0,0,0,0.3)'
-        : '0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.05)'
-    );
-    // Garante legibilidade de botões sobre accent-primary
-    root.style.setProperty('--btn-text', getContrastColor(vars['--accent-primary'] || '#3b82f6'));
-  }
-
-  function isColorDark(hex) {
-    hex = hex.replace('#', '');
-    if (hex.length < 6) return true;
-    const r = parseInt(hex.slice(0,2),16);
-    const g = parseInt(hex.slice(2,4),16);
-    const b = parseInt(hex.slice(4,6),16);
-    return (r*299 + g*587 + b*114) / 1000 < 128;
-  }
-
-  function getContrastColor(hex) {
-    return isColorDark(hex) ? '#ffffff' : '#0f172a';
-  }
-
-  function applyPreset(presetKey, customOverrides = {}) {
-    const preset = PRESETS[presetKey] || PRESETS.dark;
-    const vars = { ...preset.vars, ...customOverrides };
-    applyVars(vars);
-    // Atualiza data-theme para compatibilidade com CSS existente
-    const isDark = isColorDark(vars['--bg-primary']);
-    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
-  }
-
-  // ── Init: aplica tema salvo imediatamente ─────────────────────────────────
-  function init() {
-    const cfg = loadConfig();
-    applyPreset(cfg.preset, cfg.custom);
-    window.__themeEngine = { PRESETS, applyPreset, loadConfig, saveConfig, getContrastColor, isColorDark };
-  }
-
-  // Aplica ANTES do render para evitar flash
-  init();
-
-  // ── Renderiza painel de customização ──────────────────────────────────────
-  function renderThemePanel() {
-    const cfg = loadConfig();
-    const current = PRESETS[cfg.preset] || PRESETS.dark;
-    const mergedVars = { ...current.vars, ...cfg.custom };
-
-    return `
-    <div class="card" id="theme-panel-card" style="margin-top:20px;">
-      <div class="card-header" style="display:flex;align-items:center;gap:10px;">
-        <span style="font-size:20px;">🎨</span>
-        <h3 style="margin:0;">Personalizar Tema</h3>
-      </div>
-      <div class="card-body">
-
-        <!-- Presets -->
-        <div style="margin-bottom:24px;">
-          <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">Tema base</p>
-          <div style="display:flex;flex-wrap:wrap;gap:8px;" id="theme-presets">
-            ${Object.entries(PRESETS).map(([key, p]) => `
-              <button class="theme-preset-btn ${cfg.preset === key ? 'active' : ''}"
-                data-preset="${key}"
-                style="
-                  padding:8px 14px;border-radius:10px;border:2px solid ${cfg.preset === key ? 'var(--accent-primary)' : 'var(--border)'};
-                  background:${p.vars['--bg-secondary']};color:${p.vars['--text-primary']};
-                  font-size:13px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px;font-family:inherit;
-                ">
-                ${p.icon} ${p.label}
-              </button>
-            `).join('')}
-          </div>
-        </div>
-
-        <!-- Ajustes finos -->
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:24px;">
-          ${[
-            { var: '--accent-primary',   label: '🎯 Cor principal',    type: 'color' },
-            { var: '--accent-secondary', label: '✨ Cor secundária',   type: 'color' },
-            { var: '--accent-success',   label: '✅ Cor de sucesso',   type: 'color' },
-            { var: '--accent-warning',   label: '⚠️ Cor de aviso',     type: 'color' },
-            { var: '--accent-danger',    label: '🚨 Cor de perigo',    type: 'color' },
-            { var: '--bg-primary',       label: '🌑 Fundo principal',  type: 'color' },
-            { var: '--bg-secondary',     label: '📦 Fundo cards',      type: 'color' },
-            { var: '--text-primary',     label: '📝 Texto principal',  type: 'color' },
-            { var: '--text-secondary',   label: '💬 Texto secundário', type: 'color' },
-            { var: '--border',           label: '📐 Cor de borda',     type: 'color' },
-          ].map(item => `
-            <div style="display:flex;flex-direction:column;gap:6px;">
-              <label style="font-size:12px;color:var(--text-secondary);">${item.label}</label>
-              <div style="display:flex;align-items:center;gap:8px;">
-                <input type="color" class="theme-color-input" data-var="${item.var}"
-                  value="${mergedVars[item.var] || '#000000'}"
-                  style="width:36px;height:36px;border:none;border-radius:8px;cursor:pointer;background:none;padding:0;">
-                <span class="theme-color-value" style="font-size:11px;color:var(--text-tertiary);font-family:monospace;">
-                  ${mergedVars[item.var] || '#000000'}
-                </span>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-
-        <!-- Tamanho da fonte -->
-        <div style="margin-bottom:24px;">
-          <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:8px;">
-            🔤 Tamanho da fonte: <strong id="font-size-label">${mergedVars['--font-size-base'] || '15px'}</strong>
-          </label>
-          <input type="range" id="theme-font-size" min="12" max="20" step="1"
-            value="${parseInt(mergedVars['--font-size-base']) || 15}"
-            style="width:100%;accent-color:var(--accent-primary);">
-          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-tertiary);margin-top:4px;">
-            <span>Pequeno (12px)</span><span>Normal (15px)</span><span>Grande (20px)</span>
-          </div>
-        </div>
-
-        <!-- Arredondamento -->
-        <div style="margin-bottom:24px;">
-          <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:8px;">
-            🔘 Arredondamento dos cards: <strong id="radius-label">${parseInt(mergedVars['--radius-lg']) || 24}px</strong>
-          </label>
-          <input type="range" id="theme-radius" min="0" max="32" step="4"
-            value="${parseInt(mergedVars['--radius-lg']) || 24}"
-            style="width:100%;accent-color:var(--accent-primary);">
-          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-tertiary);margin-top:4px;">
-            <span>Quadrado</span><span>Médio</span><span>Bem arredondado</span>
-          </div>
-        </div>
-
-        <!-- Preview -->
-        <div id="theme-preview" style="
-          padding:16px;border-radius:var(--radius-md);
-          background:var(--bg-secondary);border:1px solid var(--border);
-          margin-bottom:20px;
-        ">
-          <p style="font-size:13px;color:var(--text-secondary);margin-bottom:10px;">Preview</p>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button style="padding:8px 16px;border-radius:var(--radius-sm);background:var(--accent-primary);color:${getContrastColor(mergedVars['--accent-primary']||'#3b82f6')};border:none;font-size:13px;cursor:pointer;">Primário</button>
-            <button style="padding:8px 16px;border-radius:var(--radius-sm);background:var(--accent-secondary);color:${getContrastColor(mergedVars['--accent-secondary']||'#8b5cf6')};border:none;font-size:13px;cursor:pointer;">Secundário</button>
-            <button style="padding:8px 16px;border-radius:var(--radius-sm);background:var(--accent-success);color:${getContrastColor(mergedVars['--accent-success']||'#10b981')};border:none;font-size:13px;cursor:pointer;">Sucesso</button>
-            <button style="padding:8px 16px;border-radius:var(--radius-sm);background:var(--accent-warning);color:${getContrastColor(mergedVars['--accent-warning']||'#f59e0b')};border:none;font-size:13px;cursor:pointer;">Aviso</button>
-            <button style="padding:8px 16px;border-radius:var(--radius-sm);background:var(--accent-danger);color:${getContrastColor(mergedVars['--accent-danger']||'#ef4444')};border:none;font-size:13px;cursor:pointer;">Perigo</button>
-          </div>
-        </div>
-
-        <!-- Ações -->
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          <button class="btn-primary" id="btn-save-theme">
-            <i class="fas fa-save"></i> Salvar tema
-          </button>
-          <button class="btn-secondary" id="btn-reset-theme">
-            <i class="fas fa-undo"></i> Restaurar padrão
-          </button>
-        </div>
-
-      </div>
-    </div>`;
-  }
-
-  function getContrastColor(hex) {
-    return isColorDark(hex) ? '#ffffff' : '#0f172a';
-  }
-
-  // ── Bind eventos do painel ────────────────────────────────────────────────
-  function bindThemePanel() {
-    const card = document.getElementById('theme-panel-card');
-    if (!card || card.dataset.bound) return;
-    card.dataset.bound = '1';
-
-    const cfg = loadConfig();
-
-    // Preset buttons
-    card.querySelectorAll('.theme-preset-btn').forEach(btn => {
+    root.querySelectorAll('[data-help-question]').forEach(btn => {
+      if (btn.dataset.bound) return;
+      btn.dataset.bound = '1';
       btn.addEventListener('click', () => {
-        cfg.preset = btn.dataset.preset;
-        cfg.custom = {};
-        saveConfig(cfg);
-        applyPreset(cfg.preset, {});
-        // Re-render panel
-        const container = document.querySelector('#view-container, .view-content, main');
-        if (window.app?.loadView) window.app.loadView('configuracoes');
+        const question = btn.getAttribute('data-help-question') || '';
+        if (window.app && window.app.loadView) window.app.loadView('mentor-ia');
+        markNavActive('mentor-ia');
+        setTimeout(() => {
+          const input = document.querySelector('#mentor-ia-input, #ai-chat-input, .mentor-chat-input textarea, .mentor-chat-input input');
+          if (input) {
+            input.value = question;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.focus();
+          }
+        }, 120);
       });
-    });
-
-    // Color inputs — live preview
-    card.querySelectorAll('.theme-color-input').forEach(input => {
-      input.addEventListener('input', () => {
-        const varName = input.dataset.var;
-        const val = input.value;
-        document.documentElement.style.setProperty(varName, val);
-        const span = input.parentElement.querySelector('.theme-color-value');
-        if (span) span.textContent = val;
-        if (!cfg.custom) cfg.custom = {};
-        cfg.custom[varName] = val;
-        // Update preview button contrast
-        updatePreviewContrast();
-      });
-    });
-
-    // Font size slider
-    const fontSlider = document.getElementById('theme-font-size');
-    const fontLabel  = document.getElementById('font-size-label');
-    if (fontSlider) {
-      fontSlider.addEventListener('input', () => {
-        const val = fontSlider.value + 'px';
-        document.documentElement.style.setProperty('--font-size-base', val);
-        document.documentElement.style.fontSize = val;
-        if (fontLabel) fontLabel.textContent = val;
-        if (!cfg.custom) cfg.custom = {};
-        cfg.custom['--font-size-base'] = val;
-      });
-    }
-
-    // Radius slider
-    const radiusSlider = document.getElementById('theme-radius');
-    const radiusLabel  = document.getElementById('radius-label');
-    if (radiusSlider) {
-      radiusSlider.addEventListener('input', () => {
-        const v = parseInt(radiusSlider.value);
-        document.documentElement.style.setProperty('--radius-lg', v + 'px');
-        document.documentElement.style.setProperty('--radius-md', Math.max(0, v - 8) + 'px');
-        document.documentElement.style.setProperty('--radius-sm', Math.max(0, v - 12) + 'px');
-        if (radiusLabel) radiusLabel.textContent = v + 'px';
-        if (!cfg.custom) cfg.custom = {};
-        cfg.custom['--radius-lg'] = v + 'px';
-        cfg.custom['--radius-md'] = Math.max(0, v - 8) + 'px';
-        cfg.custom['--radius-sm'] = Math.max(0, v - 12) + 'px';
-      });
-    }
-
-    // Save
-    document.getElementById('btn-save-theme')?.addEventListener('click', () => {
-      saveConfig(cfg);
-      if (window.showToast) window.showToast('Tema salvo com sucesso! ✨', 'success');
-    });
-
-    // Reset
-    document.getElementById('btn-reset-theme')?.addEventListener('click', () => {
-      cfg.preset = 'dark';
-      cfg.custom = {};
-      saveConfig(cfg);
-      applyPreset('dark', {});
-      if (window.app?.loadView) window.app.loadView('configuracoes');
-      if (window.showToast) window.showToast('Tema restaurado para o padrão', 'success');
     });
   }
 
-  function updatePreviewContrast() {
-    const preview = document.getElementById('theme-preview');
-    if (!preview) return;
-    const btns = preview.querySelectorAll('button');
-    const vars = ['--accent-primary','--accent-secondary','--accent-success','--accent-warning','--accent-danger'];
-    btns.forEach((btn, i) => {
-      if (!vars[i]) return;
-      const color = getComputedStyle(document.documentElement).getPropertyValue(vars[i]).trim();
-      btn.style.color = getContrastColor(color);
-      btn.style.background = color;
-    });
-  }
-
-  // ── Patch no renderConfiguracoes para injetar painel ─────────────────────
-  function patchConfigView() {
-    if (!window.ViewRenderer) return;
-    if (window.ViewRenderer.prototype.__themePanelPatched) return;
-
-    const orig = window.ViewRenderer.prototype.renderConfiguracoes;
-    window.ViewRenderer.prototype.renderConfiguracoes = function () {
-      return orig.call(this) + renderThemePanel();
-    };
-    window.ViewRenderer.prototype.__themePanelPatched = true;
-  }
-
-  // ── Observa carregamento do ViewRenderer ─────────────────────────────────
-  let _attempts = 0;
-  const _interval = setInterval(() => {
-    if (window.ViewRenderer) {
-      patchConfigView();
-      clearInterval(_interval);
-    }
-    if (++_attempts > 30) clearInterval(_interval);
-  }, 200);
-
-  // ── Observa quando a view de configurações é renderizada ─────────────────
-  const _observer = new MutationObserver(() => {
-    if (document.getElementById('theme-panel-card')) bindThemePanel();
-  });
+  window.SiteTutorial = SiteTutorial;
+  window.renderHelpPage = renderHelpPage;
+  window.bindHelpActions = bindHelpActions;
 
   document.addEventListener('DOMContentLoaded', () => {
-    _observer.observe(document.body, { childList: true, subtree: true });
+    assignTutorialTargets();
+    setTimeout(() => SiteTutorial.maybeStart(), 1200);
   });
-
-  // Expõe globalmente
-  window.themeEngine = { renderThemePanel, bindThemePanel, PRESETS, loadConfig, saveConfig, applyPreset, init };
-
 })();
