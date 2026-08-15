@@ -1,503 +1,1158 @@
-// improvements.js — Tema, sidebar colapsável, Ctrl+K, Charts, Export
-(function () {
-  'use strict';
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Life Control - Sistema Inteligente para Universitários</title>
+    <meta name="description" content="Organize estudos, tarefas, provas, hábitos e rotina acadêmica em um painel inteligente feito para universitários.">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta property="og:title" content="Study Life Control">
+    <meta property="og:description" content="Planejamento acadêmico inteligente para universitários.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://study-life-control.vercel.app">
+    <meta property="og:image" content="https://study-life-control.vercel.app/og-image.svg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Study Life Control">
+    <meta name="twitter:description" content="Planejamento acadêmico inteligente para universitários.">
+    <meta name="twitter:image" content="https://study-life-control.vercel.app/og-image.svg">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-  // ── 1. TEMA — gerenciado por theme-engine.js ────────────────────────────
-
-  // ── 2. SIDEBAR: grupos colapsáveis ───────────────────────────────────────
-  function initSidebarGroups() {
-    const headers = document.querySelectorAll('.nav-group-header');
-    if (!headers.length) return;
-
-    // Restaura estado salvo
-    headers.forEach(btn => {
-      const group = btn.dataset.group;
-      const items = document.getElementById(`group-${group}`);
-      if (!items) return;
-
-      const collapsed = localStorage.getItem(`slc-nav-${group}`) === 'collapsed';
-      if (collapsed) {
-        items.style.display = 'none';
-        btn.classList.add('collapsed');
-      }
-
-      btn.addEventListener('click', () => {
-        const isCollapsed = items.style.display === 'none';
-        items.style.display = isCollapsed ? '' : 'none';
-        btn.classList.toggle('collapsed', !isCollapsed);
-        localStorage.setItem(`slc-nav-${group}`, isCollapsed ? 'open' : 'collapsed');
-      });
-    });
-  }
-
-  // ── 3. BUSCA RÁPIDA Ctrl+K ────────────────────────────────────────────────
-  const NAV_ITEMS = [
-    { label: 'Dashboard',          view: 'dashboard',         icon: 'fa-chart-pie' },
-    { label: 'Mentor IA',          view: 'mentor-ia',         icon: 'fa-robot' },
-    { label: 'Matérias',           view: 'materias',          icon: 'fa-book' },
-    { label: 'Grade Horária',      view: 'grade-horaria',     icon: 'fa-calendar-week' },
-    { label: 'Grade Curricular',   view: 'grade-curricular',  icon: 'fa-sitemap' },
-    { label: 'Cursos Extras',      view: 'cursos-extras',     icon: 'fa-language' },
-    { label: 'Situação Acadêmica', view: 'situacao-academica',icon: 'fa-heartbeat' },
-    { label: 'Previsão de Notas',  view: 'previsao-notas',    icon: 'fa-chart-line' },
-    { label: 'Tarefas',            view: 'tarefas',           icon: 'fa-tasks' },
-    { label: 'Provas e Trabalhos', view: 'provas',            icon: 'fa-graduation-cap' },
-    { label: 'Sessões de Estudo',  view: 'sessoes',           icon: 'fa-clock' },
-    { label: 'Calendário',         view: 'calendario',        icon: 'fa-calendar-alt' },
-    { label: 'Hábitos',            view: 'habitos',           icon: 'fa-heart' },
-    { label: 'Modo Foco',          view: 'foco',              icon: 'fa-bullseye' },
-    { label: 'Mapa de Aprendizado',view: 'mapa-aprendizado',  icon: 'fa-map' },
-    { label: 'Materiais',          view: 'materiais',         icon: 'fa-folder' },
-    { label: 'Estatísticas',       view: 'estatisticas',      icon: 'fa-chart-bar' },
-    { label: 'Configurações',      view: 'configuracoes',     icon: 'fa-cog' },
-    { label: 'Ajuda',              view: 'ajuda',             icon: 'fa-question-circle' },
-  ];
-
-  function initNavSearch() {
-    const modal   = document.getElementById('nav-search-modal');
-    const input   = document.getElementById('nav-search-input');
-    const results = document.getElementById('nav-search-results');
-    const overlay = document.getElementById('nav-search-overlay');
-    if (!modal || !input || !results) return;
-
-    function open() {
-      modal.hidden = false;
-      input.value = '';
-      renderResults('');
-      setTimeout(() => input.focus(), 50);
-    }
-
-    function close() {
-      modal.hidden = true;
-    }
-
-    function renderResults(query) {
-      const q = query.toLowerCase().trim();
-      const filtered = q
-        ? NAV_ITEMS.filter(item => item.label.toLowerCase().includes(q))
-        : NAV_ITEMS;
-
-      results.innerHTML = filtered.map((item, i) => `
-        <button class="nav-search-result${i === 0 ? ' active' : ''}" data-view="${item.view}">
-          <i class="fas ${item.icon}"></i>
-          <span>${item.label}</span>
-        </button>
-      `).join('');
-
-      results.querySelectorAll('.nav-search-result').forEach(btn => {
-        btn.addEventListener('click', () => {
-          close();
-          if (window.app?.loadView) window.app.loadView(btn.dataset.view);
-        });
-      });
-    }
-
-    input.addEventListener('input', e => renderResults(e.target.value));
-
-    input.addEventListener('keydown', e => {
-      const active = results.querySelector('.nav-search-result.active');
-      const all    = [...results.querySelectorAll('.nav-search-result')];
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        const idx = all.indexOf(active);
-        const next = all[idx + 1] || all[0];
-        active?.classList.remove('active');
-        next?.classList.add('active');
-        next?.scrollIntoView({ block: 'nearest' });
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        const idx = all.indexOf(active);
-        const prev = all[idx - 1] || all[all.length - 1];
-        active?.classList.remove('active');
-        prev?.classList.add('active');
-        prev?.scrollIntoView({ block: 'nearest' });
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        const target = active || all[0];
-        if (target) { close(); if (window.app?.loadView) window.app.loadView(target.dataset.view); }
-      } else if (e.key === 'Escape') {
-        close();
-      }
-    });
-
-    overlay?.addEventListener('click', close);
-
-    document.addEventListener('keydown', e => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault();
-        modal.hidden ? open() : close();
-      }
-      if (e.key === 'Escape' && !modal.hidden) close();
-    });
-  }
-
-  // ── 4. CHARTS NO DASHBOARD ───────────────────────────────────────────────
-  // Injetado via patch no renderDashboard do ViewRenderer
-  function initDashboardCharts() {
-    if (!window.ViewRenderer) return;
-    const proto = ViewRenderer.prototype;
-    const originalDash = proto.renderDashboard;
-    if (!originalDash || proto.__chartPatched) return;
-
-    proto.renderDashboard = function () {
-      const html = originalDash.call(this);
-      // Injeta container de charts após o retorno
-      setTimeout(() => renderCharts(this.app?.data), 100);
-      return html;
-    };
-    proto.__chartPatched = true;
-  }
-
-  function renderCharts(data) {
-    const container = document.getElementById('view-container');
-    if (!container || !data) return;
-
-    // Evita duplicar
-    if (container.querySelector('#slc-charts-section')) return;
-
-    const sessions = data.sessions || [];
-    const grades   = data.grades   || [];
-
-    // Horas estudadas por dia (últimos 14 dias)
-    const today = new Date();
-    const labels = [], hoursData = [];
-    for (let i = 13; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
-      const ds = d.toISOString().slice(0, 10);
-      labels.push(d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }));
-      const mins = sessions
-        .filter(s => (s.data || s.dataHora || '').slice(0, 10) === ds && s.concluida)
-        .reduce((acc, s) => acc + (Number(s.duracao) || 0), 0);
-      hoursData.push(+(mins / 60).toFixed(1));
-    }
-
-    // Média de notas por matéria
-    const subjectGrades = {};
-    grades.forEach(g => {
-      if (!g.materia || !g.valor) return;
-      if (!subjectGrades[g.materia]) subjectGrades[g.materia] = [];
-      subjectGrades[g.materia].push(Number(g.valor));
-    });
-    const gradeLabels = Object.keys(subjectGrades).slice(0, 8);
-    const gradeData   = gradeLabels.map(m => {
-      const arr = subjectGrades[m];
-      return +(arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1);
-    });
-
-    // Heatmap de atividade (últimos 84 dias = 12 semanas)
-    const activityMap = {};
-    sessions.filter(s => s.concluida).forEach(s => {
-      const d = (s.data || s.dataHora || '').slice(0, 10);
-      if (d) activityMap[d] = (activityMap[d] || 0) + 1;
-    });
-
-    const section = document.createElement('div');
-    section.id = 'slc-charts-section';
-    section.style.cssText = 'padding:0 0 32px;';
-    section.innerHTML = `
-      <div class="card" style="margin-bottom:20px;">
-        <h3 style="margin-bottom:16px;font-size:15px;font-weight:600;"><i class="fas fa-clock" style="color:var(--accent-primary);margin-right:8px;"></i>Horas estudadas — últimos 14 dias</h3>
-        <div style="position:relative;height:180px;"><canvas id="chart-hours"></canvas></div>
-      </div>
-      ${gradeLabels.length ? `
-      <div class="card" style="margin-bottom:20px;">
-        <h3 style="margin-bottom:16px;font-size:15px;font-weight:600;"><i class="fas fa-star" style="color:var(--accent-warning);margin-right:8px;"></i>Médias por matéria</h3>
-        <div style="position:relative;height:180px;"><canvas id="chart-grades"></canvas></div>
-      </div>` : ''}
-      <div class="card">
-        <h3 style="margin-bottom:16px;font-size:15px;font-weight:600;"><i class="fas fa-fire" style="color:var(--accent-danger);margin-right:8px;"></i>Atividade — últimas 12 semanas</h3>
-        <div id="heatmap-container" style="overflow-x:auto;"></div>
-      </div>
-    `;
-
-    container.appendChild(section);
-    loadChartJS(labels, hoursData, gradeLabels, gradeData, activityMap);
-  }
-
-  function loadChartJS(labels, hoursData, gradeLabels, gradeData, activityMap) {
-    if (window.Chart) {
-      drawCharts(labels, hoursData, gradeLabels, gradeData, activityMap);
-      return;
-    }
-    const s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js';
-    s.onload = () => drawCharts(labels, hoursData, gradeLabels, gradeData, activityMap);
-    document.head.appendChild(s);
-  }
-
-  function drawCharts(labels, hoursData, gradeLabels, gradeData, activityMap) {
-    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
-    const textColor = isDark ? '#94a3b8' : '#64748b';
-    const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
-
-    const baseOpts = {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { color: textColor, font: { size: 11 } }, grid: { color: gridColor } },
-        y: { ticks: { color: textColor, font: { size: 11 } }, grid: { color: gridColor }, beginAtZero: true }
-      }
-    };
-
-    // Horas chart
-    const hoursCtx = document.getElementById('chart-hours');
-    if (hoursCtx) {
-      new Chart(hoursCtx, {
-        type: 'bar',
-        data: {
-          labels,
-          datasets: [{ data: hoursData, backgroundColor: 'rgba(59,130,246,0.7)', borderRadius: 6, borderSkipped: false }]
-        },
-        options: { ...baseOpts }
-      });
-    }
-
-    // Grades chart
-    const gradesCtx = document.getElementById('chart-grades');
-    if (gradesCtx && gradeLabels.length) {
-      new Chart(gradesCtx, {
-        type: 'bar',
-        data: {
-          labels: gradeLabels,
-          datasets: [{
-            data: gradeData,
-            backgroundColor: gradeData.map(v => v >= 7 ? 'rgba(16,185,129,0.7)' : v >= 5 ? 'rgba(245,158,11,0.7)' : 'rgba(239,68,68,0.7)'),
-            borderRadius: 6, borderSkipped: false
-          }]
-        },
-        options: { ...baseOpts, scales: { ...baseOpts.scales, y: { ...baseOpts.scales.y, max: 10 } } }
-      });
-    }
-
-    // Heatmap
-    const heatDiv = document.getElementById('heatmap-container');
-    if (heatDiv) {
-      const today = new Date();
-      let html = '<div style="display:flex;gap:3px;align-items:flex-start;">';
-      for (let w = 11; w >= 0; w--) {
-        html += '<div style="display:flex;flex-direction:column;gap:3px;">';
-        for (let d = 6; d >= 0; d--) {
-          const date = new Date(today);
-          date.setDate(today.getDate() - (w * 7 + d));
-          const ds = date.toISOString().slice(0, 10);
-          const count = activityMap[ds] || 0;
-          const opacity = count === 0 ? 0.08 : count === 1 ? 0.3 : count <= 3 ? 0.6 : 1;
-          html += `<div title="${ds}: ${count} sessão(ões)" style="width:12px;height:12px;border-radius:2px;background:rgba(59,130,246,${opacity});"></div>`;
-        }
-        html += '</div>';
-      }
-      html += '</div>';
-      heatDiv.innerHTML = html;
-    }
-  }
-
-  // ── 5. EXPORT CSV ────────────────────────────────────────────────────────
-  function initExport() {
-    // Adiciona botão de export na view de configurações
-    document.addEventListener('click', e => {
-      if (e.target.closest('#btn-export-csv') || e.target.id === 'btn-export-csv') {
-        exportCSV();
-      }
-      if (e.target.closest('#btn-export-pdf') || e.target.id === 'btn-export-pdf') {
-        exportPDF();
-      }
-    });
-  }
-
-  function exportCSV() {
-    const data = window.app?.data;
-    if (!data) return;
-
-    const sheets = {
-      'sessoes': ['data', 'materia', 'tipo', 'duracao', 'completada'],
-      'tarefas': ['titulo', 'materia', 'dataLimite', 'prioridade', 'concluida'],
-      'provas':  ['titulo', 'materia', 'data', 'tipo', 'nota'],
-      'grades':  ['materia', 'avaliacao', 'nota', 'peso'],
-    };
-
-    let csv = '';
-    Object.entries(sheets).forEach(([key, fields]) => {
-      const rows = data[key] || [];
-      if (!rows.length) return;
-      csv += `\n### ${key.toUpperCase()} ###\n`;
-      csv += fields.join(',') + '\n';
-      rows.forEach(row => {
-        csv += fields.map(f => `"${String(row[f] ?? '').replace(/"/g, '""')}"`).join(',') + '\n';
-      });
-    });
-
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url  = URL.createObjectURL(blob);
-    const a    = Object.assign(document.createElement('a'), { href: url, download: 'study-life-control-dados.csv' });
-    a.click();
-    URL.revokeObjectURL(url);
-    if (window.showToast) window.showToast('CSV exportado com sucesso!', 'success');
-  }
-
-  function exportPDF() {
-    const data = window.app?.data;
-    if (!data) return;
-
-    // PDF simples via print — sem dependência externa
-    const user    = data.user || {};
-    const tasks   = (data.tarefas || data.tasks || []).filter(t => !t.concluida).slice(0, 20);
-    const exams   = (data.provas  || data.exams  || []).slice(0, 20);
-    const grades  = data.grades || [];
-
-    const html = `
-      <html><head><title>Study Life Control — Relatório</title>
-      <style>
-        body { font-family: Arial, sans-serif; padding: 32px; color: #1e293b; }
-        h1 { font-size: 22px; margin-bottom: 4px; }
-        h2 { font-size: 16px; margin: 24px 0 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
-        table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        th { background: #f1f5f9; text-align: left; padding: 6px 8px; }
-        td { padding: 5px 8px; border-bottom: 1px solid #f1f5f9; }
-        .badge { display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px; }
-        .alta { background:#fee2e2;color:#dc2626; }
-        .media { background:#fef3c7;color:#d97706; }
-        .baixa { background:#dcfce7;color:#16a34a; }
-      </style></head><body>
-      <h1>📚 Study Life Control</h1>
-      <p style="color:#64748b;font-size:13px;">Relatório gerado em ${new Date().toLocaleDateString('pt-BR')} • ${user.nome || 'Usuário'}</p>
-      <h2>Tarefas Pendentes</h2>
-      <table><tr><th>Tarefa</th><th>Matéria</th><th>Prazo</th><th>Prioridade</th></tr>
-      ${tasks.map(t => `<tr><td>${t.titulo||''}</td><td>${t.materia||''}</td><td>${t.dataLimite||''}</td><td><span class="badge ${t.prioridade||''}">${t.prioridade||''}</span></td></tr>`).join('')}
-      </table>
-      <h2>Provas e Trabalhos</h2>
-      <table><tr><th>Título</th><th>Matéria</th><th>Data</th><th>Tipo</th></tr>
-      ${exams.map(e => `<tr><td>${e.titulo||''}</td><td>${e.materia||''}</td><td>${e.data||''}</td><td>${e.tipo||''}</td></tr>`).join('')}
-      </table>
-      <h2>Notas Registradas</h2>
-      <table><tr><th>Matéria</th><th>Avaliação</th><th>Nota</th><th>Peso</th></tr>
-      ${grades.map(g => `<tr><td>${g.materia||''}</td><td>${g.avaliacao||''}</td><td>${g.nota||''}</td><td>${g.peso||''}%</td></tr>`).join('')}
-      </table>
-      </body></html>`;
-
-    const win = window.open('', '_blank');
-    win.document.write(html);
-    win.document.close();
-    win.print();
-  }
-
-  // ── 6. Botões de export na tela de configurações ─────────────────────────
-  function injectExportButtons() {
-    if (!window.ViewRenderer) return;
-    const proto = ViewRenderer.prototype;
-    if (proto.__exportPatched) return;
-
-    const originalConfig = proto.renderConfiguracoes;
-    if (!originalConfig) return;
-
-    proto.renderConfiguracoes = function () {
-      const html = originalConfig.call(this);
-      const exportSection = `
-        <div class="card" style="margin-top:20px;">
-          <h3 style="margin-bottom:16px;font-size:15px;font-weight:600;"><i class="fas fa-download" style="color:var(--accent-primary);margin-right:8px;"></i>Exportar Dados</h3>
-          <p style="color:var(--text-secondary);font-size:13px;margin-bottom:16px;">Baixe seus dados acadêmicos para backup ou análise externa.</p>
-          <div style="display:flex;gap:12px;flex-wrap:wrap;">
-            <button id="btn-export-csv" class="btn-secondary"><i class="fas fa-file-csv"></i> Exportar CSV</button>
-            <button id="btn-export-pdf" class="btn-secondary"><i class="fas fa-file-pdf"></i> Exportar PDF</button>
-          </div>
-        </div>`;
-      return html + exportSection;
-    };
-    proto.__exportPatched = true;
-  }
-
-  // ── INIT ──────────────────────────────────────────────────────────────────
-  function init() {
-    initSidebarGroups();
-    initNavSearch();
-    initExport();
-
-    // Patches de ViewRenderer (aguarda estar disponível)
-    let attempts = 0;
-    const interval = setInterval(() => {
-      if (window.ViewRenderer) {
-        initDashboardCharts();
-        injectExportButtons();
-        clearInterval(interval);
-      }
-      if (++attempts > 20) clearInterval(interval);
-    }, 300);
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
-})();
-
-// ── BÔNUS: Painel de atalhos de teclado (tecla ?) ──────────────────────────
-(function () {
-  const SHORTCUTS = [
-    { key: 'Ctrl K',   desc: 'Busca rápida' },
-    { key: '?',        desc: 'Mostrar atalhos' },
-    { key: 'Ctrl S',   desc: 'Salvar dados' },
-    { key: 'Esc',      desc: 'Fechar painéis' },
-    { key: 'Alt 1-9',  desc: 'Navegar entre views' },
-  ];
-
-  function showShortcutsModal() {
-    let modal = document.getElementById('shortcuts-modal');
-    if (modal) { modal.hidden = false; return; }
-
-    modal = document.createElement('div');
-    modal.id = 'shortcuts-modal';
-    modal.style.cssText = 'position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;';
-    modal.innerHTML = `
-      <div style="position:absolute;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);" id="shortcuts-overlay"></div>
-      <div style="
-        position:relative;background:var(--bg-secondary);border:1px solid var(--border);
-        border-radius:var(--radius-lg);padding:28px;min-width:320px;max-width:420px;width:90%;
-        box-shadow:0 25px 50px rgba(0,0,0,0.4);animation:slideUp 0.18s ease;
-      ">
-        <h3 style="margin:0 0 20px;font-size:16px;display:flex;align-items:center;gap:8px;">
-          <i class="fas fa-keyboard" style="color:var(--accent-primary);"></i> Atalhos de teclado
-        </h3>
-        <div style="display:flex;flex-direction:column;gap:10px;">
-          ${SHORTCUTS.map(s => `
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-tertiary);border-radius:var(--radius-sm);">
-              <span style="font-size:13px;color:var(--text-secondary);">${s.desc}</span>
-              <kbd style="background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;padding:3px 10px;font-size:12px;font-family:monospace;color:var(--text-primary);">${s.key}</kbd>
-            </div>
-          `).join('')}
+    <!-- Motor de tema: carrega antes de tudo para evitar flash -->
+    <script src="theme-engine.js"></script>
+    <!-- Credenciais injetadas no build pelo inject-env.js -->
+    <script src="env-config.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="curriculum-catalog.js"></script>
+</head>
+<body>
+    <div id="app">
+        <div id="loading-screen" class="loading-container" style="display: none;">
+            <div class="loading-spinner"></div>
+            <p id="loading-text">Carregando seu painel acadêmico...</p>
         </div>
-        <p style="margin-top:16px;font-size:12px;color:var(--text-tertiary);text-align:center;">Pressione Esc ou clique fora para fechar</p>
-      </div>`;
-    document.body.appendChild(modal);
-    document.getElementById('shortcuts-overlay').addEventListener('click', () => modal.hidden = true);
-  }
 
-  document.addEventListener('keydown', e => {
-    if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
-      const active = document.activeElement;
-      if (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') return;
-      e.preventDefault();
-      showShortcutsModal();
-    }
-    if (e.key === 'Escape') {
-      const m = document.getElementById('shortcuts-modal');
-      if (m) m.hidden = true;
-    }
-    // Alt+1-9 navegação rápida
-    if (e.altKey && e.key >= '1' && e.key <= '9') {
-      const views = ['dashboard','mentor-ia','materias','tarefas','provas','sessoes','estatisticas','configuracoes','ajuda'];
-      const view = views[parseInt(e.key) - 1];
-      if (view && window.app?.loadView) { e.preventDefault(); window.app.loadView(view); }
-    }
-    // Ctrl+S salva dados
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-      const active = document.activeElement;
-      if (active.tagName !== 'INPUT' && active.tagName !== 'TEXTAREA') {
-        e.preventDefault();
-        window.dbService?.saveAllData?.();
-        if (window.showToast) window.showToast('Dados salvos!', 'success');
-      }
-    }
-  });
-})();
+        <div id="network-banner" class="network-banner" hidden>
+            <i class="fas fa-wifi"></i>
+            <span id="network-banner-text">Você está offline. Algumas ações podem ser salvas localmente.</span>
+        </div>
+
+        <div id="pwa-install-card" class="pwa-install-card" hidden>
+            <div>
+                <strong>Instalar app</strong>
+                <p>Abra o Study Life Control como app no celular ou PC.</p>
+            </div>
+            <div class="pwa-install-actions">
+                <button id="pwa-install-btn" class="btn-primary">Instalar</button>
+                <button id="pwa-install-close" class="btn-secondary">Agora não</button>
+            </div>
+        </div>
+
+        <div id="login-screen" class="login-container">
+            <!-- Painel esquerdo: features -->
+            <div class="login-features-panel">
+                <div class="login-brand">
+                    <i class="fas fa-brain"></i>
+                    <span>Study Life Control</span>
+                </div>
+                <h1 class="login-headline">Organize sua vida<br><span>acadêmica</span> de verdade.</h1>
+                <p class="login-subline">Tudo que um universitário precisa em um painel inteligente.</p>
+                <ul class="login-features-list">
+                    <li><div class="feat-icon">🤖</div><span>Mentor IA que analisa seus dados e sugere o que estudar agora</span></li>
+                    <li><div class="feat-icon">📊</div><span>Dashboard com gráficos de horas, notas e atividade</span></li>
+                    <li><div class="feat-icon">📅</div><span>Grade horária, provas, tarefas e sessões de estudo</span></li>
+                    <li><div class="feat-icon">🎯</div><span>Modo Foco com timer Pomodoro integrado</span></li>
+                    <li><div class="feat-icon">☁️</div><span>Sincronização em tempo real entre dispositivos</span></li>
+                </ul>
+            </div>
+            <!-- Painel direito: login -->
+            <div class="login-right-panel">
+                <div class="login-card">
+                    <div class="login-header">
+                        <i class="fas fa-brain"></i>
+                        <h1>Bem-vindo de volta</h1>
+                        <p>Entre para acessar seu painel acadêmico</p>
+                    </div>
+                    <div class="login-body">
+                        <button class="btn-google" id="login-google">
+                            <i class="fab fa-google"></i>
+                            Entrar com Google
+                        </button>
+                        <div id="login-error-msg" style="display:none;margin-top:14px;padding:10px 14px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);border-radius:10px;color:#ef4444;font-size:.88rem;text-align:center;"></div>
+                        <p style="margin-top:16px;font-size:.78rem;color:#475569;text-align:center;">Ao entrar, você concorda com o uso dos dados para fins acadêmicos pessoais.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="setup-screen" class="setup-container" style="display: none;">
+            <div class="setup-card">
+                <div class="setup-header">
+                    <i class="fas fa-rocket"></i>
+                    <h1>Configuração Inicial</h1>
+                    <p>Vamos personalizar sua experiência</p>
+                </div>
+
+                <form id="setup-form" class="setup-form">
+                    <div class="form-section">
+                        <h2><i class="fas fa-user"></i> Informações Básicas</h2>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Nome completo</label>
+                                <input type="text" id="nome" placeholder="Digite seu nome" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Curso</label>
+                                <input type="text" id="curso" placeholder="Ex: Engenharia Civil" required>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Universidade</label>
+                                <input type="text" id="universidade" placeholder="Nome da universidade" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Semestre atual</label>
+                                <select id="semestre" required>
+                                    <option value="">Selecione</option>
+                                    <option value="1">1º Semestre</option>
+                                    <option value="2">2º Semestre</option>
+                                    <option value="3">3º Semestre</option>
+                                    <option value="4">4º Semestre</option>
+                                    <option value="5">5º Semestre</option>
+                                    <option value="6">6º Semestre</option>
+                                    <option value="7">7º Semestre</option>
+                                    <option value="8">8º Semestre</option>
+                                    <option value="9">9º Semestre</option>
+                                    <option value="10">10º Semestre</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h2><i class="fas fa-clock"></i> Rotina e Disponibilidade</h2>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Turno principal de estudo</label>
+                                <select id="turno-principal" required>
+                                    <option value="manha">Manhã</option>
+                                    <option value="tarde">Tarde</option>
+                                    <option value="noite">Noite</option>
+                                    <option value="madrugada">Madrugada</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Dias preferidos para estudar</label>
+                                <div class="checkbox-group" id="dias-preferidos-container">
+                                    <label><input type="checkbox" value="seg" checked> Seg</label>
+                                    <label><input type="checkbox" value="ter" checked> Ter</label>
+                                    <label><input type="checkbox" value="qua" checked> Qua</label>
+                                    <label><input type="checkbox" value="qui" checked> Qui</label>
+                                    <label><input type="checkbox" value="sex" checked> Sex</label>
+                                    <label><input type="checkbox" value="sab"> Sáb</label>
+                                    <label><input type="checkbox" value="dom"> Dom</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Horas máximas de estudo por dia</label>
+                                <input type="number" id="horas-maximas" min="1" max="12" value="6">
+                            </div>
+                            <div class="form-group">
+                                <label>Horário de sono aproximado</label>
+                                <input type="text" id="horario-sono" placeholder="Ex: 23:00 - 07:00">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Tempo de deslocamento (minutos)</label>
+                                <input type="number" id="tempo-deslocamento" min="0" max="240" value="30">
+                            </div>
+                            <div class="form-group">
+                                <label>Tipo de rotina</label>
+                                <select id="tipo-rotina" required>
+                                    <option value="so-estuda">Só estuda</option>
+                                    <option value="estuda-trabalha">Estuda e trabalha</option>
+                                    <option value="estuda-estagio">Estuda e faz estágio</option>
+                                    <option value="rotina-pesada">Rotina pesada</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h2><i class="fas fa-chart-line"></i> Perfil Acadêmico</h2>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Nível de disciplina</label>
+                                <select id="nivel-disciplina" required>
+                                    <option value="baixo">Baixo - Preciso melhorar</option>
+                                    <option value="medio" selected>Médio - Consigo manter</option>
+                                    <option value="alto">Alto - Muito disciplinado</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Maior dificuldade atual</label>
+                                <select id="dificuldade-atual" required>
+                                    <option value="procrastinacao">Procrastinação</option>
+                                    <option value="organizacao">Falta de organização</option>
+                                    <option value="tempo">Pouco tempo</option>
+                                    <option value="materias">Dificuldade nas matérias</option>
+                                    <option value="constancia">Falta de constância</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h2><i class="fas fa-book"></i> Matérias do Semestre</h2>
+                        <div id="materias-container"></div>
+                        <button type="button" id="add-materia" class="btn-secondary">
+                            <i class="fas fa-plus"></i> Adicionar Matéria
+                        </button>
+                    </div>
+
+                    <div class="form-section">
+                        <h2><i class="fas fa-calendar-alt"></i> Grade de Aulas</h2>
+                        <div id="aulas-container"></div>
+                        <button type="button" id="add-aula" class="btn-secondary">
+                            <i class="fas fa-plus"></i> Adicionar Aula
+                        </button>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">
+                            <i class="fas fa-rocket"></i> Iniciar Jornada
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="main-dashboard" style="display: none;">
+            <div class="dashboard-layout">
+                <aside class="sidebar">
+                    <div class="sidebar-header">
+                        <div class="logo">
+                            <i class="fas fa-brain"></i>
+                            <span>SLC</span>
+                        </div>
+                    </div>
+
+                    <nav class="sidebar-nav" id="sidebar-nav">
+                        <div class="ctrl-k-hint" onclick="document.dispatchEvent(new KeyboardEvent('keydown',{key:'k',ctrlKey:true}))">
+                            <i class="fas fa-search"></i>
+                            <span>Busca rápida</span>
+                            <kbd>Ctrl K</kbd>
+                        </div>
+                        <a href="#" class="nav-item active" data-view="dashboard"><i class="fas fa-chart-pie"></i><span>Dashboard</span></a>
+                        <a href="#" class="nav-item" data-view="mentor-ia"><i class="fas fa-robot"></i><span>Mentor IA</span><span class="badge">IA</span></a>
+
+                        <!-- Grupo: Acadêmico -->
+                        <div class="nav-group">
+                            <button class="nav-group-header" data-group="academico">
+                                <span><i class="fas fa-graduation-cap"></i> Acadêmico</span>
+                                <i class="fas fa-chevron-down nav-group-arrow"></i>
+                            </button>
+                            <div class="nav-group-items" id="group-academico">
+                                <a href="#" class="nav-item" data-view="materias"><i class="fas fa-book"></i><span>Matérias</span></a>
+                                <a href="#" class="nav-item" data-view="grade-horaria"><i class="fas fa-calendar-week"></i><span>Grade Horária</span></a>
+                                <a href="#" class="nav-item" data-view="grade-curricular"><i class="fas fa-sitemap"></i><span>Grade Curricular</span></a>
+                                <a href="#" class="nav-item" data-view="cursos-extras"><i class="fas fa-language"></i><span>Cursos Extras</span></a>
+                                <a href="#" class="nav-item" data-view="situacao-academica"><i class="fas fa-heartbeat"></i><span>Situação Acadêmica</span></a>
+                                <a href="#" class="nav-item" data-view="previsao-notas"><i class="fas fa-chart-line"></i><span>Previsão de Notas</span></a>
+                            </div>
+                        </div>
+
+                        <!-- Grupo: Organização -->
+                        <div class="nav-group">
+                            <button class="nav-group-header" data-group="organizacao">
+                                <span><i class="fas fa-tasks"></i> Organização</span>
+                                <i class="fas fa-chevron-down nav-group-arrow"></i>
+                            </button>
+                            <div class="nav-group-items" id="group-organizacao">
+                                <a href="#" class="nav-item" data-view="tarefas"><i class="fas fa-tasks"></i><span>Tarefas</span></a>
+                                <a href="#" class="nav-item" data-view="provas"><i class="fas fa-graduation-cap"></i><span>Provas e Trabalhos</span></a>
+                                <a href="#" class="nav-item" data-view="sessoes"><i class="fas fa-clock"></i><span>Sessões de Estudo</span></a>
+                                <a href="#" class="nav-item" data-view="calendario"><i class="fas fa-calendar-alt"></i><span>Calendário</span></a>
+                                <a href="#" class="nav-item" data-view="habitos"><i class="fas fa-heart"></i><span>Hábitos</span></a>
+                                <a href="#" class="nav-item" data-view="foco"><i class="fas fa-bullseye"></i><span>Modo Foco</span></a>
+                            </div>
+                        </div>
+
+                        <!-- Grupo: Análise -->
+                        <div class="nav-group">
+                            <button class="nav-group-header" data-group="analise">
+                                <span><i class="fas fa-chart-bar"></i> Análise</span>
+                                <i class="fas fa-chevron-down nav-group-arrow"></i>
+                            </button>
+                            <div class="nav-group-items" id="group-analise">
+                                <a href="#" class="nav-item" data-view="mapa-aprendizado"><i class="fas fa-map"></i><span>Mapa de Aprendizado</span></a>
+                                <a href="#" class="nav-item" data-view="materiais"><i class="fas fa-folder"></i><span>Materiais</span></a>
+                                <a href="#" class="nav-item" data-view="estatisticas"><i class="fas fa-chart-bar"></i><span>Estatísticas</span></a>
+                            </div>
+                        </div>
+
+                        <a href="#" class="nav-item" data-view="configuracoes"><i class="fas fa-cog"></i><span>Configurações</span></a>
+                        <a href="#" class="nav-item" data-view="ajuda"><i class="fas fa-question-circle"></i><span>Ajuda</span></a>
+                    </nav>
+
+                    <!-- Modal busca rápida -->
+                    <div id="nav-search-modal" class="nav-search-modal" hidden>
+                        <div class="nav-search-overlay" id="nav-search-overlay"></div>
+                        <div class="nav-search-dialog">
+                            <div class="nav-search-input-wrap">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="nav-search-input" placeholder="Buscar seção..." autocomplete="off">
+                                <kbd>Esc</kbd>
+                            </div>
+                            <div class="nav-search-results" id="nav-search-results"></div>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-footer">
+                        <div class="user-info" id="user-info">
+                            <img src="" alt="" class="user-avatar" id="user-avatar">
+                            <div class="user-details">
+                                <span class="user-name" id="sidebar-user-name">Carregando...</span>
+                                <span class="user-email" id="sidebar-user-email"></span>
+                            </div>
+                        </div>
+                        <div class="streak-info">
+                            <i class="fas fa-fire"></i>
+                            <span id="sidebar-streak">0 dias</span>
+                        </div>
+                        <button class="btn-whats-now" id="whats-now-btn" onclick="app.whatsNow()">
+                            <i class="fas fa-lightbulb"></i> O que estudar agora?
+                        </button>
+                        <div class="heavy-mode-toggle">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="modo-faculdade-pesada">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span class="toggle-label">Modo Pesado</span>
+                        </div>
+                        <button class="btn-logout" id="logout-btn">
+                            <i class="fas fa-sign-out-alt"></i> Sair
+                        </button>
+                    </div>
+                </aside>
+
+                <main class="main-content">
+                    <div class="content-header">
+                        <button class="btn-icon mobile-nav-toggle" id="mobile-nav-toggle" type="button" aria-label="Abrir menu">
+                            <i class="fas fa-bars"></i>
+                        </button>
+                        <div class="page-title">
+                            <h1 id="page-title">Dashboard</h1>
+                        </div>
+                        <div class="header-actions">
+
+                            <div class="sync-status" id="sync-status">
+                                <i class="fas fa-sync-alt"></i>
+                            </div>
+                            <button class="btn-icon" id="daily-log-btn" onclick="app.openDailyLogModal()" title="Registrar Dia">
+                                <i class="fas fa-clipboard-list"></i>
+                            </button>
+                            <div class="notification-badge" id="notification-badge">
+                                <i class="fas fa-bell"></i>
+                                <span class="badge-count" id="notification-count">0</span>
+                            </div>
+                            <button class="btn-icon" id="refresh-data"><i class="fas fa-sync-alt"></i></button>
+                        </div>
+                    </div>
+                    <div id="view-container" class="view-container"></div>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-sessao" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-clock"></i> Nova Sessão de Estudo</h2>
+                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+            </div>
+            <form id="form-sessao" class="modal-form" onsubmit="app.handleSessaoSubmit(event)">
+                <div class="form-group">
+                    <label>Matéria</label>
+                    <select id="sessao-materia" required>
+                        <option value="">Selecione uma matéria</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Tipo de estudo</label>
+                        <select id="sessao-tipo" required>
+                            <option value="teoria">Teoria</option>
+                            <option value="exercicios">Exercícios</option>
+                            <option value="revisao">Revisão</option>
+                            <option value="resumo">Resumo</option>
+                            <option value="pratica">Prática</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Duração (min)</label>
+                        <input type="number" id="sessao-duracao" min="15" max="240" value="60" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Data e horário</label>
+                    <input type="datetime-local" id="sessao-data" required>
+                </div>
+                <div class="form-group">
+                    <label>Tópico específico (opcional)</label>
+                    <input type="text" id="sessao-topico" placeholder="Ex: Derivadas">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Agendar Sessão</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-tarefa" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-tasks"></i> Nova Tarefa</h2>
+                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+            </div>
+            <form id="form-tarefa" class="modal-form" onsubmit="app.handleTarefaSubmit(event)">
+                <div class="form-group">
+                    <label>Título da tarefa</label>
+                    <input type="text" id="tarefa-titulo" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Matéria</label>
+                        <select id="tarefa-materia" required>
+                            <option value="">Selecione</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Prioridade</label>
+                        <select id="tarefa-prioridade" required>
+                            <option value="alta">Alta</option>
+                            <option value="media">Média</option>
+                            <option value="baixa">Baixa</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Data limite</label>
+                        <input type="date" id="tarefa-data" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Estimativa (min)</label>
+                        <input type="number" id="tarefa-estimativa" min="15" value="60">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Adicionar Tarefa</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-prova" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-graduation-cap"></i> Nova Prova/Trabalho</h2>
+                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+            </div>
+            <form id="form-prova" class="modal-form" onsubmit="app.handleProvaSubmit(event)">
+                <div class="form-group">
+                    <label>Título</label>
+                    <input type="text" id="prova-titulo" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Matéria</label>
+                        <select id="prova-materia" required>
+                            <option value="">Selecione</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo</label>
+                        <select id="prova-tipo" required>
+                            <option value="prova">Prova</option>
+                            <option value="trabalho">Trabalho</option>
+                            <option value="lista">Lista de Exercícios</option>
+                            <option value="seminario">Seminário</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Data</label>
+                        <input type="date" id="prova-data" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Peso (%)</label>
+                        <input type="number" id="prova-peso" min="0" max="100" value="100">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Importância</label>
+                    <select id="prova-importancia" required>
+                        <option value="alta">Alta - Decide muito</option>
+                        <option value="media">Média - Importante</option>
+                        <option value="baixa">Baixa - Pouco peso</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-aula" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-calendar-week"></i> Nova Aula</h2>
+                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+            </div>
+            <form id="form-aula" class="modal-form" onsubmit="app.handleAulaSubmit(event)">
+                <div class="form-group">
+                    <label>Disciplina</label>
+                    <select id="aula-materia" required>
+                        <option value="">Selecione</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Dia da semana</label>
+                        <select id="aula-dia" required>
+                            <option value="0">Domingo</option>
+                            <option value="1">Segunda-feira</option>
+                            <option value="2">Terça-feira</option>
+                            <option value="3">Quarta-feira</option>
+                            <option value="4">Quinta-feira</option>
+                            <option value="5">Sexta-feira</option>
+                            <option value="6">Sábado</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Horário início</label>
+                        <input type="time" id="aula-inicio" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Horário fim</label>
+                        <input type="time" id="aula-fim" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Sala</label>
+                        <input type="text" id="aula-sala" placeholder="Ex: 101">
+                    </div>
+                    <div class="form-group">
+                        <label>Professor</label>
+                        <input type="text" id="aula-professor" placeholder="Nome do professor">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Bloco/Campus</label>
+                    <input type="text" id="aula-bloco" placeholder="Ex: Bloco A">
+                </div>
+                <div class="form-group">
+                    <label>Cor da disciplina</label>
+                    <input type="color" id="aula-cor" value="#3b82f6">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Salvar Aula</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-topico" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-map-marker-alt"></i> Novo Tópico</h2>
+                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+            </div>
+            <form id="form-topico" class="modal-form" onsubmit="app.handleTopicoSubmit(event)">
+                <div class="form-group">
+                    <label>Matéria</label>
+                    <select id="topico-materia" required>
+                        <option value="">Selecione</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Nome do tópico</label>
+                    <input type="text" id="topico-nome" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Dificuldade (1-5)</label>
+                        <input type="number" id="topico-dificuldade" min="1" max="5" value="3">
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="topico-status" required>
+                            <option value="nao-comecei">Não comecei</option>
+                            <option value="estudando">Estudando</option>
+                            <option value="revisando">Revisando</option>
+                            <option value="dominado">Dominado</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Confiança (1-5)</label>
+                    <input type="number" id="topico-confianca" min="1" max="5" value="3">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Adicionar Tópico</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-nota" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-star"></i> Registrar Nota</h2>
+                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+            </div>
+            <form id="form-nota" class="modal-form" onsubmit="app.handleNotaSubmit(event)">
+                <div class="form-group">
+                    <label>Matéria</label>
+                    <select id="nota-materia" required>
+                        <option value="">Selecione</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Avaliação</label>
+                    <input type="text" id="nota-avaliacao" placeholder="Ex: Prova 1, Trabalho" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nota obtida</label>
+                        <input type="number" id="nota-valor" min="0" max="10" step="0.1" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Peso (%)</label>
+                        <input type="number" id="nota-peso" min="0" max="100" value="100">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Registrar Nota</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-material" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-folder"></i> Novo Material</h2>
+                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+            </div>
+            <form id="form-material" class="modal-form" onsubmit="app.handleMaterialSubmit(event)">
+                <div class="form-group">
+                    <label>Título</label>
+                    <input type="text" id="material-titulo" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Matéria</label>
+                        <select id="material-materia" required>
+                            <option value="">Selecione</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo</label>
+                        <select id="material-tipo" required>
+                            <option value="link">Link</option>
+                            <option value="pdf">PDF</option>
+                            <option value="video">Vídeo</option>
+                            <option value="anotacao">Anotação</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Conteúdo (URL ou texto)</label>
+                    <textarea id="material-conteudo" rows="3" required></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Salvar Material</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <div id="modal-materia" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-book"></i> Matéria</h2>
+                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+            </div>
+            <form id="form-materia" class="modal-form">
+                <div class="form-group">
+                    <label>Nome da matéria</label>
+                    <input type="text" id="materia-nome-modal" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Dificuldade (1 a 5)</label>
+                        <input type="number" id="materia-dificuldade-modal" min="1" max="5" value="3" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Peso / Prioridade (1 a 5) <span style="font-weight:400;font-size:.82rem;color:#94a3b8">— quanto essa matéria exige de você vs as outras</span></label>
+                        <input type="number" id="materia-peso-modal" min="1" max="5" value="3" required>
+                        <small style="color:#64748b;font-size:.8rem">1 = pouco esforço &nbsp;|&nbsp; 3 = médio &nbsp;|&nbsp; 5 = prioridade máxima</small>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nota desejada</label>
+                        <input type="number" id="materia-nota-desejada-modal" min="0" max="10" step="0.1" value="7" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Carga horária da matéria</label>
+                        <input type="number" id="materia-carga-horaria-modal" min="0" placeholder="Ex: 60">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Professor (opcional)</label>
+                    <input type="text" id="materia-professor-modal" placeholder="Nome do professor">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Salvar Matéria</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-curriculum" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-sitemap"></i> Componente Curricular</h2>
+                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+            </div>
+            <form id="form-curriculum" class="modal-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nome da disciplina/componente</label>
+                        <input type="text" id="curriculum-nome" required placeholder="Ex: Resistência dos Materiais I">
+                    </div>
+                    <div class="form-group">
+                        <label>Código do componente (opcional)</label>
+                        <input type="text" id="curriculum-codigo" placeholder="Ex: CET0150">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Semestre sugerido</label>
+                        <input type="number" id="curriculum-semestre" min="1" max="20" placeholder="Ex: 3">
+                    </div>
+                    <div class="form-group">
+                        <label>Carga horária</label>
+                        <input type="number" id="curriculum-carga-horaria" min="0" placeholder="Ex: 60" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="curriculum-status" required>
+                            <option value="nao-cursada">Não cursada</option>
+                            <option value="cursando">Cursando</option>
+                            <option value="concluida">Concluída</option>
+                            <option value="reprovada">Reprovada</option>
+                            <option value="trancada">Trancada</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo</label>
+                        <select id="curriculum-tipo" required>
+                            <option value="obrigatoria">Obrigatória</option>
+                            <option value="optativa">Optativa</option>
+                            <option value="extensao">Extensão</option>
+                            <option value="atividade">Atividade complementar</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Carga horária rápida</label>
+                        <div class="ch-preset-buttons">
+                            <button type="button" class="btn-secondary btn-ch-preset" data-value="30">30h</button>
+                            <button type="button" class="btn-secondary btn-ch-preset" data-value="60">60h</button>
+                            <button type="button" class="btn-secondary btn-ch-preset" data-value="90">90h</button>
+                            <button type="button" class="btn-secondary btn-ch-preset" data-value="0">Personalizado</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Créditos (opcional)</label>
+                        <input type="number" id="curriculum-creditos" min="0" step="0.5" placeholder="Só use se realmente precisar">
+                        <small class="form-help">Pode deixar vazio. O sistema funciona normalmente só com carga horária.</small>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Pré-requisitos</label>
+                    <div id="curriculum-ai-suggestions" class="curriculum-ai-suggestions"></div>
+                    <div id="curriculum-prerequisitos-picker" class="prereq-picker">
+                        <div class="prereq-input-row">
+                            <input type="text" id="curriculum-prerequisito-busca" placeholder="Pesquise entre matérias já cadastradas ou digite uma nova">
+                            <button type="button" class="btn-secondary" id="btn-add-custom-prereq">Adicionar texto</button>
+                        </div>
+                        <div id="curriculum-prerequisitos-sugestoes" class="prereq-suggestions"></div>
+                        <div id="curriculum-prerequisitos-tags" class="selected-prereqs"></div>
+                        <input type="hidden" id="curriculum-prerequisitos">
+                        <small class="form-help">Você pode selecionar várias matérias. O sistema converte seus dados antigos para a nova lista automaticamente.</small>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Observações</label>
+                    <textarea id="curriculum-observacoes" rows="4" placeholder="Anotações úteis sobre a disciplina"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Salvar Componente</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-extra-course" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-language"></i> Curso Extra</h2>
+                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+            </div>
+            <form id="form-extra-course" class="modal-form">
+                <div class="form-group">
+                    <label>Nome do curso</label>
+                    <input type="text" id="extra-course-nome" required placeholder="Ex: Duolingo - Inglês">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Plataforma</label>
+                        <input type="text" id="extra-course-plataforma" placeholder="Ex: Duolingo, Udemy, YouTube">
+                    </div>
+                    <div class="form-group">
+                        <label>Área</label>
+                        <input type="text" id="extra-course-area" placeholder="Ex: Idiomas, Programação">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="extra-course-status">
+                            <option value="planejado">Planejado</option>
+                            <option value="em-andamento" selected>Em andamento</option>
+                            <option value="concluido">Concluído</option>
+                            <option value="pausado">Pausado</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Meta total (horas)</label>
+                        <input type="number" id="extra-course-meta-horas" min="0" placeholder="Ex: 120">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Horas já estudadas</label>
+                        <input type="number" id="extra-course-horas-estudadas" min="0" step="0.5" placeholder="Ex: 8">
+                    </div>
+                    <div class="form-group">
+                        <label>Percentual concluído (%)</label>
+                        <input type="number" id="extra-course-progresso" min="0" max="100" placeholder="Ex: 15">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Data de início</label>
+                        <input type="date" id="extra-course-data-inicio">
+                    </div>
+                    <div class="form-group">
+                        <label>Link (opcional)</label>
+                        <input type="url" id="extra-course-link" placeholder="https://...">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Observações</label>
+                    <textarea id="extra-course-observacoes" rows="4" placeholder="Anotações, metas, sequência de estudos..."></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Salvar Curso</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-daily-log" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-clipboard-list"></i> Registro do Dia</h2>
+                <span class="close-modal" onclick="document.getElementById('modal-daily-log').style.display='none'">&times;</span>
+            </div>
+            <form id="form-daily-log" class="modal-form" onsubmit="app.handleDailyLogSubmit(event)">
+                <div class="form-section">
+                    <h3>📚 Estudo</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Início</label>
+                            <input type="time" id="daily-log-estudo-inicio">
+                        </div>
+                        <div class="form-group">
+                            <label>Fim</label>
+                            <input type="time" id="daily-log-estudo-fim">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>🏛️ Aula</h3>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="daily-log-foi-aula"> Fui para a aula
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>💼 Trabalho</h3>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="daily-log-trabalhou"> Trabalhei hoje
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>Duração (minutos)</label>
+                        <input type="number" id="daily-log-trabalho-duracao" min="0" value="0">
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>⚡ Energia e Foco</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Energia do dia</label>
+                            <select id="daily-log-energia">
+                                <option value="baixa">🔴 Baixa</option>
+                                <option value="media" selected>🟡 Média</option>
+                                <option value="alta">🟢 Alta</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Foco do dia</label>
+                            <select id="daily-log-foco">
+                                <option value="ruim">🔴 Ruim</option>
+                                <option value="normal" selected>🟡 Normal</option>
+                                <option value="bom">🟢 Bom</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>📝 Observações</h3>
+                    <textarea id="daily-log-observacoes" rows="3" placeholder="Algo relevante sobre o dia..."></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Salvar Registro</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-class-diary" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-chalkboard"></i> Diário de Aula</h2>
+                <span class="close-modal" onclick="document.getElementById('modal-class-diary').style.display='none'">&times;</span>
+            </div>
+            <form id="form-class-diary" class="modal-form" onsubmit="app.handleClassDiarySubmit(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Matéria</label>
+                        <select id="class-diary-materia" required>
+                            <option value="">Selecione</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Data</label>
+                        <input type="date" id="class-diary-data" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Presença</label>
+                    <select id="class-diary-presenca" required>
+                        <option value="present">✅ Fui</option>
+                        <option value="absent">❌ Faltei</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Conteúdo explicado</label>
+                    <textarea id="class-diary-conteudo" rows="3" placeholder="O que foi explicado hoje?"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Exercícios passados</label>
+                    <textarea id="class-diary-exercicios" rows="2" placeholder="Lista de exercícios, páginas..."></textarea>
+                </div>
+
+                
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>O que eu entendi</label>
+                        <textarea id="class-diary-entendi" rows="2" placeholder="Resumo do que ficou claro para você"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>O que eu não entendi</label>
+                        <textarea id="class-diary-nao-entendi" rows="2" placeholder="Parte que ficou confusa ou precisa rever"></textarea>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Dúvida pendente</label>
+                        <input type="text" id="class-diary-duvida" placeholder="Ex: perguntar ao professor sobre integrais por partes">
+                    </div>
+                    <div class="form-group">
+                        <label>Links / anexos</label>
+                        <input type="text" id="class-diary-links" placeholder="Cole links de PDF, fotos ou drive separados por vírgula">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Trabalho anunciado</label>
+                    <input type="text" id="class-diary-trabalho" placeholder="Descrição do trabalho">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Dificuldade (1-5)</label>
+                        <input type="number" id="class-diary-dificuldade" min="1" max="5" value="3">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="class-diary-revisar"> Preciso revisar
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Observações</label>
+                    <textarea id="class-diary-observacoes" rows="2"></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Salvar Diário</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-aula-detail" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-calendar-week"></i> Detalhes da Aula</h2>
+                <span class="close-modal" onclick="document.getElementById('modal-aula-detail').style.display='none'">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="aula-detail-info">
+                    <p><strong>Matéria:</strong> <span id="aula-detail-materia"></span></p>
+                    <p><strong>Horário:</strong> <span id="aula-detail-horario"></span></p>
+                    <p><strong>Sala:</strong> <span id="aula-detail-sala"></span></p>
+                    <p><strong>Professor:</strong> <span id="aula-detail-professor"></span></p>
+
+                    <div class="aula-detail-presenca" id="aula-detail-presenca"></div>
+
+                    <h4>Último conteúdo registrado</h4>
+                    <div id="aula-detail-ultimo-conteudo" class="aula-detail-conteudo"></div>
+
+                    <button class="btn-primary" onclick="app.openClassDiaryModal()">
+                        <i class="fas fa-plus"></i> Registrar Diário
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-whats-now" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-lightbulb"></i> O que estudar agora?</h2>
+                <span class="close-modal" onclick="document.getElementById('modal-whats-now').style.display='none'">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="whats-now-content" class="whats-now-content"></div>
+                <button class="btn-primary" onclick="document.getElementById('modal-whats-now').style.display='none'">Entendi!</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-grade-structure" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-chart-pie"></i> Configurar Estrutura de Notas</h2>
+                <span class="close-modal" onclick="document.getElementById('modal-grade-structure').style.display='none'">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="grade-structure-materia" class="grade-structure-materia"></div>
+                <div id="grade-structure-items"></div>
+                <button class="btn-secondary" onclick="app.addGradeStructureItem()">
+                    <i class="fas fa-plus"></i> Adicionar Avaliação
+                </button>
+                <div class="form-actions">
+                    <button class="btn-primary" onclick="app.saveGradeStructure()">Salvar Estrutura</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <script src="firebase-config.js"></script>
+<script src="security.js"></script>
+<script src="utils.js"></script>
+<script src="auth.js"></script>
+<script src="database.js"></script>
+<script src="daily-log.js"></script>
+<script src="class-diary.js"></script>
+<script src="review-system.js"></script>
+<script src="grade-calculator.js"></script>
+<script src="smart-dashboard.js"></script>
+<script src="ai-assistant.js"></script>  <!-- Use este, não o enhanced -->
+<script src="schedule.js"></script>      <!-- Use este, não o enhanced -->
+<script src="views.js"></script>
+<script src="tutorial.js"></script>
+<script src="app.js"></script>
+<script src="semester-finish.js"></script>
+<script src="setup-wizard.js"></script>
+<script src="launch-ready.js"></script>
+<script src="script.js"></script>
+<div id="mobile-nav-overlay" class="mobile-nav-overlay" hidden></div>
+    <script src="grade-ia-import.js"></script>
+    <script src="setup-onboarding-enhancer.js"></script>
+    <script src="app-enhancements.js"></script>
+    <link rel="stylesheet" href="launch-polish.css">
+    <script src="launch-polish.js"></script>
+    <script src="improvements.js"></script>
+    <script src="ux-improvements.js"></script>
+</body>
+</html>
