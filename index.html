@@ -21,6 +21,8 @@
     <meta name="twitter:image" content="https://study-life-control.vercel.app/og-image.svg">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <!-- iOS não lê SVG nem o manifest para o ícone de tela inicial — precisa deste PNG -->
+    <link rel="apple-touch-icon" href="icon-180.png">
     <!-- Preconnect: acelera o popup do Google e o carregamento de fontes/ícones -->
     <link rel="preconnect" href="https://accounts.google.com">
     <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
@@ -1144,8 +1146,8 @@
 <script src="review-system.js"></script>
 <script src="grade-calculator.js"></script>
 <script src="smart-dashboard.js"></script>
-<script src="ai-assistant.js"></script>  <!-- Use este, não o enhanced -->
-<script src="schedule.js"></script>      <!-- Use este, não o enhanced -->
+<script src="ai-assistant.js"></script>
+<script src="schedule.js"></script>
 <script src="views.js"></script>
 <script src="tutorial.js"></script>
 <script src="app.js"></script>

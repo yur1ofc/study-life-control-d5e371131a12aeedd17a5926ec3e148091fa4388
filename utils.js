@@ -7,20 +7,45 @@ function generateId() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
+// Faz o parse de uma data SEM sofrer o "bug do dia anterior".
+// Strings no formato "YYYY-MM-DD" (o que <input type="date"> sempre gera)
+// são interpretadas pelo `new Date(string)` nativo como UTC meia-noite —
+// em qualquer fuso atrás de UTC (Brasil inteiro, por exemplo) isso resulta
+// num Date que na hora LOCAL já é o dia anterior. Aqui, datas "só dia" são
+// montadas manualmente em horário local; tudo o resto (Date, timestamp,
+// ISO com horário) continua indo pelo `new Date()` normal.
+function parseDateSafe(dateInput) {
+    if (dateInput instanceof Date) return new Date(dateInput.getTime());
+    if (typeof dateInput === 'string') {
+        const m = dateInput.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (m) {
+            return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+        }
+    }
+    return new Date(dateInput);
+}
+
 function toDateOnly(dateInput = new Date()) {
-    const d = new Date(dateInput);
+    const d = parseDateSafe(dateInput);
     d.setHours(0, 0, 0, 0);
     return d;
 }
 
 function toDateString(dateInput = new Date()) {
-    return toDateOnly(dateInput).toISOString().split('T')[0];
+    // Monta "YYYY-MM-DD" a partir dos componentes locais — evita o mesmo
+    // problema de fuso horário que toISOString() teria aqui (toISOString
+    // sempre converte para UTC antes de formatar).
+    const d = toDateOnly(dateInput);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
 }
 
 function diasAte(data) {
     if (!data) return 0;
     const hoje = toDateOnly(new Date());
-    const alvo = toDateOnly(new Date(data));
+    const alvo = toDateOnly(data);
     const diff = alvo - hoje;
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
@@ -28,19 +53,19 @@ function diasAte(data) {
 function diasDesde(data) {
     if (!data) return 0;
     const hoje = toDateOnly(new Date());
-    const alvo = toDateOnly(new Date(data));
+    const alvo = toDateOnly(data);
     const diff = hoje - alvo;
     return Math.floor(diff / (1000 * 60 * 60 * 24));
 }
 
 function formatarData(data) {
     if (!data) return '';
-    return new Date(data).toLocaleDateString('pt-BR');
+    return parseDateSafe(data).toLocaleDateString('pt-BR');
 }
 
 function formatarHora(data) {
     if (!data) return '';
-    return new Date(data).toLocaleTimeString('pt-BR', {
+    return parseDateSafe(data).toLocaleTimeString('pt-BR', {
         hour: '2-digit',
         minute: '2-digit'
     });

@@ -47,7 +47,7 @@
 
       container.innerHTML = items.map((item, i) => `
         <div class="grade-structure-item" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-          <input type="text" value="${(item.nome || '').replace(/"/g, '&quot;')}" placeholder="Nome (ex: Prova 1)" data-idx="${i}" data-field="nome" style="flex:2;">
+          <input type="text" value="${escapeHtml(item.nome || '')}" placeholder="Nome (ex: Prova 1)" data-idx="${i}" data-field="nome" style="flex:2;">
           <input type="number" value="${item.peso ?? ''}" placeholder="Peso (%)" data-idx="${i}" data-field="peso" style="flex:1;">
           <button type="button" class="btn-remove" data-idx="${i}" aria-label="Remover"><i class="fas fa-times"></i></button>
         </div>

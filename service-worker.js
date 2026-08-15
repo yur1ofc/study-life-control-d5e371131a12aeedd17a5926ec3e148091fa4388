@@ -1,5 +1,11 @@
 // service-worker.js — Cache inteligente com estratégias por tipo de recurso
-const CACHE_VERSION = 'slc-v7';
+//
+// IMPORTANTE: esta lista precisa ficar em sincronia com os <script> do
+// index.html. Toda vez que um arquivo .js novo for adicionado ao site,
+// adicione ele aqui também — senão ele só entra no cache dinâmico depois
+// do primeiro acesso online, e falha se o usuário abrir o app offline
+// (ou logo após instalar como PWA) antes disso acontecer.
+const CACHE_VERSION = 'slc-v8';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 
@@ -11,8 +17,14 @@ const STATIC_ASSETS = [
   './launch-polish.css',
   './manifest.json',
   './favicon.svg',
+  './icon-180.png',
+  './icon-192.png',
+  './icon-512.png',
+  './theme-engine.js',
   './env-config.js',
+  './curriculum-catalog.js',
   './firebase-config.js',
+  './security.js',
   './utils.js',
   './auth.js',
   './database.js',
@@ -24,16 +36,26 @@ const STATIC_ASSETS = [
   './ai-assistant.js',
   './schedule.js',
   './views.js',
-  './app.js',
-  './script.js',
-  './setup-wizard.js',
   './tutorial.js',
+  './app.js',
+  './semester-finish.js',
+  './setup-wizard.js',
   './launch-ready.js',
-  './launch-polish.js',
+  './script.js',
+  './dashboard-prioritario.js',
+  './onboarding-simplificado.js',
+  './schedule-ia-import.js',
+  './subjects-curriculum-sync.js',
+  './grade-structure-modal.js',
+  './grade-ia-import.js',
   './setup-onboarding-enhancer.js',
   './app-enhancements.js',
-  './security.js',
-  './curriculum-catalog.js'
+  './xp-widget.js',
+  './export-data.js',
+  './feedback-widget.js',
+  './launch-polish.js',
+  './improvements.js',
+  './ux-improvements.js'
 ];
 
 // Origens externas: busca sempre da rede, sem interceptar
