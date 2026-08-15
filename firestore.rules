@@ -112,6 +112,18 @@ service cloud.firestore {
         && request.resource.data.count <= 1000;
     }
 
+    // ─── Feedback in-app (feedback-widget.js) ─────────────────────────────────
+    // Qualquer usuário logado pode criar um feedback próprio. Ninguém lê,
+    // edita ou apaga pelo app — só você, direto no Console do Firebase.
+
+    match /feedback/{docId} {
+      allow read, update, delete: if false;
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && strLen(request.resource.data.mensagem, 2000)
+        && request.resource.data.tipo in ['bug', 'sugestao', 'elogio'];
+    }
+
     // ─── Proteção padrão: nega tudo que não foi explicitamente permitido ──────
     match /{document=**} {
       allow read, write: if false;

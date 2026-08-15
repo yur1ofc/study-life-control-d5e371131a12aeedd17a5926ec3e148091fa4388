@@ -20,6 +20,7 @@
     'Sua Rotina',
     'Matérias & Perfil'
   ];
+  const DRAFT_KEY = 'slc_wizard_draft_v1';
 
   /* ─── Estado do wizard ───────────────────────────────────── */
   let wizardState = {
@@ -573,24 +574,27 @@ Regras:
     return `
 <div class="wiz-card" id="wiz-step-2">
   <div class="wiz-card-title">📚 Grade Curricular</div>
-  <button id="wiz-buscar-grade-pronta" style="
+
+  <button id="wiz-auto-ia-import" type="button" style="
     width:100%;display:flex;align-items:center;justify-content:center;gap:10px;
-    padding:12px 16px;border-radius:var(--radius-md);border:1.5px dashed var(--accent-primary);
-    background:rgba(59,130,246,.06);color:var(--accent-primary);cursor:pointer;
-    font-size:13px;font-weight:500;font-family:inherit;margin-bottom:16px;
-    transition:background .15s;
-  " onmouseover="this.style.background='rgba(59,130,246,.12)'" onmouseout="this.style.background='rgba(59,130,246,.06)'">
-    <i class="fas fa-search"></i> Buscar grade pronta da comunidade
+    padding:14px 16px;border-radius:var(--radius-md);border:none;
+    background:linear-gradient(135deg,#1a73e8,#4f46e5);color:#fff;cursor:pointer;
+    font-size:13.5px;font-weight:600;font-family:inherit;margin-bottom:10px;
+    box-shadow:0 4px 14px rgba(79,70,229,.28);
+  ">
+    <i class="fas fa-wand-magic-sparkles"></i> Importar PDF ou foto com IA (automático, grátis)
   </button>
+  <p style="text-align:center;font-size:11px;color:var(--text-tertiary);margin:0 0 16px;">A IA lê o arquivo e preenche a grade sozinha — sem precisar colar em outro site</p>
+
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
     <div style="flex:1;height:1px;background:var(--border);"></div>
-    <span style="font-size:11px;color:var(--text-tertiary);">ou importe manualmente abaixo</span>
+    <span style="font-size:11px;color:var(--text-tertiary);">ou use um método manual abaixo</span>
     <div style="flex:1;height:1px;background:var(--border);"></div>
   </div>
   <div class="wiz-card-sub">Importe todas as disciplinas do seu curso de uma vez. Você pode pular e fazer depois.</div>
 
   <div class="wiz-import-tabs">
-    <button class="wiz-tab active" data-tab="ia">📷 Via IA (PDF/Foto)</button>
+    <button class="wiz-tab active" data-tab="ia">📋 Prompt manual (ChatGPT/Claude)</button>
     <button class="wiz-tab" data-tab="texto">📋 Colar Texto</button>
     <button class="wiz-tab" data-tab="manual">✏️ Manual</button>
   </div>
@@ -598,8 +602,8 @@ Regras:
   <!-- Tab: IA (PDF/Foto) -->
   <div class="wiz-tab-panel active" id="wiz-tab-ia">
     <div class="wiz-ai-box">
-      <h4>🤖 Use ChatGPT ou Claude para ler o PDF/foto</h4>
-      <p>O sistema não tem como acessar o site da sua faculdade diretamente, mas você pode usar uma IA gratuita em 3 passos simples:</p>
+      <h4>🤖 Alternativa: use ChatGPT ou Claude você mesmo</h4>
+      <p>Se preferir não usar o botão automático acima, dá pra fazer manualmente com uma IA gratuita em 3 passos simples:</p>
       <div class="wiz-ai-steps">
         <div class="wiz-ai-step">
           <div class="wiz-ai-step-num">1</div>
@@ -713,6 +717,63 @@ Regras:
     ${items.length > 40 ? `<span class="wiz-curr-chip">+${items.length-40} mais</span>` : ''}
   </div>
 </div>`;
+  }
+
+  // ─── Importação automática (PDF/foto via IA) dentro do wizard ────────────
+  // window.GradeIAImport (grade-ia-import.js) foi originalmente feito para a
+  // tela de setup antiga (procura #semestre no DOM e chama
+  // app.populateSetupSubjects). Aqui a gente cria um shim: espelha o semestre
+  // escolhido num input oculto e "escuta" o resultado via
+  // app.pendingSetupImportedCurriculum, que o módulo já preenche sozinho.
+  let _autoImportPoll = null;
+
+  function openAutoGradeImport() {
+    if (!window.GradeIAImport || typeof window.GradeIAImport.openModal !== 'function') {
+      if (window.showToast) window.showToast('Importação automática indisponível agora. Use uma das opções manuais abaixo.', 'error');
+      return;
+    }
+    if (!window.app) {
+      if (window.showToast) window.showToast('Aguarde a página carregar por completo e tente novamente.', 'error');
+      return;
+    }
+
+    // Shim: espelha o semestre da etapa 1 no campo que o grade-ia-import.js espera encontrar
+    let hiddenSemestre = document.getElementById('semestre');
+    if (!hiddenSemestre) {
+      hiddenSemestre = document.createElement('input');
+      hiddenSemestre.type = 'hidden';
+      hiddenSemestre.id = 'semestre';
+      document.body.appendChild(hiddenSemestre);
+    }
+    hiddenSemestre.value = wizardState.semestre || q('#wiz-semestre')?.value || '';
+
+    window.app.pendingSetupImportedCurriculum = null;
+    window.GradeIAImport.openModal('setup');
+
+    if (_autoImportPoll) clearInterval(_autoImportPoll);
+    let attempts = 0;
+    _autoImportPoll = setInterval(() => {
+      attempts++;
+      const pending = window.app?.pendingSetupImportedCurriculum;
+
+      if (Array.isArray(pending) && pending.length) {
+        clearInterval(_autoImportPoll);
+        _autoImportPoll = null;
+        window.app.pendingSetupImportedCurriculum = null;
+
+        const existingNames = new Set(wizardState.importedCurriculum.map(d => (d.nome || '').toLowerCase().trim()));
+        const novos = pending.filter(d => !existingNames.has((d.nome || '').toLowerCase().trim()));
+        wizardState.importedCurriculum = [...wizardState.importedCurriculum, ...novos];
+
+        saveDraft();
+        if (wizardState.step === 2) renderWizard();
+        if (window.showToast) window.showToast(`${novos.length} disciplina(s) importada(s) com IA!`, 'success');
+      } else if (attempts > 300) {
+        // ~2 minutos sem resultado (modal cancelado ou fechado) — para de esperar
+        clearInterval(_autoImportPoll);
+        _autoImportPoll = null;
+      }
+    }, 400);
   }
 
   function renderStep3() {
@@ -972,10 +1033,12 @@ Regras:
     q('#wiz-btn-next')?.addEventListener('click', () => goNext());
     q('#wiz-btn-finish')?.addEventListener('click', () => finishSetup());
     q('#wiz-btn-back')?.addEventListener('click', () => goBack());
-    q('#wiz-skip-step')?.addEventListener('click', () => { wizardState.step++; renderWizard(); });
+    q('#wiz-skip-step')?.addEventListener('click', () => { wizardState.step++; saveDraft(); renderWizard(); });
 
     // Etapa 2: tabs
     if (step === 2) {
+      q('#wiz-auto-ia-import')?.addEventListener('click', () => openAutoGradeImport());
+
       document.querySelectorAll('.wiz-tab').forEach(tab => {
         tab.addEventListener('click', () => {
           document.querySelectorAll('.wiz-tab').forEach(t => t.classList.remove('active'));
@@ -1161,11 +1224,37 @@ Regras:
     return results;
   }
 
+  /* ─── Rascunho (localStorage) ────────────────────────────── */
+  // Se a pessoa fechar a aba no meio do cadastro, retoma de onde parou.
+  function saveDraft() {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(wizardState));
+    } catch (_) { /* localStorage indisponível — ignora silenciosamente */ }
+  }
+
+  function loadDraft() {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return false;
+      const saved = JSON.parse(raw);
+      if (saved && typeof saved === 'object') {
+        Object.assign(wizardState, saved);
+        return wizardState.step > 1;
+      }
+    } catch (_) { /* rascunho corrompido — ignora e começa do zero */ }
+    return false;
+  }
+
+  function clearDraft() {
+    try { localStorage.removeItem(DRAFT_KEY); } catch (_) {}
+  }
+
   /* ─── Navegação ──────────────────────────────────────────── */
   function goNext() {
     if (wizardState.step === 1 && !validateStep1()) return;
     saveCurrentStep();
     wizardState.step++;
+    saveDraft();
     renderWizard();
     window.scrollTo(0, 0);
   }
@@ -1174,6 +1263,7 @@ Regras:
     if (wizardState.step <= 1) return;
     saveCurrentStep();
     wizardState.step--;
+    saveDraft();
     renderWizard();
     window.scrollTo(0, 0);
   }
@@ -1317,6 +1407,7 @@ Regras:
       }
 
       if (window.showToast) window.showToast('Configuração concluída! Bem-vindo(a)! 🚀');
+      clearDraft();
 
     } catch (err) {
       console.error('[setup-wizard] Erro ao finalizar:', err);
@@ -1353,7 +1444,11 @@ Regras:
   /* ─── Inicialização ──────────────────────────────────────── */
   function init() {
     injectStyles();
+    const restored = loadDraft();
     renderWizard();
+    if (restored && window.showToast) {
+      window.showToast('Continuando de onde você parou 👍', 'success');
+    }
   }
 
   /* Aguardar o setup-screen aparecer */

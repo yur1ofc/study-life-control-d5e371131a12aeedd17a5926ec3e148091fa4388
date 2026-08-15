@@ -439,7 +439,12 @@
     { key: '?',        desc: 'Mostrar atalhos' },
     { key: 'Ctrl S',   desc: 'Salvar dados' },
     { key: 'Esc',      desc: 'Fechar painéis' },
-    { key: 'Alt 1-9',  desc: 'Navegar entre views' },
+    { key: 'Alt 1-9',  desc: 'Navegar entre views (na ordem do menu)' },
+    { key: 'Alt D',    desc: 'Ir para o Dashboard' },
+    { key: 'Alt F',    desc: 'Ir para o Modo Foco' },
+    { key: 'Alt T',    desc: 'Ir para Tarefas' },
+    { key: 'Alt P',    desc: 'Ir para Provas' },
+    { key: 'Alt M',    desc: 'Ir para o Mentor IA' },
   ];
 
   function showShortcutsModal() {

@@ -21,6 +21,12 @@
     <meta name="twitter:image" content="https://study-life-control.vercel.app/og-image.svg">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <!-- Preconnect: acelera o popup do Google e o carregamento de fontes/ícones -->
+    <link rel="preconnect" href="https://accounts.google.com">
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -88,7 +94,8 @@
                             Entrar com Google
                         </button>
                         <div id="login-error-msg" style="display:none;margin-top:14px;padding:10px 14px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);border-radius:10px;color:#ef4444;font-size:.88rem;text-align:center;"></div>
-                        <p style="margin-top:16px;font-size:.78rem;color:#475569;text-align:center;">Ao entrar, você concorda com o uso dos dados para fins acadêmicos pessoais.</p>
+                        <p style="margin-top:14px;font-size:.76rem;color:#64748b;text-align:center;display:flex;align-items:center;justify-content:center;gap:6px;"><i class="fas fa-lock" style="font-size:.7rem;"></i> Seus dados ficam só na sua conta — ninguém mais tem acesso a eles.</p>
+                        <p style="margin-top:8px;font-size:.72rem;color:#475569;text-align:center;">Ao entrar, você concorda com o uso dos dados para fins acadêmicos pessoais.</p>
                     </div>
                 </div>
             </div>
@@ -1155,6 +1162,9 @@
     <script src="grade-ia-import.js"></script>
     <script src="setup-onboarding-enhancer.js"></script>
     <script src="app-enhancements.js"></script>
+    <script src="xp-widget.js"></script>
+    <script src="export-data.js"></script>
+    <script src="feedback-widget.js"></script>
     <link rel="stylesheet" href="launch-polish.css">
     <script src="launch-polish.js"></script>
     <script src="improvements.js"></script>
