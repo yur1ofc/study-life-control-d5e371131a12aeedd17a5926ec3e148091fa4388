@@ -1,121 +1,120 @@
-// grade-calculator.js - Cálculo de Notas e Médias
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
 
-class GradeCalculator {
-    constructor() {
-        this.grades = [];
-        this.subjects = [];
+    // ─── Funções auxiliares ─────────────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    loadData() {
-        this.grades = window.app?.data?.grades || [];
-        this.subjects = window.app?.data?.subjects || [];
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
 
-    calcularMedia(materiaNome) {
-        this.loadData();
-        const notasMateria = this.grades.filter(g => g.materia === materiaNome);
-        return calcularMediaPonderada(notasMateria);
+    // Limite de tamanho para campos de texto livres (previne abusos de storage)
+    function strLen(field, max) {
+      return field is string && field.size() <= max;
     }
 
-    calcularNotaNecessaria(materiaNome, notaDesejada) {
-        this.loadData();
-
-        const materia = this.subjects.find(s => s.nome === materiaNome);
-        if (!materia) return null;
-
-        const notasMateria = this.grades.filter(g => g.materia === materiaNome);
-        const somaPesosRealizados = notasMateria.reduce((acc, n) => acc + n.peso, 0);
-        const mediaAtual = this.calcularMedia(materiaNome);
-
-        if (somaPesosRealizados >= 100) {
-            return {
-                possivel: mediaAtual >= notaDesejada,
-                notaNecessaria: 0,
-                mediaAtual: mediaAtual.toFixed(1),
-                mensagem: mediaAtual >= notaDesejada
-                    ? `✅ Você já atingiu a média desejada (${mediaAtual.toFixed(1)})`
-                    : `❌ Infelizmente não é mais possível. Média atual: ${mediaAtual.toFixed(1)}`
-            };
-        }
-
-        const pesoRestante = 100 - somaPesosRealizados;
-        const somaPonderadaAtual = notasMateria.reduce((acc, n) => acc + (n.valor * n.peso), 0);
-
-        const notaNecessaria = ((notaDesejada * 100) - somaPonderadaAtual) / pesoRestante;
-        const possivel = notaNecessaria <= 10;
-
-        return {
-            possivel,
-            notaNecessaria: Math.max(0, Math.min(10, notaNecessaria)).toFixed(1),
-            mediaAtual: mediaAtual.toFixed(1),
-            pesoRestante,
-            mensagem: possivel
-                ? `🎯 Você precisa tirar ${Math.max(0, Math.min(10, notaNecessaria)).toFixed(1)} na próxima avaliação (peso ${pesoRestante}%) para atingir média ${notaDesejada}.`
-                : `❌ Não é mais possível atingir ${notaDesejada}. Foque em maximizar as notas restantes.`
-        };
+    // Validação de schema do catálogo comunitário
+    function validCatalogSchema(docId) {
+      let d = request.resource.data;
+      return d.key == docId
+        && strLen(d.faculdade, 120)
+        && strLen(d.curso, 120)
+        && d.subjects is list
+        && d.subjects.size() <= 200          // máx 200 matérias por catálogo
+        && strLen(d.updatedAt, 30);
     }
 
-    preverNotaFinal(materiaNome) {
-        this.loadData();
-
-        const materia = this.subjects.find(s => s.nome === materiaNome);
-        if (!materia) return null;
-
-        const notasMateria = this.grades.filter(g => g.materia === materiaNome);
-        const somaPesosRealizados = notasMateria.reduce((acc, n) => acc + n.peso, 0);
-
-        if (somaPesosRealizados === 0) {
-            return {
-                previsao: '?',
-                confianca: 'baixa',
-                mensagem: 'Nenhuma nota registrada'
-            };
-        }
-
-        const mediaAtual = this.calcularMedia(materiaNome);
-
-        if (somaPesosRealizados >= 70) {
-            return {
-                previsao: mediaAtual.toFixed(1),
-                confianca: 'alta',
-                mensagem: `Com base em ${somaPesosRealizados}% das notas`
-            };
-        }
-
-        return {
-            previsao: mediaAtual.toFixed(1),
-            confianca: 'media',
-            mensagem: `Previsão preliminar (${somaPesosRealizados}% das notas)`
-        };
+    // Validação de tamanho do documento do usuário (máx ~2 MB serializado)
+    // O Firestore tem limite de 1 MB por documento; essa regra impede payloads
+    // malformados antes mesmo de chegar ao servidor.
+    function validUserDocSize() {
+      // Limita arrays principais para evitar crescimento ilimitado
+      let d = request.resource.data;
+      return (!('sessions'   in d) || d.sessions.size()   <= 5000)
+          && (!('tasks'      in d) || d.tasks.size()      <= 2000)
+          && (!('exams'      in d) || d.exams.size()      <= 500)
+          && (!('materials'  in d) || d.materials.size()  <= 2000)
+          && (!('grades'     in d) || d.grades.size()     <= 2000)
+          && (!('dailyLogs'  in d) || d.dailyLogs.size()  <= 3650)  // ~10 anos
+          && (!('classDiaries' in d) || d.classDiaries.size() <= 5000)
+          && (!('curriculum' in d) || d.curriculum.size() <= 500)
+          && (!('extraCourses' in d) || d.extraCourses.size() <= 200);
     }
 
-    async configurarEstruturaNotas(materiaNome, estrutura) {
-        this.loadData();
+    // ─── Dados do usuário ────────────────────────────────────────────────────
 
-        const materia = this.subjects.find(s => s.nome === materiaNome);
-        if (!materia) return false;
-
-        materia.estruturaNotas = estrutura;
-        return dbService.updateItem('subjects', materia.id, { estruturaNotas: estrutura });
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId) && validUserDocSize();
     }
 
-    async registrarNota(notaData) {
-        const novaNota = {
-            id: generateId(),
-            materia: notaData.materia,
-            avaliacao: notaData.avaliacao,
-            valor: parseFloat(notaData.valor),
-            peso: parseInt(notaData.peso, 10) || 100,
-            data: new Date().toISOString()
-        };
-
-        const success = await dbService.addItem('grades', novaNota);
-        if (success) {
-            this.loadData();
-            showToast('Nota registrada!');
-        }
-        return success;
+    match /users/{userId}/{document=**} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId);
     }
+
+    // ─── Catálogo comunitário ────────────────────────────────────────────────
+
+    match /community_catalogs/{docId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && validCatalogSchema(docId)
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.updatedBy == request.auth.uid;
+
+      allow update: if isSignedIn()
+        && validCatalogSchema(docId)
+        && resource.data.key == docId
+        && request.resource.data.key == resource.data.key
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedBy == request.auth.uid;
+
+      allow delete: if false;
+    }
+
+    match /community_catalogs/{docId}/{document=**} {
+      allow read: if isSignedIn();
+      allow write, delete: if false;
+    }
+
+    // ─── Submissions comunitárias ─────────────────────────────────────────────
+
+    match /community_catalog_submissions/{docId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && request.resource.data.sourceUserId == request.auth.uid
+        && strLen(request.resource.data.faculdade, 120)
+        && strLen(request.resource.data.curso, 120)
+        && request.resource.data.subjects is list
+        && request.resource.data.subjects.size() <= 200
+        && strLen(request.resource.data.submittedAt, 30);
+
+      allow update, delete: if false;
+    }
+
+    // ─── Contador de uso da importação de grade por IA ────────────────────────
+    // Um documento por usuário só com "date" e "count" — usado pelo
+    // api/gemini.js para limitar quantas importações cada um faz por dia.
+
+    match /ai_usage/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId)
+        && strLen(request.resource.data.date, 10)
+        && request.resource.data.count is int
+        && request.resource.data.count >= 0
+        && request.resource.data.count <= 1000;
+    }
+
+    // ─── Proteção padrão: nega tudo que não foi explicitamente permitido ──────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
 }
-
-window.gradeCalculator = new GradeCalculator();

@@ -1,38 +1,7 @@
-// firebase-config.js
-// As credenciais são injetadas pelo Vercel via variáveis de ambiente.
-// NUNCA commite valores reais aqui. Configure no painel do Vercel:
-// Settings → Environment Variables → adicione cada FIREBASE_* abaixo.
-
-const firebaseConfig = {
-  apiKey:            window.__ENV?.FIREBASE_API_KEY             || '',
-  authDomain:        window.__ENV?.FIREBASE_AUTH_DOMAIN         || '',
-  projectId:         window.__ENV?.FIREBASE_PROJECT_ID          || '',
-  storageBucket:     window.__ENV?.FIREBASE_STORAGE_BUCKET      || '',
-  messagingSenderId: window.__ENV?.FIREBASE_MESSAGING_SENDER_ID || '',
-  appId:             window.__ENV?.FIREBASE_APP_ID              || ''
-};
-
-// Avisa em desenvolvimento se alguma variável estiver faltando
-if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-  const missing = Object.entries(firebaseConfig).filter(([, v]) => !v).map(([k]) => k);
-  if (missing.length) {
-    console.warn('[SLC] Firebase: variáveis de ambiente faltando →', missing);
-    console.warn('[SLC] Crie env-config.js com window.__ENV = { ... } para desenvolvimento local.');
-  }
-}
-
-firebase.initializeApp(firebaseConfig);
-
-const auth = firebase.auth();
-const db   = firebase.firestore();
-
-const googleProvider = new firebase.auth.GoogleAuthProvider();
-googleProvider.setCustomParameters({ prompt: 'select_account' });
-
-window.auth           = auth;
-window.db             = db;
-window.googleProvider = googleProvider;
-
-auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch((error) => {
-  console.warn('Não foi possível ativar persistência local de login:', error);
-});
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <rect width="64" height="64" rx="16" fill="#2563eb"/>
+  <path d="M18 20C18 17.7909 19.7909 16 22 16H42C44.2091 16 46 17.7909 46 20V44C46 46.2091 44.2091 48 42 48H22C19.7909 48 18 46.2091 18 44V20Z" fill="white" fill-opacity="0.14"/>
+  <path d="M24 22H40" stroke="white" stroke-width="4" stroke-linecap="round"/>
+  <path d="M24 30H40" stroke="white" stroke-width="4" stroke-linecap="round"/>
+  <path d="M24 38H33" stroke="white" stroke-width="4" stroke-linecap="round"/>
+</svg>

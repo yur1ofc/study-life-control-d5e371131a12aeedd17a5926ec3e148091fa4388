@@ -1,17 +1,33 @@
-// env-config.example.js
-// RENOMEIE para env-config.js para desenvolvimento local.
-// NUNCA commite o env-config.js real — ele já está no .gitignore.
-// No Vercel, configure as mesmas variáveis em: Settings → Environment Variables
+# Checklist de deploy público - Study Life Control
 
-window.__ENV = {
-  FIREBASE_API_KEY:             'AIzaSy...',           // Cole sua API Key aqui
-  FIREBASE_AUTH_DOMAIN:         'seu-projeto.firebaseapp.com',
-  FIREBASE_PROJECT_ID:          'seu-projeto',
-  FIREBASE_STORAGE_BUCKET:      'seu-projeto.appspot.com',
-  FIREBASE_MESSAGING_SENDER_ID: '000000000000',
-  FIREBASE_APP_ID:              '1:000000000000:web:xxxx'
-};
+## Firebase
+- [ ] Firestore Rules publicadas usando o arquivo `firestore.rules`
+- [ ] Authentication > Sign-in method > Google habilitado
+- [ ] Authentication > Settings > Authorized domains contém:
+  - [ ] `study-life-control.vercel.app`
+  - [ ] seu domínio final personalizado
+  - [ ] `localhost` para testes locais
+- [ ] Firestore Database criado em modo produção
 
-// A chave do Gemini (importação/atualização de grade com IA) NÃO vai aqui.
-// Ela é usada só no servidor: Vercel → Settings → Environment Variables → GEMINI_API_KEY
-// (gratuita em https://aistudio.google.com/apikey). Veja api/gemini.js.
+## Vercel
+- [ ] Repositório conectado na Vercel
+- [ ] Projeto configurado como site estático
+- [ ] Deploy sem erro no build/output
+- [ ] HTTPS ativo no domínio final
+- [ ] Cache limpo após publicar nova versão
+
+## Fluxo funcional
+- [ ] Login com conta Google nova
+- [ ] Setup inicial salva nome/curso/universidade
+- [ ] Criar matéria
+- [ ] Criar aula
+- [ ] Recarregar a página e conferir persistência
+- [ ] Sair da conta
+- [ ] Entrar novamente e conferir dados
+- [ ] Teste offline: abrir, desligar internet, navegar, religar internet
+
+## Qualidade visual
+- [ ] Banner de conexão aparece só quando necessário
+- [ ] Mobile abre sidebar corretamente
+- [ ] Dashboard não quebra em 360px de largura
+- [ ] PWA pode ser instalada

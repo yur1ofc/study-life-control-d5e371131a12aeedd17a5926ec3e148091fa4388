@@ -1,503 +1,566 @@
-// improvements.js — Tema, sidebar colapsável, Ctrl+K, Charts, Export
+// grade-ia-import.js
+// Importação e ATUALIZAÇÃO da grade curricular por IA usando Google Gemini.
+// Gratuito (chave pessoal grátis em aistudio.google.com/apikey, sem cartão).
+// O PDF/imagem é enviado direto para a IA — não precisa mais copiar prompt em outro site.
+//
+// Como ativar:
+// 1. Acesse https://aistudio.google.com/apikey e crie uma chave gratuita (só precisa de conta Google)
+// 2. No Vercel: Settings → Environment Variables → adicione GEMINI_API_KEY
+// 3. Garanta que o arquivo api/gemini.js está na pasta /api do projeto (é o que publica a função)
+//
+// Adicione no index.html ANTES do </body>, depois do app.js:
+//   <script src="grade-ia-import.js"></script>
+
 (function () {
   'use strict';
 
-  // ── 1. TEMA — gerenciado por theme-engine.js ────────────────────────────
+  const GRADE_PROMPT = `Leia o conteúdo fornecido (PDF, imagem de fluxograma ou texto com disciplinas de uma grade curricular) e retorne SOMENTE um JSON válido, sem texto antes ou depois, sem markdown, sem blocos de código.
 
-  // ── 2. SIDEBAR: grupos colapsáveis ───────────────────────────────────────
-  function initSidebarGroups() {
-    const headers = document.querySelectorAll('.nav-group-header');
-    if (!headers.length) return;
+Formato obrigatório:
+{
+  "faculdade": "Nome da faculdade ou string vazia",
+  "curso": "Nome do curso ou string vazia",
+  "disciplinas": [
+    {
+      "nome": "Nome da disciplina",
+      "codigo": "Código ou string vazia",
+      "semestre": 1,
+      "cargaHoraria": 60,
+      "creditos": 4,
+      "prerequisitos": ["Nome de disciplina anterior"],
+      "tipo": "obrigatoria"
+    }
+  ]
+}
 
-    // Restaura estado salvo
-    headers.forEach(btn => {
-      const group = btn.dataset.group;
-      const items = document.getElementById(`group-${group}`);
-      if (!items) return;
+Regras:
+- Retorne APENAS JSON puro. Absolutamente nada mais.
+- "semestre" deve ser número inteiro. Se não encontrar, use 0.
+- "cargaHoraria" e "creditos" devem ser números. Se não encontrar, use 0.
+- "prerequisitos" é lista de nomes. Se não houver, use [].
+- "tipo" deve ser "obrigatoria" para componentes obrigatórios/núcleo comum, e "optativa" para optativas/eletivas/complementares/extensão.
+- Liste TODAS as disciplinas que aparecerem no conteúdo, de todos os semestres, mesmo repetidas em versões diferentes da grade.
+- Não invente disciplinas que não estiverem no conteúdo enviado.`;
 
-      const collapsed = localStorage.getItem(`slc-nav-${group}`) === 'collapsed';
-      if (collapsed) {
-        items.style.display = 'none';
-        btn.classList.add('collapsed');
-      }
+  // ─── Conversão de arquivo ──────────────────────────────────────────────────
 
-      btn.addEventListener('click', () => {
-        const isCollapsed = items.style.display === 'none';
-        items.style.display = isCollapsed ? '' : 'none';
-        btn.classList.toggle('collapsed', !isCollapsed);
-        localStorage.setItem(`slc-nav-${group}`, isCollapsed ? 'open' : 'collapsed');
-      });
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = () => reject(new Error('Falha ao ler o arquivo'));
+      reader.readAsDataURL(file);
     });
   }
 
-  // ── 3. BUSCA RÁPIDA Ctrl+K ────────────────────────────────────────────────
-  const NAV_ITEMS = [
-    { label: 'Dashboard',          view: 'dashboard',         icon: 'fa-chart-pie' },
-    { label: 'Mentor IA',          view: 'mentor-ia',         icon: 'fa-robot' },
-    { label: 'Matérias',           view: 'materias',          icon: 'fa-book' },
-    { label: 'Grade Horária',      view: 'grade-horaria',     icon: 'fa-calendar-week' },
-    { label: 'Grade Curricular',   view: 'grade-curricular',  icon: 'fa-sitemap' },
-    { label: 'Cursos Extras',      view: 'cursos-extras',     icon: 'fa-language' },
-    { label: 'Situação Acadêmica', view: 'situacao-academica',icon: 'fa-heartbeat' },
-    { label: 'Previsão de Notas',  view: 'previsao-notas',    icon: 'fa-chart-line' },
-    { label: 'Tarefas',            view: 'tarefas',           icon: 'fa-tasks' },
-    { label: 'Provas e Trabalhos', view: 'provas',            icon: 'fa-graduation-cap' },
-    { label: 'Sessões de Estudo',  view: 'sessoes',           icon: 'fa-clock' },
-    { label: 'Calendário',         view: 'calendario',        icon: 'fa-calendar-alt' },
-    { label: 'Hábitos',            view: 'habitos',           icon: 'fa-heart' },
-    { label: 'Modo Foco',          view: 'foco',              icon: 'fa-bullseye' },
-    { label: 'Mapa de Aprendizado',view: 'mapa-aprendizado',  icon: 'fa-map' },
-    { label: 'Materiais',          view: 'materiais',         icon: 'fa-folder' },
-    { label: 'Estatísticas',       view: 'estatisticas',      icon: 'fa-chart-bar' },
-    { label: 'Configurações',      view: 'configuracoes',     icon: 'fa-cog' },
-    { label: 'Ajuda',              view: 'ajuda',             icon: 'fa-question-circle' },
-  ];
-
-  function initNavSearch() {
-    const modal   = document.getElementById('nav-search-modal');
-    const input   = document.getElementById('nav-search-input');
-    const results = document.getElementById('nav-search-results');
-    const overlay = document.getElementById('nav-search-overlay');
-    if (!modal || !input || !results) return;
-
-    function open() {
-      modal.hidden = false;
-      input.value = '';
-      renderResults('');
-      setTimeout(() => input.focus(), 50);
-    }
-
-    function close() {
-      modal.hidden = true;
-    }
-
-    function renderResults(query) {
-      const q = query.toLowerCase().trim();
-      const filtered = q
-        ? NAV_ITEMS.filter(item => item.label.toLowerCase().includes(q))
-        : NAV_ITEMS;
-
-      results.innerHTML = filtered.map((item, i) => `
-        <button class="nav-search-result${i === 0 ? ' active' : ''}" data-view="${item.view}">
-          <i class="fas ${item.icon}"></i>
-          <span>${item.label}</span>
-        </button>
-      `).join('');
-
-      results.querySelectorAll('.nav-search-result').forEach(btn => {
-        btn.addEventListener('click', () => {
-          close();
-          if (window.app?.loadView) window.app.loadView(btn.dataset.view);
-        });
-      });
-    }
-
-    input.addEventListener('input', e => renderResults(e.target.value));
-
-    input.addEventListener('keydown', e => {
-      const active = results.querySelector('.nav-search-result.active');
-      const all    = [...results.querySelectorAll('.nav-search-result')];
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        const idx = all.indexOf(active);
-        const next = all[idx + 1] || all[0];
-        active?.classList.remove('active');
-        next?.classList.add('active');
-        next?.scrollIntoView({ block: 'nearest' });
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        const idx = all.indexOf(active);
-        const prev = all[idx - 1] || all[all.length - 1];
-        active?.classList.remove('active');
-        prev?.classList.add('active');
-        prev?.scrollIntoView({ block: 'nearest' });
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        const target = active || all[0];
-        if (target) { close(); if (window.app?.loadView) window.app.loadView(target.dataset.view); }
-      } else if (e.key === 'Escape') {
-        close();
-      }
-    });
-
-    overlay?.addEventListener('click', close);
-
-    document.addEventListener('keydown', e => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault();
-        modal.hidden ? open() : close();
-      }
-      if (e.key === 'Escape' && !modal.hidden) close();
-    });
+  function getMimeType(file) {
+    if (file.type) return file.type;
+    const ext = (file.name || '').split('.').pop().toLowerCase();
+    const map = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' };
+    return map[ext] || 'application/octet-stream';
   }
 
-  // ── 4. CHARTS NO DASHBOARD ───────────────────────────────────────────────
-  // Injetado via patch no renderDashboard do ViewRenderer
-  function initDashboardCharts() {
-    if (!window.ViewRenderer) return;
-    const proto = ViewRenderer.prototype;
-    const originalDash = proto.renderDashboard;
-    if (!originalDash || proto.__chartPatched) return;
+  // ─── Chamada ao Gemini ─────────────────────────────────────────────────────
 
-    proto.renderDashboard = function () {
-      const html = originalDash.call(this);
-      // Injeta container de charts após o retorno
-      setTimeout(() => renderCharts(this.app?.data), 100);
-      return html;
+  async function callGemini(parts) {
+    // Só usuários logados no app podem chamar o proxy — evita que gente de fora
+    // (ou scripts) descubra a URL e fique consumindo sua cota diária do Gemini.
+    const user = window.auth?.currentUser;
+    if (!user) throw new Error('Você precisa estar logado para usar a importação com IA.');
+    const idToken = await user.getIdToken();
+
+    // Chama o proxy seguro em /api/gemini — a chave fica só no servidor (Vercel), nunca no navegador
+    const response = await fetch('/api/gemini', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ contents: [{ parts }] })
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      const msg = (typeof err?.error === 'string' ? err.error : err?.error?.message) || `Erro HTTP ${response.status}`;
+      throw new Error(msg);
+    }
+
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const clean = text.replace(/```json|```/gi, '').trim();
+
+    try {
+      return JSON.parse(clean);
+    } catch {
+      throw new Error('A IA retornou um formato inesperado. Tente novamente — geralmente funciona na segunda tentativa.');
+    }
+  }
+
+  // ─── Normalização ───────────────────────────────────────────────────────────
+
+  function makeId() {
+    return typeof generateId === 'function' ? generateId() : Math.random().toString(36).slice(2, 10);
+  }
+
+  function slugKey(nome) {
+    return String(nome || '')
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function normalizeItem(app, d) {
+    const item = {
+      id: makeId(),
+      nome: d.nome || '',
+      codigo: d.codigo || '',
+      semestre: d.semestre || 0,
+      cargaHoraria: Number(d.cargaHoraria) || 0,
+      creditos: Number(d.creditos) || 0,
+      tipo: d.tipo || 'obrigatoria',
+      prerequisitosLista: Array.isArray(d.prerequisitos) ? d.prerequisitos : [],
+      prerequisitos: Array.isArray(d.prerequisitos) ? d.prerequisitos.join(' | ') : '',
+      status: 'nao-cursada',
+      observacoes: ''
     };
-    proto.__chartPatched = true;
+    return app.normalizeCurriculumItem ? app.normalizeCurriculumItem(item) : item;
   }
 
-  function renderCharts(data) {
-    const container = document.getElementById('view-container');
-    if (!container || !data) return;
+  // ─── Aplicar resultado: modo SETUP (primeiro cadastro) ─────────────────────
 
-    // Evita duplicar
-    if (container.querySelector('#slc-charts-section')) return;
+  function applySetupResult(app, parsed) {
+    const disciplinas = parsed?.disciplinas || [];
+    if (!disciplinas.length) return { count: 0, error: 'Nenhuma disciplina encontrada no arquivo.' };
 
-    const sessions = data.sessions || [];
-    const grades   = data.grades   || [];
+    const curriculum = disciplinas.map(d => normalizeItem(app, d));
+    app.pendingSetupImportedCurriculum = curriculum;
 
-    // Horas estudadas por dia (últimos 14 dias)
-    const today = new Date();
-    const labels = [], hoursData = [];
-    for (let i = 13; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
-      const ds = d.toISOString().slice(0, 10);
-      labels.push(d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }));
-      const mins = sessions
-        .filter(s => (s.data || s.dataHora || '').slice(0, 10) === ds && s.concluida)
-        .reduce((acc, s) => acc + (Number(s.duracao) || 0), 0);
-      hoursData.push(+(mins / 60).toFixed(1));
+    const semester = document.getElementById('semestre')?.value || '';
+    const semesterSubjects = curriculum
+      .filter(item => String(item.semestre || '') === String(semester))
+      .map(item => ({ id: item.id, nome: item.nome, dificuldade: 3, peso: item.tipo === 'obrigatoria' ? 4 : 3, notaDesejada: 7 }));
+
+    if (semesterSubjects.length && app.populateSetupSubjects) {
+      app.populateSetupSubjects(semesterSubjects);
     }
 
-    // Média de notas por matéria
-    const subjectGrades = {};
-    grades.forEach(g => {
-      if (!g.materia || !g.valor) return;
-      if (!subjectGrades[g.materia]) subjectGrades[g.materia] = [];
-      subjectGrades[g.materia].push(Number(g.valor));
-    });
-    const gradeLabels = Object.keys(subjectGrades).slice(0, 8);
-    const gradeData   = gradeLabels.map(m => {
-      const arr = subjectGrades[m];
-      return +(arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1);
+    return { count: curriculum.length, semesterCount: semesterSubjects.length };
+  }
+
+  // ─── Aplicar resultado: modo ATUALIZAÇÃO da grade existente ────────────────
+  // Mantém tudo que já existe (status/progresso/notas) nos semestres certos,
+  // atualiza dados estruturais (semestre, carga horária, créditos, obrigatória/optativa,
+  // pré-requisitos, código) a partir do novo arquivo, adiciona o que for novo e
+  // sinaliza (sem apagar sozinho) o que sumiu da grade nova.
+
+  function computeUpdateDiff(app, disciplinas) {
+    if (!Array.isArray(app.data.curriculum)) app.data.curriculum = [];
+    const existing = app.data.curriculum;
+    const matchedIds = new Set();
+
+    const added = [];
+    const updated = [];
+
+    disciplinas.forEach(d => {
+      const key = slugKey(d.nome);
+      if (!key) return;
+
+      // 1) tenta casar por código (mais confiável quando existe)
+      let target = null;
+      const codigoNovo = String(d.codigo || '').trim().toUpperCase();
+      if (codigoNovo) {
+        target = existing.find(item => !matchedIds.has(item.id) && String(item.codigo || '').trim().toUpperCase() === codigoNovo);
+      }
+      // 2) senão, casa por nome normalizado
+      if (!target) {
+        target = existing.find(item => !matchedIds.has(item.id) && slugKey(item.nome) === key);
+      }
+
+      if (target) {
+        matchedIds.add(target.id);
+        const changes = {};
+        const novoSemestre = d.semestre ? String(d.semestre) : target.semestre;
+        const novoTipo = d.tipo || target.tipo;
+        const novaCarga = Number(d.cargaHoraria) || target.cargaHoraria;
+        const novosCreditos = Number(d.creditos) || target.creditos;
+        const novoCodigo = d.codigo ? String(d.codigo).toUpperCase() : target.codigo;
+        const novosPrereqs = Array.isArray(d.prerequisitos) && d.prerequisitos.length ? d.prerequisitos : target.prerequisitosLista;
+
+        if (String(target.semestre) !== String(novoSemestre)) changes.semestre = { de: target.semestre, para: novoSemestre };
+        if (target.tipo !== novoTipo) changes.tipo = { de: target.tipo, para: novoTipo };
+        if (Number(target.cargaHoraria) !== Number(novaCarga)) changes.cargaHoraria = { de: target.cargaHoraria, para: novaCarga };
+        if (Number(target.creditos) !== Number(novosCreditos)) changes.creditos = { de: target.creditos, para: novosCreditos };
+
+        if (Object.keys(changes).length) {
+          updated.push({ item: target, novo: d, changes, novoSemestre, novoTipo, novaCarga, novosCreditos, novoCodigo, novosPrereqs });
+        }
+      } else {
+        added.push(d);
+      }
     });
 
-    // Heatmap de atividade (últimos 84 dias = 12 semanas)
-    const activityMap = {};
-    sessions.filter(s => s.concluida).forEach(s => {
-      const d = (s.data || s.dataHora || '').slice(0, 10);
-      if (d) activityMap[d] = (activityMap[d] || 0) + 1;
+    // Matérias que existiam e não vieram na nova grade — candidatas a remoção,
+    // mas só quem já foi cursada/em curso conta (evita sinalizar coisas que o
+    // usuário cadastrou manualmente fora do fluxograma oficial sem necessidade).
+    const removedCandidates = existing.filter(item => !matchedIds.has(item.id));
+
+    return { added, updated, removedCandidates };
+  }
+
+  function applyUpdate(app, diff, { removeIds = [] } = {}) {
+    if (!Array.isArray(app.data.curriculum)) app.data.curriculum = [];
+
+    diff.updated.forEach(({ item, novoSemestre, novoTipo, novaCarga, novosCreditos, novoCodigo, novosPrereqs }) => {
+      item.semestre = novoSemestre;
+      item.tipo = novoTipo;
+      item.cargaHoraria = Number(novaCarga) || 0;
+      item.creditos = Number(novosCreditos) || 0;
+      if (novoCodigo) item.codigo = novoCodigo;
+      if (Array.isArray(novosPrereqs)) {
+        item.prerequisitosLista = novosPrereqs;
+        item.prerequisitos = novosPrereqs.join(' | ');
+      }
+      // status, observações, nota e demais dados de progresso NÃO são tocados
     });
 
-    const section = document.createElement('div');
-    section.id = 'slc-charts-section';
-    section.style.cssText = 'padding:0 0 32px;';
-    section.innerHTML = `
-      <div class="card" style="margin-bottom:20px;">
-        <h3 style="margin-bottom:16px;font-size:15px;font-weight:600;"><i class="fas fa-clock" style="color:var(--accent-primary);margin-right:8px;"></i>Horas estudadas — últimos 14 dias</h3>
-        <div style="position:relative;height:180px;"><canvas id="chart-hours"></canvas></div>
-      </div>
-      ${gradeLabels.length ? `
-      <div class="card" style="margin-bottom:20px;">
-        <h3 style="margin-bottom:16px;font-size:15px;font-weight:600;"><i class="fas fa-star" style="color:var(--accent-warning);margin-right:8px;"></i>Médias por matéria</h3>
-        <div style="position:relative;height:180px;"><canvas id="chart-grades"></canvas></div>
-      </div>` : ''}
-      <div class="card">
-        <h3 style="margin-bottom:16px;font-size:15px;font-weight:600;"><i class="fas fa-fire" style="color:var(--accent-danger);margin-right:8px;"></i>Atividade — últimas 12 semanas</h3>
-        <div id="heatmap-container" style="overflow-x:auto;"></div>
+    diff.added.forEach(d => {
+      app.data.curriculum.push(normalizeItem(app, d));
+    });
+
+    if (removeIds.length) {
+      const removeSet = new Set(removeIds);
+      app.data.curriculum = app.data.curriculum.filter(item => !removeSet.has(item.id));
+    }
+
+    if (typeof dbService !== 'undefined') dbService.saveData('curriculum', app.data.curriculum);
+    if (app.loadView) app.loadView('grade-curricular');
+  }
+
+  // ─── Modal de resumo (o que mudou) antes de confirmar ──────────────────────
+
+  function showDiffModal(app, diff, disciplinas) {
+    return new Promise(resolve => {
+      const wrap = document.createElement('div');
+      wrap.id = 'slc-gim-diff-modal';
+      wrap.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:1rem;';
+
+      const updatedRows = diff.updated.map(u => {
+        const bits = Object.entries(u.changes).map(([campo, v]) => {
+          const label = { semestre: 'semestre', tipo: 'tipo', cargaHoraria: 'carga horária', creditos: 'créditos' }[campo] || campo;
+          return `${label}: <s style="opacity:.55">${v.de || '—'}</s> → <strong>${v.para}</strong>`;
+        }).join(' · ');
+        return `<li style="padding:.4rem 0;border-bottom:1px solid #eef2f7;font-size:.82rem;"><strong>${u.item.nome}</strong><br><span style="color:#64748b">${bits}</span></li>`;
+      }).join('');
+
+      const addedRows = diff.added.map(d => `<li style="padding:.3rem 0;font-size:.82rem;">${d.nome} <span style="color:#94a3b8">· ${d.semestre ? d.semestre + 'º sem.' : 'sem semestre'} · ${d.tipo === 'optativa' ? 'optativa' : 'obrigatória'}</span></li>`).join('');
+
+      const removedRows = diff.removedCandidates.map(item => `
+        <li style="padding:.35rem 0;font-size:.82rem;display:flex;align-items:center;gap:.5rem;">
+          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;flex:1;">
+            <input type="checkbox" class="slc-gim-remove-check" value="${item.id}">
+            <span>${item.nome} <span style="color:#94a3b8">· status: ${item.status || 'não cursada'}</span></span>
+          </label>
+        </li>`).join('');
+
+      wrap.innerHTML = `
+        <div style="background:#fff;color:#1e293b;border-radius:16px;width:100%;max-width:560px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.22);overflow:hidden;">
+          <div style="padding:1.1rem 1.4rem;background:linear-gradient(135deg,#1a73e8,#4f46e5);color:#fff;">
+            <h3 style="margin:0;font-size:1rem;">Confira o que vai mudar</h3>
+            <p style="margin:.2rem 0 0;font-size:.78rem;opacity:.85;">Nada é aplicado até você confirmar. Progresso e notas já lançados não são alterados.</p>
+          </div>
+          <div style="padding:1.2rem 1.4rem;overflow-y:auto;flex:1;">
+            ${diff.added.length ? `<h4 style="font-size:.85rem;margin:.2rem 0 .4rem;color:#16a34a;">+ ${diff.added.length} nova(s) disciplina(s)</h4><ul style="list-style:none;padding:0;margin:0 0 1rem;">${addedRows}</ul>` : ''}
+            ${diff.updated.length ? `<h4 style="font-size:.85rem;margin:.2rem 0 .4rem;color:#1a73e8;">${diff.updated.length} disciplina(s) com dado atualizado</h4><ul style="list-style:none;padding:0;margin:0 0 1rem;">${updatedRows}</ul>` : ''}
+            ${diff.removedCandidates.length ? `
+              <h4 style="font-size:.85rem;margin:.2rem 0 .4rem;color:#dc2626;">${diff.removedCandidates.length} não apareceram no arquivo novo</h4>
+              <p style="font-size:.76rem;color:#64748b;margin:0 0 .4rem;">Marque só as que você quer remover da sua grade. As desmarcadas continuam como estão.</p>
+              <ul style="list-style:none;padding:0;margin:0 0 1rem;">${removedRows}</ul>` : ''}
+            ${(!diff.added.length && !diff.updated.length && !diff.removedCandidates.length) ? '<p style="font-size:.85rem;color:#64748b;">Nenhuma diferença encontrada — sua grade já está igual ao arquivo enviado.</p>' : ''}
+          </div>
+          <div style="padding:1rem 1.4rem;border-top:1px solid #eef2f7;display:flex;gap:.6rem;justify-content:flex-end;">
+            <button id="slc-gim-diff-cancel" style="padding:.55rem 1rem;border-radius:8px;border:1px solid #e2e8f0;background:#fff;cursor:pointer;font-size:.83rem;">Cancelar</button>
+            <button id="slc-gim-diff-confirm" style="padding:.55rem 1.1rem;border-radius:8px;border:none;background:#1a73e8;color:#fff;cursor:pointer;font-size:.83rem;font-weight:600;">Aplicar atualização</button>
+          </div>
+        </div>`;
+
+      document.body.appendChild(wrap);
+
+      wrap.querySelector('#slc-gim-diff-cancel').addEventListener('click', () => { wrap.remove(); resolve(null); });
+      wrap.addEventListener('click', e => { if (e.target === wrap) { wrap.remove(); resolve(null); } });
+      wrap.querySelector('#slc-gim-diff-confirm').addEventListener('click', () => {
+        const removeIds = Array.from(wrap.querySelectorAll('.slc-gim-remove-check:checked')).map(el => el.value);
+        wrap.remove();
+        resolve({ removeIds });
+      });
+    });
+  }
+
+  // ─── Modal principal de importação/atualização ──────────────────────────────
+
+  function createImportModal(targetContext) {
+    document.getElementById('slc-grade-ia-modal')?.remove();
+    const isUpdate = targetContext === 'grade';
+
+    const modal = document.createElement('div');
+    modal.id = 'slc-grade-ia-modal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.52);display:flex;align-items:center;justify-content:center;padding:1rem;';
+
+    modal.innerHTML = `
+      <div style="background:#fff;color:#1e293b;border-radius:16px;width:100%;max-width:540px;box-shadow:0 8px 40px rgba(0,0,0,.22);overflow:hidden;">
+        <div style="background:linear-gradient(135deg,#1a73e8,#4f46e5);padding:1.25rem 1.5rem;display:flex;align-items:center;gap:.75rem;">
+          <i class="fas fa-wand-magic-sparkles" style="color:#fff;font-size:1.25rem;"></i>
+          <div style="flex:1">
+            <h3 style="margin:0;color:#fff;font-size:1rem;font-weight:600;">${isUpdate ? 'Atualizar grade com IA' : 'Importar grade com IA'}</h3>
+            <p style="margin:0;color:rgba(255,255,255,.8);font-size:.78rem;">Google Gemini • Grátis • ~1.500 leituras/dia (mais que suficiente pro dia a dia)</p>
+          </div>
+          <button id="slc-gim-close" style="background:rgba(255,255,255,.2);border:none;border-radius:8px;padding:5px 10px;color:#fff;cursor:pointer;">✕</button>
+        </div>
+
+        <div style="padding:1.5rem;">
+          ${isUpdate ? `<p style="font-size:.82rem;color:#475569;margin:0 0 1rem;background:#f8fafc;border:1px solid #eef2f7;border-radius:8px;padding:.6rem .8rem;">Envie a grade nova (PDF do fluxograma atualizado). O que você já cursou ou está cursando continua como está — só a estrutura (matérias, semestre, obrigatória/optativa) é atualizada, e você confirma tudo antes de salvar.</p>` : ''}
+          <div style="display:flex;gap:.5rem;margin-bottom:1.25rem;">
+            <button class="slc-gim-tab slc-gim-tab-on" data-tab="arquivo" style="flex:1;padding:.5rem;border-radius:8px;border:1.5px solid #1a73e8;background:#e8f0fe;color:#1a73e8;cursor:pointer;font-size:.83rem;font-weight:500;">
+              <i class="fas fa-file-upload"></i> PDF ou imagem
+            </button>
+            <button class="slc-gim-tab" data-tab="texto" style="flex:1;padding:.5rem;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;font-size:.83rem;">
+              <i class="fas fa-align-left"></i> Colar texto
+            </button>
+          </div>
+
+          <div id="slc-gim-tab-arquivo">
+            <div id="slc-gim-dropzone" style="border:2px dashed #cbd5e1;border-radius:12px;padding:2rem;text-align:center;cursor:pointer;background:#f8fafc;transition:all .2s;">
+              <i class="fas fa-cloud-upload-alt" style="font-size:2rem;color:#94a3b8;display:block;margin-bottom:.5rem;"></i>
+              <p style="margin:0 0 .2rem;font-weight:500;color:#475569;">Arraste o PDF ou foto do fluxograma</p>
+              <p style="margin:0;font-size:.78rem;color:#94a3b8;">ou clique para escolher · PDF, PNG, JPG, WEBP</p>
+              <input type="file" id="slc-gim-file-input" accept=".pdf,.png,.jpg,.jpeg,.webp" style="display:none;">
+            </div>
+            <div id="slc-gim-preview" style="display:none;margin-top:.75rem;padding:.65rem 1rem;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;align-items:center;gap:.5rem;">
+              <i class="fas fa-file-check" style="color:#16a34a;"></i>
+              <span id="slc-gim-fname" style="font-size:.83rem;color:#166534;flex:1;"></span>
+              <button id="slc-gim-fremove" style="background:none;border:none;color:#ef4444;cursor:pointer;">✕</button>
+            </div>
+          </div>
+
+          <div id="slc-gim-tab-texto" style="display:none;">
+            <label style="font-size:.83rem;font-weight:500;color:#374151;display:block;margin-bottom:.4rem;">Cole o texto da grade (site da faculdade, PDF copiado, etc.):</label>
+            <textarea id="slc-gim-texto" rows="8" placeholder="1º Semestre&#10;Cálculo I - 60h&#10;Geometria Analítica - 90h&#10;&#10;2º Semestre&#10;Cálculo II - 60h&#10;Física I - 60h" style="width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:8px;padding:.7rem;font-size:.83rem;font-family:inherit;resize:vertical;outline:none;"></textarea>
+          </div>
+
+          <div id="slc-gim-status" style="display:none;margin-top:1rem;padding:.7rem 1rem;border-radius:8px;font-size:.83rem;"></div>
+
+          <button id="slc-gim-run" style="width:100%;margin-top:1rem;padding:.75rem;background:#1a73e8;color:#fff;border:none;border-radius:10px;font-size:.93rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.5rem;">
+            <i class="fas fa-magic"></i> ${isUpdate ? 'Analisar e comparar' : 'Importar com IA (grátis)'}
+          </button>
+
+          <p style="text-align:center;font-size:.73rem;color:#94a3b8;margin:.65rem 0 0;">
+            Powered by Google Gemini · chave pessoal grátis · o arquivo não fica salvo, só é lido na hora
+          </p>
+        </div>
       </div>
     `;
 
-    container.appendChild(section);
-    loadChartJS(labels, hoursData, gradeLabels, gradeData, activityMap);
-  }
-
-  function loadChartJS(labels, hoursData, gradeLabels, gradeData, activityMap) {
-    if (window.Chart) {
-      drawCharts(labels, hoursData, gradeLabels, gradeData, activityMap);
-      return;
-    }
-    const s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js';
-    s.onload = () => drawCharts(labels, hoursData, gradeLabels, gradeData, activityMap);
-    document.head.appendChild(s);
-  }
-
-  function drawCharts(labels, hoursData, gradeLabels, gradeData, activityMap) {
-    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
-    const textColor = isDark ? '#94a3b8' : '#64748b';
-    const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
-
-    const baseOpts = {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { color: textColor, font: { size: 11 } }, grid: { color: gridColor } },
-        y: { ticks: { color: textColor, font: { size: 11 } }, grid: { color: gridColor }, beginAtZero: true }
-      }
-    };
-
-    // Horas chart
-    const hoursCtx = document.getElementById('chart-hours');
-    if (hoursCtx) {
-      new Chart(hoursCtx, {
-        type: 'bar',
-        data: {
-          labels,
-          datasets: [{ data: hoursData, backgroundColor: 'rgba(59,130,246,0.7)', borderRadius: 6, borderSkipped: false }]
-        },
-        options: { ...baseOpts }
-      });
-    }
-
-    // Grades chart
-    const gradesCtx = document.getElementById('chart-grades');
-    if (gradesCtx && gradeLabels.length) {
-      new Chart(gradesCtx, {
-        type: 'bar',
-        data: {
-          labels: gradeLabels,
-          datasets: [{
-            data: gradeData,
-            backgroundColor: gradeData.map(v => v >= 7 ? 'rgba(16,185,129,0.7)' : v >= 5 ? 'rgba(245,158,11,0.7)' : 'rgba(239,68,68,0.7)'),
-            borderRadius: 6, borderSkipped: false
-          }]
-        },
-        options: { ...baseOpts, scales: { ...baseOpts.scales, y: { ...baseOpts.scales.y, max: 10 } } }
-      });
-    }
-
-    // Heatmap
-    const heatDiv = document.getElementById('heatmap-container');
-    if (heatDiv) {
-      const today = new Date();
-      let html = '<div style="display:flex;gap:3px;align-items:flex-start;">';
-      for (let w = 11; w >= 0; w--) {
-        html += '<div style="display:flex;flex-direction:column;gap:3px;">';
-        for (let d = 6; d >= 0; d--) {
-          const date = new Date(today);
-          date.setDate(today.getDate() - (w * 7 + d));
-          const ds = date.toISOString().slice(0, 10);
-          const count = activityMap[ds] || 0;
-          const opacity = count === 0 ? 0.08 : count === 1 ? 0.3 : count <= 3 ? 0.6 : 1;
-          html += `<div title="${ds}: ${count} sessão(ões)" style="width:12px;height:12px;border-radius:2px;background:rgba(59,130,246,${opacity});"></div>`;
-        }
-        html += '</div>';
-      }
-      html += '</div>';
-      heatDiv.innerHTML = html;
-    }
-  }
-
-  // ── 5. EXPORT CSV ────────────────────────────────────────────────────────
-  function initExport() {
-    // Adiciona botão de export na view de configurações
-    document.addEventListener('click', e => {
-      if (e.target.closest('#btn-export-csv') || e.target.id === 'btn-export-csv') {
-        exportCSV();
-      }
-      if (e.target.closest('#btn-export-pdf') || e.target.id === 'btn-export-pdf') {
-        exportPDF();
-      }
-    });
-  }
-
-  function exportCSV() {
-    const data = window.app?.data;
-    if (!data) return;
-
-    const sheets = {
-      'sessoes': ['data', 'materia', 'tipo', 'duracao', 'completada'],
-      'tarefas': ['titulo', 'materia', 'dataLimite', 'prioridade', 'concluida'],
-      'provas':  ['titulo', 'materia', 'data', 'tipo', 'nota'],
-      'grades':  ['materia', 'avaliacao', 'nota', 'peso'],
-    };
-
-    let csv = '';
-    Object.entries(sheets).forEach(([key, fields]) => {
-      const rows = data[key] || [];
-      if (!rows.length) return;
-      csv += `\n### ${key.toUpperCase()} ###\n`;
-      csv += fields.join(',') + '\n';
-      rows.forEach(row => {
-        csv += fields.map(f => `"${String(row[f] ?? '').replace(/"/g, '""')}"`).join(',') + '\n';
-      });
-    });
-
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url  = URL.createObjectURL(blob);
-    const a    = Object.assign(document.createElement('a'), { href: url, download: 'study-life-control-dados.csv' });
-    a.click();
-    URL.revokeObjectURL(url);
-    if (window.showToast) window.showToast('CSV exportado com sucesso!', 'success');
-  }
-
-  function exportPDF() {
-    const data = window.app?.data;
-    if (!data) return;
-
-    // PDF simples via print — sem dependência externa
-    const user    = data.user || {};
-    const tasks   = (data.tarefas || data.tasks || []).filter(t => !t.concluida).slice(0, 20);
-    const exams   = (data.provas  || data.exams  || []).slice(0, 20);
-    const grades  = data.grades || [];
-
-    const html = `
-      <html><head><title>Study Life Control — Relatório</title>
-      <style>
-        body { font-family: Arial, sans-serif; padding: 32px; color: #1e293b; }
-        h1 { font-size: 22px; margin-bottom: 4px; }
-        h2 { font-size: 16px; margin: 24px 0 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
-        table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        th { background: #f1f5f9; text-align: left; padding: 6px 8px; }
-        td { padding: 5px 8px; border-bottom: 1px solid #f1f5f9; }
-        .badge { display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px; }
-        .alta { background:#fee2e2;color:#dc2626; }
-        .media { background:#fef3c7;color:#d97706; }
-        .baixa { background:#dcfce7;color:#16a34a; }
-      </style></head><body>
-      <h1>📚 Study Life Control</h1>
-      <p style="color:#64748b;font-size:13px;">Relatório gerado em ${new Date().toLocaleDateString('pt-BR')} • ${user.nome || 'Usuário'}</p>
-      <h2>Tarefas Pendentes</h2>
-      <table><tr><th>Tarefa</th><th>Matéria</th><th>Prazo</th><th>Prioridade</th></tr>
-      ${tasks.map(t => `<tr><td>${t.titulo||''}</td><td>${t.materia||''}</td><td>${t.dataLimite||''}</td><td><span class="badge ${t.prioridade||''}">${t.prioridade||''}</span></td></tr>`).join('')}
-      </table>
-      <h2>Provas e Trabalhos</h2>
-      <table><tr><th>Título</th><th>Matéria</th><th>Data</th><th>Tipo</th></tr>
-      ${exams.map(e => `<tr><td>${e.titulo||''}</td><td>${e.materia||''}</td><td>${e.data||''}</td><td>${e.tipo||''}</td></tr>`).join('')}
-      </table>
-      <h2>Notas Registradas</h2>
-      <table><tr><th>Matéria</th><th>Avaliação</th><th>Nota</th><th>Peso</th></tr>
-      ${grades.map(g => `<tr><td>${g.materia||''}</td><td>${g.avaliacao||''}</td><td>${g.nota||''}</td><td>${g.peso||''}%</td></tr>`).join('')}
-      </table>
-      </body></html>`;
-
-    const win = window.open('', '_blank');
-    win.document.write(html);
-    win.document.close();
-    win.print();
-  }
-
-  // ── 6. Botões de export na tela de configurações ─────────────────────────
-  function injectExportButtons() {
-    if (!window.ViewRenderer) return;
-    const proto = ViewRenderer.prototype;
-    if (proto.__exportPatched) return;
-
-    const originalConfig = proto.renderConfiguracoes;
-    if (!originalConfig) return;
-
-    proto.renderConfiguracoes = function () {
-      const html = originalConfig.call(this);
-      const exportSection = `
-        <div class="card" style="margin-top:20px;">
-          <h3 style="margin-bottom:16px;font-size:15px;font-weight:600;"><i class="fas fa-download" style="color:var(--accent-primary);margin-right:8px;"></i>Exportar Dados</h3>
-          <p style="color:var(--text-secondary);font-size:13px;margin-bottom:16px;">Baixe seus dados acadêmicos para backup ou análise externa.</p>
-          <div style="display:flex;gap:12px;flex-wrap:wrap;">
-            <button id="btn-export-csv" class="btn-secondary"><i class="fas fa-file-csv"></i> Exportar CSV</button>
-            <button id="btn-export-pdf" class="btn-secondary"><i class="fas fa-file-pdf"></i> Exportar PDF</button>
-          </div>
-        </div>`;
-      return html + exportSection;
-    };
-    proto.__exportPatched = true;
-  }
-
-  // ── INIT ──────────────────────────────────────────────────────────────────
-  function init() {
-    initSidebarGroups();
-    initNavSearch();
-    initExport();
-
-    // Patches de ViewRenderer (aguarda estar disponível)
-    let attempts = 0;
-    const interval = setInterval(() => {
-      if (window.ViewRenderer) {
-        initDashboardCharts();
-        injectExportButtons();
-        clearInterval(interval);
-      }
-      if (++attempts > 20) clearInterval(interval);
-    }, 300);
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
-})();
-
-// ── BÔNUS: Painel de atalhos de teclado (tecla ?) ──────────────────────────
-(function () {
-  const SHORTCUTS = [
-    { key: 'Ctrl K',   desc: 'Busca rápida' },
-    { key: '?',        desc: 'Mostrar atalhos' },
-    { key: 'Ctrl S',   desc: 'Salvar dados' },
-    { key: 'Esc',      desc: 'Fechar painéis' },
-    { key: 'Alt 1-9',  desc: 'Navegar entre views' },
-  ];
-
-  function showShortcutsModal() {
-    let modal = document.getElementById('shortcuts-modal');
-    if (modal) { modal.hidden = false; return; }
-
-    modal = document.createElement('div');
-    modal.id = 'shortcuts-modal';
-    modal.style.cssText = 'position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;';
-    modal.innerHTML = `
-      <div style="position:absolute;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);" id="shortcuts-overlay"></div>
-      <div style="
-        position:relative;background:var(--bg-secondary);border:1px solid var(--border);
-        border-radius:var(--radius-lg);padding:28px;min-width:320px;max-width:420px;width:90%;
-        box-shadow:0 25px 50px rgba(0,0,0,0.4);animation:slideUp 0.18s ease;
-      ">
-        <h3 style="margin:0 0 20px;font-size:16px;display:flex;align-items:center;gap:8px;">
-          <i class="fas fa-keyboard" style="color:var(--accent-primary);"></i> Atalhos de teclado
-        </h3>
-        <div style="display:flex;flex-direction:column;gap:10px;">
-          ${SHORTCUTS.map(s => `
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-tertiary);border-radius:var(--radius-sm);">
-              <span style="font-size:13px;color:var(--text-secondary);">${s.desc}</span>
-              <kbd style="background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;padding:3px 10px;font-size:12px;font-family:monospace;color:var(--text-primary);">${s.key}</kbd>
-            </div>
-          `).join('')}
-        </div>
-        <p style="margin-top:16px;font-size:12px;color:var(--text-tertiary);text-align:center;">Pressione Esc ou clique fora para fechar</p>
-      </div>`;
     document.body.appendChild(modal);
-    document.getElementById('shortcuts-overlay').addEventListener('click', () => modal.hidden = true);
+
+    let selectedFile = null;
+    let activeTab = 'arquivo';
+
+    modal.querySelector('#slc-gim-close').addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+
+    modal.querySelectorAll('.slc-gim-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        activeTab = btn.dataset.tab;
+        modal.querySelectorAll('.slc-gim-tab').forEach(b => {
+          const on = b.dataset.tab === activeTab;
+          b.style.border = on ? '1.5px solid #1a73e8' : '1px solid #e2e8f0';
+          b.style.background = on ? '#e8f0fe' : '#fff';
+          b.style.color = on ? '#1a73e8' : '#64748b';
+        });
+        modal.querySelector('#slc-gim-tab-arquivo').style.display = activeTab === 'arquivo' ? 'block' : 'none';
+        modal.querySelector('#slc-gim-tab-texto').style.display = activeTab === 'texto' ? 'block' : 'none';
+      });
+    });
+
+    const dropzone = modal.querySelector('#slc-gim-dropzone');
+    const fileInput = modal.querySelector('#slc-gim-file-input');
+    const preview = modal.querySelector('#slc-gim-preview');
+    const fname = modal.querySelector('#slc-gim-fname');
+
+    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.style.background = '#e8f0fe'; dropzone.style.borderColor = '#1a73e8'; });
+    dropzone.addEventListener('dragleave', () => { dropzone.style.background = '#f8fafc'; dropzone.style.borderColor = '#cbd5e1'; });
+    dropzone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropzone.style.background = '#f8fafc'; dropzone.style.borderColor = '#cbd5e1';
+      if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
+
+    function setFile(file) {
+      selectedFile = file;
+      fname.textContent = file.name;
+      preview.style.display = 'flex';
+      dropzone.style.display = 'none';
+    }
+
+    modal.querySelector('#slc-gim-fremove').addEventListener('click', () => {
+      selectedFile = null; fileInput.value = '';
+      preview.style.display = 'none'; dropzone.style.display = 'block';
+    });
+
+    const btn = modal.querySelector('#slc-gim-run');
+    const statusEl = modal.querySelector('#slc-gim-status');
+
+    function setStatus(html, type) {
+      const cfg = {
+        loading: ['#eff6ff', '#bfdbfe', '#1e40af'],
+        success: ['#f0fdf4', '#bbf7d0', '#166534'],
+        error: ['#fef2f2', '#fecaca', '#991b1b']
+      };
+      const [bg, border, color] = cfg[type] || cfg.loading;
+      statusEl.style.cssText = `display:block;background:${bg};border:1px solid ${border};color:${color};padding:.7rem 1rem;border-radius:8px;font-size:.83rem;margin-top:1rem;`;
+      statusEl.innerHTML = html;
+    }
+
+    btn.addEventListener('click', async () => {
+      statusEl.style.display = 'none';
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';
+
+      try {
+        let parts;
+
+        if (activeTab === 'arquivo') {
+          if (!selectedFile) throw new Error('Selecione um PDF ou imagem primeiro.');
+          const mime = getMimeType(selectedFile);
+          const isPdf = mime === 'application/pdf';
+          const isImg = mime.startsWith('image/');
+          if (!isPdf && !isImg) throw new Error('Formato não suportado. Use PDF, PNG, JPG ou WEBP.');
+
+          setStatus('<i class="fas fa-spinner fa-spin"></i> Lendo o arquivo com IA...', 'loading');
+          const b64 = await fileToBase64(selectedFile);
+
+          parts = [
+            { text: GRADE_PROMPT },
+            { inline_data: { mime_type: mime, data: b64 } }
+          ];
+        } else {
+          const text = modal.querySelector('#slc-gim-texto').value.trim();
+          if (!text) throw new Error('Cole o texto da grade primeiro.');
+          setStatus('<i class="fas fa-spinner fa-spin"></i> Interpretando com IA...', 'loading');
+          parts = [{ text: GRADE_PROMPT + '\n\nConteúdo da grade:\n\n' + text }];
+        }
+
+        const result = await callGemini(parts);
+        const disciplinas = result?.disciplinas || [];
+        if (!disciplinas.length) throw new Error('Nenhuma disciplina encontrada no arquivo.');
+
+        const app = window.app;
+        if (!app) throw new Error('App não encontrado.');
+
+        if (targetContext === 'setup') {
+          const applied = applySetupResult(app, result);
+          const extra = applied.semesterCount > 0
+            ? `<br><small style="opacity:.8">${applied.semesterCount} matéria(s) do semestre atual preenchidas.</small>` : '';
+          setStatus(`<i class="fas fa-check-circle"></i> <strong>${applied.count} disciplinas importadas!</strong>${extra}`, 'success');
+          btn.innerHTML = '<i class="fas fa-check"></i> Concluído!';
+          btn.style.background = '#16a34a';
+          if (typeof showToast === 'function') showToast(`${applied.count} disciplinas importadas com IA!`, 'success');
+          setTimeout(() => modal.remove(), 1600);
+          return;
+        }
+
+        // modo atualização: mostra diff e só aplica com confirmação
+        const diff = computeUpdateDiff(app, disciplinas);
+        modal.remove();
+        const decision = await showDiffModal(app, diff, disciplinas);
+        if (!decision) return; // cancelado
+
+        applyUpdate(app, diff, decision);
+        if (typeof showToast === 'function') {
+          showToast(`Grade atualizada: +${diff.added.length} novas, ${diff.updated.length} ajustadas${decision.removeIds.length ? `, ${decision.removeIds.length} removidas` : ''}.`, 'success');
+        }
+
+      } catch (err) {
+        setStatus(`<i class="fas fa-exclamation-circle"></i> ${err.message}`, 'error');
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fas fa-magic"></i> Tentar novamente`;
+        btn.style.background = '#1a73e8';
+      }
+    });
   }
 
-  document.addEventListener('keydown', e => {
-    if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
-      const active = document.activeElement;
-      if (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') return;
-      e.preventDefault();
-      showShortcutsModal();
+  // ─── API pública ────────────────────────────────────────────────────────────
+
+  window.GradeIAImport = {
+    openModal(ctx) { createImportModal(ctx || 'grade'); }
+  };
+
+  // ─── Assume o clique do botão "Importar grade pronta" ───────────────────────
+  // O projeto tem mais de um script disputando o clique desse mesmo botão
+  // (ex.: app.js abre um assistente antigo). Em vez de tentar "ganhar a corrida"
+  // no momento de anexar o listener (o que depende da ordem de carregamento dos
+  // scripts e é frágil), interceptamos o clique na FASE DE CAPTURA do documento.
+  // A fase de captura roda sempre antes dos listeners do próprio botão, então
+  // isso funciona não importa quais outros scripts também estejam ouvindo esse
+  // botão, nem em que ordem foram carregados.
+  document.addEventListener('click', function (e) {
+    const btn = e.target.closest('#btn-importar-ufob');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    window.GradeIAImport.openModal('grade');
+  }, true);
+
+  // ─── Relabela o botão + mostra o chip do semestre atual ─────────────────────
+  // Também via MutationObserver (não depende de loadView ser chamado do jeito
+  // que a gente espera — só reage quando o botão realmente aparece na tela).
+
+  function relabelImportButton() {
+    const btn = document.getElementById('btn-importar-ufob');
+    if (btn && !btn.dataset.iaLabel) {
+      btn.dataset.iaLabel = '1';
+      btn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Atualizar com IA (PDF)';
+      btn.title = 'Envie o PDF novo do fluxograma para comparar e atualizar sua grade';
     }
-    if (e.key === 'Escape') {
-      const m = document.getElementById('shortcuts-modal');
-      if (m) m.hidden = true;
-    }
-    // Alt+1-9 navegação rápida
-    if (e.altKey && e.key >= '1' && e.key <= '9') {
-      const views = ['dashboard','mentor-ia','materias','tarefas','provas','sessoes','estatisticas','configuracoes','ajuda'];
-      const view = views[parseInt(e.key) - 1];
-      if (view && window.app?.loadView) { e.preventDefault(); window.app.loadView(view); }
-    }
-    // Ctrl+S salva dados
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-      const active = document.activeElement;
-      if (active.tagName !== 'INPUT' && active.tagName !== 'TEXTAREA') {
-        e.preventDefault();
-        window.dbService?.saveAllData?.();
-        if (window.showToast) window.showToast('Dados salvos!', 'success');
-      }
-    }
-  });
+    addCurrentSemesterChip();
+  }
+
+  new MutationObserver(relabelImportButton).observe(document.body, { childList: true, subtree: true });
+  document.addEventListener('app-ready', () => setTimeout(relabelImportButton, 200));
+
+  // ─── Chip do semestre atual ao lado do título da página ────────────────────
+
+  function addCurrentSemesterChip() {
+    const header = document.querySelector('.view-header-grade-upgraded h2, .view-header h2');
+    if (!header || header.dataset.semChip) return;
+    const semestre = parseInt(window.app?.data?.user?.semestre || 0, 10) || 0;
+    if (!semestre) return;
+    header.dataset.semChip = '1';
+    const chip = document.createElement('span');
+    chip.textContent = `${semestre}º semestre atual`;
+    chip.style.cssText = 'margin-left:.6rem;font-size:.7rem;font-weight:600;background:#1a73e8;color:#fff;padding:.2rem .55rem;border-radius:999px;vertical-align:middle;';
+    header.appendChild(chip);
+  }
+
+  // ─── Botão extra no setup ──────────────────────────────────────────────────
+
+  new MutationObserver(() => {
+    const section = document.getElementById('setup-smart-import-section');
+    if (!section || section.dataset.iaBtnAdded) return;
+    section.dataset.iaBtnAdded = '1';
+
+    const helper = section.querySelector('.setup-import-chatgpt-card');
+    if (!helper) return;
+
+    const iaBtn = document.createElement('button');
+    iaBtn.type = 'button';
+    iaBtn.className = 'btn-primary';
+    iaBtn.style.cssText = 'background:linear-gradient(135deg,#1a73e8,#4f46e5);border:none;margin-bottom:.5rem;width:100%;';
+    iaBtn.innerHTML = '<i class="fas fa-magic"></i> Importar PDF ou imagem com IA (grátis, automático)';
+    iaBtn.addEventListener('click', () => window.GradeIAImport.openModal('setup'));
+    helper.insertBefore(iaBtn, helper.querySelector('.setup-import-actions'));
+
+    const p = helper.querySelector('p');
+    if (p) p.textContent = 'Envie o PDF ou imagem da grade e a IA extrai tudo automaticamente. Ou use o método manual abaixo.';
+  }).observe(document.body, { childList: true, subtree: true });
+
 })();
