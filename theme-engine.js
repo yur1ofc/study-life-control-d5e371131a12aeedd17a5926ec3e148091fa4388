@@ -417,8 +417,8 @@
     if (window.ViewRenderer.prototype.__themePanelPatched) return;
 
     const orig = window.ViewRenderer.prototype.renderConfiguracoes;
-    window.ViewRenderer.prototype.renderConfiguracoes = function () {
-      return orig.call(this) + renderThemePanel();
+    window.ViewRenderer.prototype.renderConfiguracoes = function (aba) {
+      return orig.call(this, aba) + renderThemePanel();
     };
     window.ViewRenderer.prototype.__themePanelPatched = true;
   }

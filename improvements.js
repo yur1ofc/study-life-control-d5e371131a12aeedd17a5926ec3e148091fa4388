@@ -391,8 +391,8 @@
     const originalConfig = proto.renderConfiguracoes;
     if (!originalConfig) return;
 
-    proto.renderConfiguracoes = function () {
-      const html = originalConfig.call(this);
+    proto.renderConfiguracoes = function (aba) {
+      const html = originalConfig.call(this, aba);
       const exportSection = `
         <div class="card" style="margin-top:20px;">
           <h3 style="margin-bottom:16px;font-size:15px;font-weight:600;"><i class="fas fa-download" style="color:var(--accent-primary);margin-right:8px;"></i>Exportar Dados</h3>

@@ -748,8 +748,8 @@
       };
     }
     if (typeof originalRenderConfiguracoes === 'function') {
-      proto.renderConfiguracoes = function () {
-        const original = originalRenderConfiguracoes.call(this);
+      proto.renderConfiguracoes = function (aba) {
+        const original = originalRenderConfiguracoes.call(this, aba);
         const extra = `
           <div class="catalog-preview" style="margin-top:18px">
             <h4>Catálogo comunitário</h4>

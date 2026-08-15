@@ -970,8 +970,8 @@
       return result;
     };
 
-    proto.renderConfiguracoes = function () {
-      return `${originalConfig.call(this)}<div class="card"><div class="card-header"><h3><i class="fas fa-bullseye"></i> Metas rápidas</h3></div><div class="card-body"><p>Você também pode editar suas metas diretamente no Dashboard, na seção de metas semanais e mensais.</p></div></div>`;
+    proto.renderConfiguracoes = function (aba) {
+      return `${originalConfig.call(this, aba)}<div class="card"><div class="card-header"><h3><i class="fas fa-bullseye"></i> Metas rápidas</h3></div><div class="card-body"><p>Você também pode editar suas metas diretamente no Dashboard, na seção de metas semanais e mensais.</p></div></div>`;
     };
 
     proto[PATCH_FLAG] = true;
