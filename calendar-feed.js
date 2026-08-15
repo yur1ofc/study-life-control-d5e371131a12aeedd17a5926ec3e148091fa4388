@@ -10,15 +10,18 @@
 //      cópia enxuta (só datas/títulos, sem nome nem e-mail) das
 //      provas/tarefas/sessões/aulas no documento público
 //      calendar_feeds/{token} — sem o usuário precisar fazer nada.
-//   3) O usuário cola a URL `/api/calendar/{token}` (ou a versão `webcal://`)
-//      UMA ÚNICA VEZ no Google Calendar/Apple Calendário/Outlook, como
-//      "assinar calendário por URL". O app de calendário dele busca esse
+//   3) O usuário cola a URL `/api/calendar/feed?token={token}` (ou a versão
+//      `webcal://`) UMA ÚNICA VEZ no Google Calendar/Apple Calendário/Outlook,
+//      como "assinar calendário por URL". O app de calendário dele busca esse
 //      link sozinho de tempos em tempos (normalmente a cada 12–24h) e
 //      sempre mostra o que estiver salvo no site, sem exportar/importar
 //      nada de novo manualmente.
 //
 // O endpoint que transforma esse documento em .ics de verdade fica em
-// api/calendar/[token].js (roda no servidor, Vercel Function).
+// api/calendar/feed.js (roda no servidor, Vercel Function). Era uma rota
+// dinâmica (api/calendar/[token].js) antes, mas foi trocada pra rota fixa
+// com querystring por causa de um bug de roteamento da Vercel com rotas
+// dinâmicas (ver comentário no topo de api/calendar/feed.js).
 
 (function () {
   'use strict';
@@ -81,7 +84,7 @@
 
   function feedUrls(token) {
     if (!token) return null;
-    const base = `${window.location.origin}/api/calendar/${token}`;
+    const base = `${window.location.origin}/api/calendar/feed?token=${token}`;
     return {
       https: base,
       // webcal:// faz o SO abrir direto no app de calendário padrão ao
