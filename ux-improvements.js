@@ -375,26 +375,23 @@
     if (!container || document.getElementById('slc-briefing-card')) return;
     if (window.app?.currentView !== 'dashboard') return;
 
-    const saved = loadBriefing();
-    const card = document.createElement('div');
-    card.id = 'slc-briefing-card';
-    card.className = 'card';
-    card.style.cssText = 'margin-bottom:20px;border-left:3px solid var(--accent-primary);';
-    card.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <h3 style="font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;">
-          <i class="fas fa-robot" style="color:var(--accent-primary);"></i> Briefing do dia
-        </h3>
-        <button id="slc-refresh-briefing" style="
-          background:none;border:1px solid var(--border);border-radius:8px;
-          padding:3px 10px;font-size:11px;color:var(--text-secondary);cursor:pointer;font-family:inherit;
-        ">Atualizar</button>
-      </div>
-      <div id="slc-briefing-text" style="font-size:13px;color:var(--text-secondary);line-height:1.6;">
-        ${saved ? saved : '<span style="opacity:.6">Gerando briefing...</span>'}
-      </div>`;
+    // Antes o briefing entrava como o 1º elemento da página inteira, acima
+    // até do "Olá, Yuri...". Agora ele vira uma linha dentro do próprio
+    // cabeçalho de saudação — é um comentário sobre o dia, não um card à
+    // parte competindo por atenção com o resto do dashboard.
+    const header = container.querySelector('.dashboard-header');
+    if (!header) return;
 
-    container.insertBefore(card, container.firstChild);
+    const saved = loadBriefing();
+    const line = document.createElement('div');
+    line.id = 'slc-briefing-card';
+    line.className = 'slc-briefing-line';
+    line.innerHTML = `
+      <i class="fas fa-robot"></i>
+      <span id="slc-briefing-text">${saved ? saved : '<span style="opacity:.6">Gerando briefing...</span>'}</span>
+      <button id="slc-refresh-briefing" title="Atualizar briefing" aria-label="Atualizar briefing"><i class="fas fa-rotate-right"></i></button>`;
+
+    header.insertAdjacentElement('afterend', line);
 
     if (!saved || shouldRegenerateBriefing()) generateBriefing();
 
@@ -413,13 +410,13 @@
       window.aiAssistant.updateContext?.(app.data);
       const today = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
       const resp = await window.aiAssistant.ask(
-        `Em 3 linhas curtas e diretas, me dá um briefing rápido do meu dia de hoje (${today}): ` +
-        `menciona as provas/aulas mais importantes, tarefas com prazo hoje e uma dica de foco. ` +
-        `Sem introdução, vai direto ao ponto.`
+        `Numa frase só, curta e direta (máx. 20 palavras), resume o meu dia de hoje (${today}): ` +
+        `o que é mais urgente entre provas, aulas e tarefas com prazo hoje. ` +
+        `Sem introdução, sem saudação, vai direto ao ponto.`
       );
       if (resp) {
         saveBriefing(resp);
-        if (textEl) textEl.innerHTML = resp.replace(/\n/g, '<br>');
+        if (textEl) textEl.innerHTML = resp.replace(/\n/g, ' ');
       }
     } catch (e) {
       if (textEl) textEl.innerHTML = '<span style="opacity:.6">Não foi possível gerar o briefing agora.</span>';

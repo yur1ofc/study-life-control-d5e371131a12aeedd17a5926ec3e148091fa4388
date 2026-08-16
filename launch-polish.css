@@ -10,6 +10,20 @@ body{background:linear-gradient(180deg,#08111f 0%,#0a1222 100%)}
 .view-container{padding-bottom:100px}
 .card,.login-card,.setup-card,.modal-content,.pwa-install-card{border:1px solid var(--soft-border);box-shadow:0 16px 40px rgba(2,8,23,.34)}
 .dashboard-header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.slc-briefing-line{display:flex;align-items:center;gap:10px;margin:-8px 0 18px;padding:0;font-size:13px;color:var(--text-secondary);line-height:1.5}
+.slc-briefing-line i.fa-robot{color:var(--accent-primary);font-size:13px;flex-shrink:0}
+.slc-briefing-line span{flex:1;min-width:0}
+.slc-briefing-line button{background:none;border:none;color:var(--text-tertiary);cursor:pointer;padding:4px;flex-shrink:0;font-size:12px;transition:color .15s,transform .4s}
+.slc-briefing-line button:hover{color:var(--text-primary);transform:rotate(70deg)}
+.slc-grade-rows{display:flex;flex-direction:column;gap:12px}
+.slc-grade-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(80px,140px) 32px;align-items:center;gap:12px}
+.slc-grade-label{font-size:12px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slc-grade-track{height:6px;border-radius:999px;background:rgba(148,163,184,.14);overflow:hidden}
+.slc-grade-fill{height:100%;border-radius:999px;transition:width .3s ease}
+.slc-grade-value{font-size:12px;font-weight:700;text-align:right}
+@media (max-width:560px){
+  .slc-grade-row{grid-template-columns:minmax(0,1fr) 70px 30px;gap:8px}
+}
 .dashboard-header h2{font-size:1.8rem;margin:0}
 .dashboard-header p{color:var(--text-secondary);margin:4px 0 0}
 .dashboard-shell{display:grid;gap:18px}
@@ -42,11 +56,9 @@ body{background:linear-gradient(180deg,#08111f 0%,#0a1222 100%)}
 .notification-badge{position:relative;cursor:pointer}
 .notification-badge.has-alert{color:#fff}
 .notification-badge.has-alert::after{content:'';position:absolute;inset:-4px;border-radius:14px;border:1px solid rgba(96,165,250,.35);pointer-events:none}
-.notification-panel{position:absolute;right:18px;top:74px;width:min(390px,calc(100vw - 28px));padding:14px;z-index:70}
-.notification-panel[hidden]{display:none !important}
-.notification-panel-header{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 4px 12px}
-.notification-panel-header h3{margin:0;font-size:1rem}
-.notification-list{display:grid;gap:10px;max-height:60vh;overflow:auto;padding-right:4px}
+/* .notification-panel removido: era o painel duplicado "Lembretes internos"
+   que abria dentro do popover "Notificações" do script.js. Agora existe só
+   um painel de notificações — ver ensureNotificationPopover em script.js. */
 .notification-item{align-items:center}
 .notification-item[data-level='danger']{border-color:rgba(248,113,113,.25);background:rgba(127,29,29,.16)}
 .notification-item[data-level='warning']{border-color:rgba(251,191,36,.25);background:rgba(120,53,15,.16)}
@@ -78,7 +90,6 @@ body{background:linear-gradient(180deg,#08111f 0%,#0a1222 100%)}
   .quick-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
   .content-header{padding:14px 16px}
   .page-title h1{font-size:1.2rem}
-  .notification-panel{right:12px;top:68px}
   .aula-days-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 @media (max-width: 640px){

@@ -149,7 +149,9 @@
       @media (max-width: 768px){ .floating-ai-launcher{ display:none !important; } }
       .notification-popover{position:absolute;top:calc(100% + 10px);right:0;width:min(420px,calc(100vw - 32px));background:rgba(2,6,23,.96);border:1px solid rgba(148,163,184,.16);border-radius:20px;box-shadow:0 24px 60px rgba(2,6,23,.35);padding:14px;display:none;z-index:50;}
       .notification-popover.open{display:block;}
-      .notification-popover-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:10px;}
+      .notification-popover-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:10px;}
+      .notification-popover-actions{display:flex;gap:8px;flex-shrink:0;}
+      .notification-popover-actions .btn-secondary{white-space:nowrap;padding:6px 10px;font-size:.78rem;}
       .notification-popover-list{display:grid;gap:10px;max-height:55vh;overflow:auto;}
       .notification-empty{padding:12px 0;opacity:.8;}
       .level-avatar-wrap{position:relative;width:54px;height:54px;border-radius:50%;display:grid;place-items:center;padding:3px;background:conic-gradient(#22c55e 0deg,#2563eb 0deg,#1e293b 0deg);box-shadow:0 10px 24px rgba(2,6,23,.24);}
@@ -1134,7 +1136,10 @@
       pop.innerHTML = `
         <div class="notification-popover-head">
           <div><strong>Notificações</strong><div class="text-secondary">Alertas rápidos do teu semestre</div></div>
-          <button class="btn-secondary" type="button" id="notification-close-btn">Fechar</button>
+          <div class="notification-popover-actions">
+            <button class="btn-secondary" type="button" id="mark-all-notifications-read">Marcar como visto</button>
+            <button class="btn-secondary" type="button" id="notification-close-btn">Fechar</button>
+          </div>
         </div>
         <div class="notification-popover-list" id="notification-popover-list"></div>`;
       badge.appendChild(pop);
@@ -1142,16 +1147,10 @@
     return pop;
   }
 
-  function renderNotificationPopover(app) {
-    const list = el('notification-popover-list');
-    const count = el('notification-count');
-    if (!list || !app) return;
-    const items = app.getLaunchNotifications?.() || [];
-    if (count) count.textContent = String(items.length);
-    list.innerHTML = items.length
-      ? items.map(item => `<div class="notification-item"><div><strong>${escapeHtml(item.title || '')}</strong><small>${escapeHtml(item.text || '')}</small></div><span class="risk-pill ${item.priority === 'alta' ? 'alto' : item.priority === 'media' ? 'medio' : 'baixo'}">${escapeHtml(item.badge || '')}</span></div>`).join('')
-      : '<div class="notification-empty">Nenhum alerta agora.</div>';
-  }
+  // O conteúdo da lista (#notification-popover-list) e a contagem do badge
+  // são preenchidos por launch-polish.js (buildNotifications/renderNotifications
+  // — única fonte de verdade, com marcação de lido). Aqui só montamos a casca
+  // do popover (cabeçalho + botão fechar) pra evitar dois painéis competindo.
 
   function openNotificationPopover() {
     ensureNotificationPopover()?.classList.add('open');
@@ -1220,7 +1219,6 @@
     const badge = el('notification-badge');
     const pop = ensureNotificationPopover();
     if (!badge || !pop || !app) return;
-    renderNotificationPopover(app);
     updateSidebarLevelRing(app);
     if (!badge.dataset.bound) {
       badge.dataset.bound = '1';
@@ -1315,8 +1313,10 @@
       ensureFocusState(window.app);
       bindDashboardEvents(window.app);
       bindCalendarFilters();
-      bindFloatingAI(window.app);
-      syncFloatingAIVisibility();
+      // bindFloatingAI removido: a bolha "Mentor IA" flutuante era o mesmo
+      // recurso que já existe como item fixo na sidebar (desktop) e como aba
+      // "IA" na barra inferior (mobile) — dois botões pra abrir a mesma
+      // coisa. Ficou só o item de navegação.
       window.app.syncGamificationAchievements?.().catch?.(()=>{});
       window.app.syncGamificationAchievements?.().catch?.(()=>{});
       setupNotificationCenter(window.app);

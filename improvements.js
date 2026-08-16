@@ -197,16 +197,16 @@
     section.style.cssText = 'padding:0 0 32px;';
     section.innerHTML = `
       <div class="card" style="margin-bottom:20px;">
-        <h3 style="margin-bottom:16px;font-size:15px;font-weight:600;"><i class="fas fa-clock" style="color:var(--accent-primary);margin-right:8px;"></i>Horas estudadas — últimos 14 dias</h3>
-        <div style="position:relative;height:180px;"><canvas id="chart-hours"></canvas></div>
+        <h3 style="margin-bottom:14px;font-size:14px;font-weight:600;color:var(--text-secondary);"><i class="fas fa-clock" style="color:var(--accent-primary);margin-right:8px;"></i>Horas estudadas — últimos 14 dias</h3>
+        <div style="position:relative;height:120px;"><canvas id="chart-hours"></canvas></div>
       </div>
       ${gradeLabels.length ? `
       <div class="card" style="margin-bottom:20px;">
-        <h3 style="margin-bottom:16px;font-size:15px;font-weight:600;"><i class="fas fa-star" style="color:var(--accent-warning);margin-right:8px;"></i>Médias por matéria</h3>
-        <div style="position:relative;height:180px;"><canvas id="chart-grades"></canvas></div>
+        <h3 style="margin-bottom:16px;font-size:14px;font-weight:600;color:var(--text-secondary);"><i class="fas fa-star" style="color:var(--accent-warning);margin-right:8px;"></i>Médias por matéria</h3>
+        <div id="slc-grades-list" class="slc-grade-rows"></div>
       </div>` : ''}
       <div class="card">
-        <h3 style="margin-bottom:16px;font-size:15px;font-weight:600;"><i class="fas fa-fire" style="color:var(--accent-danger);margin-right:8px;"></i>Atividade — últimas 12 semanas</h3>
+        <h3 style="margin-bottom:16px;font-size:14px;font-weight:600;color:var(--text-secondary);"><i class="fas fa-fire" style="color:var(--accent-danger);margin-right:8px;"></i>Atividade — últimas 12 semanas</h3>
         <div id="heatmap-container" style="overflow-x:auto;"></div>
       </div>
     `;
@@ -234,41 +234,42 @@
     const baseOpts = {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: { legend: { display: false }, tooltip: { backgroundColor: isDark ? '#1e293b' : '#fff', titleColor: textColor, bodyColor: textColor, borderColor: gridColor, borderWidth: 1, padding: 8, displayColors: false } },
       scales: {
-        x: { ticks: { color: textColor, font: { size: 11 } }, grid: { color: gridColor } },
-        y: { ticks: { color: textColor, font: { size: 11 } }, grid: { color: gridColor }, beginAtZero: true }
+        x: { ticks: { color: textColor, font: { size: 10 } }, grid: { display: false }, border: { display: false } },
+        y: { ticks: { color: textColor, font: { size: 10 }, maxTicksLimit: 4 }, grid: { color: gridColor }, border: { display: false }, beginAtZero: true }
       }
     };
 
-    // Horas chart
+    // Horas chart — barra fina, cor suave, sem grade vertical (visual mais limpo)
     const hoursCtx = document.getElementById('chart-hours');
     if (hoursCtx) {
       new Chart(hoursCtx, {
         type: 'bar',
         data: {
           labels,
-          datasets: [{ data: hoursData, backgroundColor: 'rgba(59,130,246,0.7)', borderRadius: 6, borderSkipped: false }]
+          datasets: [{ data: hoursData, backgroundColor: 'rgba(96,165,250,0.55)', hoverBackgroundColor: 'rgba(96,165,250,0.85)', borderRadius: 4, borderSkipped: false, maxBarThickness: 18 }]
         },
         options: { ...baseOpts }
       });
     }
 
-    // Grades chart
-    const gradesCtx = document.getElementById('chart-grades');
-    if (gradesCtx && gradeLabels.length) {
-      new Chart(gradesCtx, {
-        type: 'bar',
-        data: {
-          labels: gradeLabels,
-          datasets: [{
-            data: gradeData,
-            backgroundColor: gradeData.map(v => v >= 7 ? 'rgba(16,185,129,0.7)' : v >= 5 ? 'rgba(245,158,11,0.7)' : 'rgba(239,68,68,0.7)'),
-            borderRadius: 6, borderSkipped: false
-          }]
-        },
-        options: { ...baseOpts, scales: { ...baseOpts.scales, y: { ...baseOpts.scales.y, max: 10 } } }
-      });
+    // Médias por matéria — virou lista de barrinhas horizontais em vez de
+    // gráfico de barras verticais: mais legível com nomes longos de matéria
+    // e visualmente mais leve (sem eixo, sem canvas, sem legenda).
+    const gradesList = document.getElementById('slc-grades-list');
+    if (gradesList && gradeLabels.length) {
+      gradesList.innerHTML = gradeLabels.map((label, i) => {
+        const value = gradeData[i];
+        const pct = Math.max(4, Math.min(100, (value / 10) * 100));
+        const color = value >= 7 ? '#10b981' : value >= 5 ? '#f59e0b' : '#ef4444';
+        return `
+          <div class="slc-grade-row">
+            <span class="slc-grade-label" title="${label}">${label}</span>
+            <div class="slc-grade-track"><div class="slc-grade-fill" style="width:${pct}%;background:${color};"></div></div>
+            <span class="slc-grade-value" style="color:${color};">${value.toFixed(1)}</span>
+          </div>`;
+      }).join('');
     }
 
     // Heatmap

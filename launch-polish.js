@@ -175,23 +175,19 @@
   }
 
   function ensureNotificationPanel(){
-    // Reutiliza o popover do script.js em vez de criar um segundo painel
-    let panel=$('#notification-panel');
-    if(!panel){
-      panel=document.createElement('div');
-      panel.id='notification-panel';
-      panel.className='notification-panel';
-      panel.hidden=true;
-      panel.innerHTML=`<div class="notification-panel-header"><h3>Lembretes internos</h3><button class="btn-secondary" id="mark-all-notifications-read">Marcar como visto</button></div><div class="notification-list" id="notification-list"></div>`;
-      // Injeta DENTRO do popover existente, não ao lado
-      const existingPopover=$('#notification-popover-list');
-      if(existingPopover){ existingPopover.appendChild(panel); panel.hidden=false; }
-      else { const header=$('.content-header .header-actions'); if(header) header.appendChild(panel); }
+    // A casca do popover (cabeçalho, botão Fechar, botão Marcar como visto)
+    // já é criada por script.js (ensureNotificationPopover). Aqui só
+    // garantimos que o container da lista existe — sem criar um segundo
+    // painel dentro do primeiro, que era o que causava o popup duplicado
+    // ("Lembretes internos" dentro de "Notificações").
+    let list = $('#notification-popover-list');
+    if (!list && window.ensureNotificationPopoverFallback) list = window.ensureNotificationPopoverFallback();
+    const markBtn = $('#mark-all-notifications-read');
+    if (markBtn && !markBtn.dataset.bound) {
+      markBtn.dataset.bound = '1';
+      markBtn.addEventListener('click', () => { markNotificationsRead(); renderNotifications(); });
     }
-    return panel;
-
-    // Evento do badge gerenciado pelo script.js — apenas o botão interno
-    $('#mark-all-notifications-read')?.addEventListener('click', ()=>{markNotificationsRead(); panel.hidden=true; renderNotifications();});
+    return list;
   }
 
   function buildNotifications(){
@@ -205,10 +201,9 @@
     });
     const exams=(app.getUpcomingExams?app.getUpcomingExams(7):(app.data?.exams||[]).filter(e=>!e.concluida)).slice(0,3);
     exams.forEach(e=>notes.push({id:'exam-'+e.id,title:e.titulo||'Avaliação',text:`${e.materia||'Sem matéria'} • ${dueLabel(e.data)}`,level:'warning'}));
-    const next=getNextClass();
-    if(next) notes.unshift({id:'nextclass-'+next.id,title:'Próxima aula',text:`${next.materia} • ${fullDays[parseInt(next.dia,10)]||''} ${next.inicio}-${next.fim}`,level:'info'});
-    const p=progressData();
-    if(p.done < p.planned/2) notes.push({id:'goal-half',title:'Meta do dia em aberto',text:`Você estudou ${p.done.toFixed(1)}h de ${p.planned}h planejadas.`,level:'info'});
+    // "Próxima aula" e "Meta do dia" saíram daqui: já aparecem em destaque
+    // no card principal do dashboard e no briefing — repetir aqui era
+    // notificação de coisa que a pessoa já estava vendo na tela.
     return notes.slice(0,8);
   }
 
@@ -226,8 +221,8 @@
     badge?.classList.toggle('has-alert', unread>0);
   }
   function renderNotifications(){
-    ensureNotificationPanel();
-    const list=$('#notification-list'); if(!list) return;
+    const list = ensureNotificationPanel();
+    if (!list) return;
     const notes=buildNotifications();
     list.innerHTML=notes.length ? notes.map(n=>`<div class="notification-item" data-level="${esc(n.level)}"><div class="notification-item-main"><strong>${esc(n.title)}</strong><small>${esc(n.text)}</small></div><span class="tag ${n.level==='danger'?'high':n.level==='warning'?'warning':'success'}">${esc(n.level)}</span></div>`).join('') : '<div class="notification-empty">Sem lembretes agora.</div>';
     updateNotificationBadge();
