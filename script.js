@@ -143,6 +143,10 @@
       .floating-ai-memory-chip{display:inline-flex;align-items:center;gap:6px;font-size:.74rem;padding:6px 10px;border-radius:999px;background:rgba(59,130,246,.12);color:#bfdbfe;margin-bottom:6px;}
       .floating-ai-backdrop{position:fixed;inset:0;background:rgba(2,6,23,.35);z-index:1190;display:none;}
       .floating-ai-backdrop.open{display:block;}
+      /* No mobile a aba "IA" da barra inferior (#slc-bottom-nav) já leva pro
+         mentor IA em tela cheia — a bolha flutuante some pra não duplicar
+         o mesmo atalho e não brigar de posição com o FAB de "+". */
+      @media (max-width: 768px){ .floating-ai-launcher{ display:none !important; } }
       .notification-popover{position:absolute;top:calc(100% + 10px);right:0;width:min(420px,calc(100vw - 32px));background:rgba(2,6,23,.96);border:1px solid rgba(148,163,184,.16);border-radius:20px;box-shadow:0 24px 60px rgba(2,6,23,.35);padding:14px;display:none;z-index:50;}
       .notification-popover.open{display:block;}
       .notification-popover-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:10px;}

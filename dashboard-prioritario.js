@@ -290,39 +290,10 @@
     if (view) { e.preventDefault(); window.app.loadView(view); }
   });
 
-  // 2. Botão "voltar ao início" flutuante em views secundárias
-  function injectBackButton(view) {
-    const secondaryViews = ['grade-curricular', 'cursos-extras', 'situacao-academica',
-      'previsao-notas', 'mapa-aprendizado', 'materiais', 'estatisticas',
-      'calendario', 'habitos', 'configuracoes', 'ajuda'];
-
-    const fab = document.getElementById('slc-back-fab');
-    if (secondaryViews.includes(view)) {
-      if (!fab) {
-        const btn = document.createElement('button');
-        btn.id = 'slc-back-fab';
-        btn.innerHTML = '<i class="fas fa-home"></i>';
-        btn.title = 'Voltar ao início (Alt+D)';
-        btn.style.cssText = `
-          position: fixed; bottom: 24px; right: 24px; z-index: 900;
-          width: 44px; height: 44px; border-radius: 50%;
-          background: #2563eb; color: #fff; border: none;
-          box-shadow: 0 4px 12px rgba(37,99,235,.4);
-          cursor: pointer; font-size: 1rem;
-          display: flex; align-items: center; justify-content: center;
-          transition: transform .15s, box-shadow .15s;
-        `;
-        btn.addEventListener('mouseenter', () => { btn.style.transform = 'scale(1.1)'; });
-        btn.addEventListener('mouseleave', () => { btn.style.transform = 'scale(1)'; });
-        btn.addEventListener('click', () => {
-          if (window.app?.loadView) window.app.loadView('dashboard');
-        });
-        document.body.appendChild(btn);
-      }
-    } else {
-      fab?.remove();
-    }
-  }
+  // 2. (Removido) Botão "voltar ao início" flutuante — era um 5º elemento
+  // fixo na tela brigando com a barra inferior e o FAB de "+". No mobile a
+  // barra inferior já tem a aba Início; no desktop a sidebar já tem o mesmo
+  // link. Alt+D continua funcionando via atalho de teclado acima.
 
   // 3. Confirmação antes de sair do setup sem salvar
   function patchSetupUnsavedWarning() {
@@ -360,8 +331,6 @@
           renderPriorityCard(window.app?.data);
         }, 200);
       }
-
-      injectBackButton(view);
 
       if (view === 'configuracoes') {
         setTimeout(patchSetupUnsavedWarning, 300);

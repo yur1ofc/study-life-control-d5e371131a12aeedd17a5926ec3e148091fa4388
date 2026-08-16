@@ -188,16 +188,26 @@ function hideLoading() {
 }
 
 function updateSyncStatus(success) {
-    const status = document.getElementById('sync-status');
-    if (!status) return;
+    // Único ícone de sync/refresh no header (id="refresh-data-icon", dentro do
+    // botão #refresh-data). Antes existiam dois elementos fazendo a mesma
+    // coisa (#sync-status só-status + #refresh-data só-botão); foram unidos.
+    const icon = document.getElementById('refresh-data-icon');
+    const btn = document.getElementById('refresh-data');
+    if (!icon) return;
 
     if (success) {
-        status.innerHTML = '<i class="fas fa-check-circle" style="color: var(--accent-success);"></i>';
+        icon.className = 'fas fa-check-circle';
+        icon.style.color = 'var(--accent-success)';
+        if (btn) btn.title = 'Sincronizado agora mesmo';
         setTimeout(() => {
-            status.innerHTML = '<i class="fas fa-sync-alt"></i>';
+            icon.className = 'fas fa-sync-alt';
+            icon.style.color = '';
+            if (btn) btn.title = 'Sincronizar dados';
         }, 2000);
     } else {
-        status.innerHTML = '<i class="fas fa-exclamation-circle" style="color: var(--accent-danger);"></i>';
+        icon.className = 'fas fa-exclamation-circle';
+        icon.style.color = 'var(--accent-danger)';
+        if (btn) btn.title = 'Falha ao sincronizar — clique para tentar de novo';
     }
 }
 

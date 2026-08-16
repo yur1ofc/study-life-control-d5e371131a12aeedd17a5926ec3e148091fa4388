@@ -370,9 +370,6 @@
                         </div>
                         <div class="header-actions">
 
-                            <div class="sync-status" id="sync-status">
-                                <i class="fas fa-sync-alt"></i>
-                            </div>
                             <button class="btn-icon" id="daily-log-btn" onclick="app.openDailyLogModal()" title="Registrar Dia">
                                 <i class="fas fa-clipboard-list"></i>
                             </button>
@@ -380,7 +377,9 @@
                                 <i class="fas fa-bell"></i>
                                 <span class="badge-count" id="notification-count">0</span>
                             </div>
-                            <button class="btn-icon" id="refresh-data"><i class="fas fa-sync-alt"></i></button>
+                            <button class="btn-icon" id="refresh-data" title="Sincronizar dados">
+                                <i class="fas fa-sync-alt" id="refresh-data-icon"></i>
+                            </button>
                         </div>
                     </div>
                     <div id="view-container" class="view-container"></div>

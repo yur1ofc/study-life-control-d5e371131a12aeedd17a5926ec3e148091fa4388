@@ -377,27 +377,15 @@
         if(view==='dashboard'){
           $('#quick-aula')?.addEventListener('click',()=>this.openModal('aula'));
         }
-        setTimeout(()=>{ renderNotifications(); ensureMobileQuickbar(); },50);
+        setTimeout(()=>{ renderNotifications(); },50);
       };
     },150);
   }
 
-  function ensureMobileQuickbar(){
-    if($('#mobile-quickbar') || !window.app) return;
-    const bar=document.createElement('div');
-    bar.id='mobile-quickbar';
-    bar.className='mobile-quickbar';
-    bar.innerHTML=`<button data-action="dashboard"><i class="fas fa-house"></i><br>Início</button><button data-action="tarefa"><i class="fas fa-plus"></i><br>Tarefa</button><button data-action="sessao"><i class="fas fa-clock"></i><br>Sessão</button><button data-action="aula"><i class="fas fa-calendar"></i><br>Aula</button>`;
-    document.body.appendChild(bar);
-    bar.addEventListener('click',(e)=>{
-      const btn=e.target.closest('button'); if(!btn) return;
-      const action=btn.dataset.action;
-      if(action==='dashboard') window.app.loadView('dashboard');
-      if(action==='tarefa') window.app.openModal('tarefa');
-      if(action==='sessao') window.app.openModal('sessao');
-      if(action==='aula') window.app.openModal('aula');
-    });
-  }
+  // A barra inferior mobile (#mobile-quickbar) que existia aqui foi removida:
+  // duplicava o #slc-bottom-nav (ux-improvements.js), que já cobre Início,
+  // Tarefas e Sessão e ainda tem Hoje e IA. Duas barras fixas na mesma tela
+  // não faz sentido — ver LEIA-ISSO-RELATORIO-DA-BAGUNCA.md / limpeza de UI.
 
   function improveOnboarding(){
     const screen=$('#setup-screen'); const form=$('#setup-form'); if(!screen||!form||$('#quick-onboarding-card')) return;
@@ -439,7 +427,7 @@
       const original=proto.loadView;
       proto.loadView=function(view,...rest){
         const res=original.call(this,view,...rest);
-        setTimeout(()=>{ renderNotifications(); ensureNotificationPanel(); ensureMobileQuickbar(); if($('#setup-screen') && getComputedStyle($('#setup-screen')).display !== 'none') improveOnboarding(); },80);
+        setTimeout(()=>{ renderNotifications(); ensureNotificationPanel(); if($('#setup-screen') && getComputedStyle($('#setup-screen')).display !== 'none') improveOnboarding(); },80);
         return res;
       };
     },150);
@@ -447,7 +435,7 @@
 
   document.addEventListener('DOMContentLoaded',()=>{
     patchDashboard(); patchAulaSubmit(); patchOpenModalAndDetail(); patchLoadViewHooks();
-    setTimeout(()=>{ ensureNotificationPanel(); renderNotifications(); injectAulaEnhancements(); improveOnboarding(); ensureMobileQuickbar(); },700);
+    setTimeout(()=>{ ensureNotificationPanel(); renderNotifications(); injectAulaEnhancements(); improveOnboarding(); },700);
   });
-  document.addEventListener('app-ready',()=>{ setTimeout(()=>{ ensureNotificationPanel(); renderNotifications(); improveOnboarding(); ensureMobileQuickbar(); },120); });
+  document.addEventListener('app-ready',()=>{ setTimeout(()=>{ ensureNotificationPanel(); renderNotifications(); improveOnboarding(); },120); });
 })();

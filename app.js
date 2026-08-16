@@ -314,9 +314,15 @@ class StudyLifeControl {
         });
 
         document.getElementById('refresh-data')?.addEventListener('click', async () => {
-            await this.loadData();
-            this.loadView(this.currentView);
-            showToast('Dados atualizados');
+            const icon = document.getElementById('refresh-data-icon');
+            icon?.classList.add('fa-spin');
+            try {
+                await this.loadData();
+                this.loadView(this.currentView);
+                showToast('Dados atualizados');
+            } finally {
+                icon?.classList.remove('fa-spin');
+            }
         });
     }
 

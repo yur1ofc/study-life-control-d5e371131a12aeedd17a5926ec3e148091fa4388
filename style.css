@@ -811,15 +811,6 @@ button:active,
     text-align: center;
 }
 
-.sync-status {
-    margin-right: 10px;
-}
-
-.sync-status i {
-    font-size: 16px;
-    color: var(--text-secondary);
-}
-
 .view-container {
     padding: 32px;
     -webkit-overflow-scrolling: touch;
@@ -3958,7 +3949,8 @@ body.sidebar-open .mobile-nav-overlay {
     right: 12px;
     left: 12px;
     width: auto;
-    bottom: 12px;
+    /* sobe pra não ficar atrás/colado na barra inferior (#slc-bottom-nav) */
+    bottom: calc(72px + env(safe-area-inset-bottom));
   }
 
   .network-banner {
