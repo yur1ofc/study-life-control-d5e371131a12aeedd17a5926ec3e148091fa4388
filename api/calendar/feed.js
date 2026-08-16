@@ -74,16 +74,55 @@ function addDaysToDateOnly(yyyyMmDd, days) {
   return `${dt.getUTCFullYear()}${String(dt.getUTCMonth() + 1).padStart(2, '0')}${String(dt.getUTCDate()).padStart(2, '0')}`;
 }
 
-// datetime-local ("2026-08-20T14:00") -> "20260820T140000" (hora "flutuante",
-// sem timezone — cada calendário mostra no fuso local de quem está vendo,
-// que normalmente é o mesmo fuso de quem criou o evento).
-function floatingDateTime(isoLocal, extraMinutes = 0) {
+// Fuso horário fixo usado em todos os eventos com hora (aulas e sessões de
+// estudo). Brasil não tem mais horário de verão desde 2019, então o
+// offset de America/Sao_Paulo é sempre -03:00 — não precisa de regra
+// sazonal no VTIMEZONE abaixo.
+//
+// IMPORTANTE: antes essas datas eram emitidas como "hora flutuante" (sem
+// Z e sem TZID), que pelo RFC 5545 deveria ser mostrada no fuso de quem
+// está vendo. Na prática o Google Calendar NÃO respeita isso em feeds
+// assinados por URL — ele trata a hora flutuante como se fosse UTC. Como
+// o Brasil é UTC-3, toda aula aparecia 3h adiantada... digo, atrasada
+// (07:30 virava 04:30). Por isso agora declaramos TZID explicitamente em
+// vez de deixar a hora "flutuando".
+const TZID = 'America/Sao_Paulo';
+
+function icsTimezoneBlock() {
+  return [
+    'BEGIN:VTIMEZONE',
+    `TZID:${TZID}`,
+    'BEGIN:STANDARD',
+    'TZOFFSETFROM:-0300',
+    'TZOFFSETTO:-0300',
+    'TZNAME:-03',
+    'DTSTART:19700101T000000',
+    'END:STANDARD',
+    'END:VTIMEZONE'
+  ].join('\r\n');
+}
+
+// datetime-local ("2026-08-20T14:00") -> "20260820T140000" (hora de
+// parede, sem conversão — o TZID declarado no DTSTART/DTEND é quem diz
+// ao calendário que isso é horário de Brasília).
+function wallClockDateTime(isoLocal, extraMinutes = 0) {
   const m = String(isoLocal).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
   if (!m) return null;
   const dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]));
   dt.setMinutes(dt.getMinutes() + extraMinutes);
   const p = n => String(n).padStart(2, '0');
   return `${dt.getFullYear()}${p(dt.getMonth() + 1)}${p(dt.getDate())}T${p(dt.getHours())}${p(dt.getMinutes())}00`;
+}
+
+// DTSTAMP tem que ser sempre UTC de verdade (com Z), diferente do
+// DTSTART/DTEND dos eventos. feed.updatedAt já vem em ISO UTC
+// (new Date().toISOString(), gerado no calendar-feed.js), então só
+// formatamos sem reinterpretar os números como se fossem hora local.
+function utcStamp(isoUtc) {
+  const dt = isoUtc ? new Date(isoUtc) : new Date();
+  const valid = !isNaN(dt.getTime()) ? dt : new Date();
+  const p = n => String(n).padStart(2, '0');
+  return `${valid.getUTCFullYear()}${p(valid.getUTCMonth() + 1)}${p(valid.getUTCDate())}T${p(valid.getUTCHours())}${p(valid.getUTCMinutes())}${p(valid.getUTCSeconds())}Z`;
 }
 
 const WEEKDAY_ICS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
@@ -111,12 +150,14 @@ function buildIcs(feed) {
   // busca de qualquer forma a cada 12–24h, mas não custa declarar).
   lines.push('REFRESH-INTERVAL;VALUE=DURATION:PT12H');
   lines.push('X-PUBLISHED-TTL:PT12H');
+  lines.push(`X-WR-TIMEZONE:${TZID}`);
+  lines.push(icsTimezoneBlock());
 
   (feed.exams || []).forEach(e => {
     if (!e.data) return;
     lines.push('BEGIN:VEVENT');
     lines.push(`UID:exam-${e.id}@study-life-control`);
-    lines.push(`DTSTAMP:${floatingDateTime(feed.updatedAt) || dateOnly(e.data) + 'T000000'}Z`);
+    lines.push(`DTSTAMP:${utcStamp(feed.updatedAt)}`);
     lines.push(`DTSTART;VALUE=DATE:${dateOnly(e.data)}`);
     lines.push(`DTEND;VALUE=DATE:${addDaysToDateOnly(e.data, 1)}`);
     lines.push(foldLine(`SUMMARY:${icsEscape(`📝 Prova: ${e.titulo}${e.materia ? ` (${e.materia})` : ''}`)}`));
@@ -134,7 +175,7 @@ function buildIcs(feed) {
     if (!t.dataLimite) return;
     lines.push('BEGIN:VEVENT');
     lines.push(`UID:task-${t.id}@study-life-control`);
-    lines.push(`DTSTAMP:${floatingDateTime(feed.updatedAt) || dateOnly(t.dataLimite) + 'T000000'}Z`);
+    lines.push(`DTSTAMP:${utcStamp(feed.updatedAt)}`);
     lines.push(`DTSTART;VALUE=DATE:${dateOnly(t.dataLimite)}`);
     lines.push(`DTEND;VALUE=DATE:${addDaysToDateOnly(t.dataLimite, 1)}`);
     lines.push(foldLine(`SUMMARY:${icsEscape(`✅ Tarefa: ${t.titulo}${t.materia ? ` (${t.materia})` : ''}`)}`));
@@ -149,14 +190,14 @@ function buildIcs(feed) {
   });
 
   (feed.sessions || []).forEach(s => {
-    const start = floatingDateTime(s.data);
+    const start = wallClockDateTime(s.data);
     if (!start) return;
-    const end = floatingDateTime(s.data, s.duracao || 60);
+    const end = wallClockDateTime(s.data, s.duracao || 60);
     lines.push('BEGIN:VEVENT');
     lines.push(`UID:session-${s.id}@study-life-control`);
-    lines.push(`DTSTAMP:${floatingDateTime(feed.updatedAt) || start}Z`);
-    lines.push(`DTSTART:${start}`);
-    lines.push(`DTEND:${end}`);
+    lines.push(`DTSTAMP:${utcStamp(feed.updatedAt)}`);
+    lines.push(`DTSTART;TZID=${TZID}:${start}`);
+    lines.push(`DTEND;TZID=${TZID}:${end}`);
     lines.push(foldLine(`SUMMARY:${icsEscape(`📚 Estudo: ${s.materia}${s.topico ? ` — ${s.topico}` : ''}`)}`));
     if (s.tipo) lines.push(foldLine(`DESCRIPTION:${icsEscape(`Tipo: ${s.tipo}`)}`));
     lines.push('BEGIN:VALARM');
@@ -173,9 +214,9 @@ function buildIcs(feed) {
     const end = anchoredWeeklyDateTime(a.dia, a.fim);
     lines.push('BEGIN:VEVENT');
     lines.push(`UID:class-${a.id}@study-life-control`);
-    lines.push(`DTSTAMP:${floatingDateTime(feed.updatedAt) || start}Z`);
-    lines.push(`DTSTART:${start}`);
-    lines.push(`DTEND:${end}`);
+    lines.push(`DTSTAMP:${utcStamp(feed.updatedAt)}`);
+    lines.push(`DTSTART;TZID=${TZID}:${start}`);
+    lines.push(`DTEND;TZID=${TZID}:${end}`);
     lines.push(`RRULE:FREQ=WEEKLY;BYDAY=${WEEKDAY_ICS[Number(a.dia) % 7]}`);
     lines.push(foldLine(`SUMMARY:${icsEscape(`🎓 Aula: ${a.materia}`)}`));
     lines.push('BEGIN:VALARM');
