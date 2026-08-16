@@ -74,32 +74,38 @@ function addDaysToDateOnly(yyyyMmDd, days) {
   return `${dt.getUTCFullYear()}${String(dt.getUTCMonth() + 1).padStart(2, '0')}${String(dt.getUTCDate()).padStart(2, '0')}`;
 }
 
-// Fuso horário fixo usado em todos os eventos com hora (aulas e sessões de
-// estudo). Brasil não tem mais horário de verão desde 2019, então o
-// offset de America/Sao_Paulo é sempre -03:00 — não precisa de regra
-// sazonal no VTIMEZONE abaixo.
+// Fuso horário usado nos eventos com hora (aulas e sessões de estudo).
+// Vem do feed do próprio usuário (settings.timezone, detectado no
+// navegador dele em calendar-feed.js — front). Isso é o que faz o
+// horário sair certo pra qualquer usuário, não só pra quem mora no
+// Brasil.
 //
-// IMPORTANTE: antes essas datas eram emitidas como "hora flutuante" (sem
-// Z e sem TZID), que pelo RFC 5545 deveria ser mostrada no fuso de quem
-// está vendo. Na prática o Google Calendar NÃO respeita isso em feeds
-// assinados por URL — ele trata a hora flutuante como se fosse UTC. Como
-// o Brasil é UTC-3, toda aula aparecia 3h adiantada... digo, atrasada
-// (07:30 virava 04:30). Por isso agora declaramos TZID explicitamente em
-// vez de deixar a hora "flutuando".
-const TZID = 'America/Sao_Paulo';
+// DECISÃO DE DESIGN — por que TZID sem VTIMEZONE embutido:
+// A abordagem anterior tentou embutir um VTIMEZONE com as regras de
+// horário de verão do fuso. O problema é que essas regras mudam (o
+// Brasil, por exemplo, aboliu o horário de verão em 2019) e qualquer
+// tabela que a gente embuta no código fica desatualizada mais cedo ou
+// mais tarde — recriando o mesmo tipo de bug, só que sazonal. Referenciar
+// o TZID pelo nome IANA puro (ex: "America/Sao_Paulo", "Europe/Lisbon",
+// "America/New_York") e deixar o Google Calendar / Apple Calendário /
+// Outlook resolverem contra o banco de fusos deles (que eles mantêm
+// atualizado) é mais simples e correto pra sempre — inclusive pra
+// recorrência semanal das aulas atravessando trocas de horário de verão
+// em países que ainda têm.
+const DEFAULT_TZID = 'America/Sao_Paulo';
 
-function icsTimezoneBlock() {
-  return [
-    'BEGIN:VTIMEZONE',
-    `TZID:${TZID}`,
-    'BEGIN:STANDARD',
-    'TZOFFSETFROM:-0300',
-    'TZOFFSETTO:-0300',
-    'TZNAME:-03',
-    'DTSTART:19700101T000000',
-    'END:STANDARD',
-    'END:VTIMEZONE'
-  ].join('\r\n');
+// Confirma que o navegador/runtime reconhece o nome do fuso (formato
+// IANA válido) antes de colocar no .ics — string inválida ali quebraria
+// o arquivo inteiro para o app de calendário do usuário.
+function safeTzid(tz) {
+  const candidate = String(tz || '').trim();
+  if (!candidate) return DEFAULT_TZID;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: candidate });
+    return candidate;
+  } catch (_) {
+    return DEFAULT_TZID;
+  }
 }
 
 // datetime-local ("2026-08-20T14:00") -> "20260820T140000" (hora de
@@ -138,6 +144,7 @@ function anchoredWeeklyDateTime(diaSemana, hhmm) {
 }
 
 function buildIcs(feed) {
+  const tzid = safeTzid(feed.timezone);
   const lines = [];
   lines.push('BEGIN:VCALENDAR');
   lines.push('VERSION:2.0');
@@ -150,8 +157,7 @@ function buildIcs(feed) {
   // busca de qualquer forma a cada 12–24h, mas não custa declarar).
   lines.push('REFRESH-INTERVAL;VALUE=DURATION:PT12H');
   lines.push('X-PUBLISHED-TTL:PT12H');
-  lines.push(`X-WR-TIMEZONE:${TZID}`);
-  lines.push(icsTimezoneBlock());
+  lines.push(`X-WR-TIMEZONE:${tzid}`);
 
   (feed.exams || []).forEach(e => {
     if (!e.data) return;
@@ -196,8 +202,8 @@ function buildIcs(feed) {
     lines.push('BEGIN:VEVENT');
     lines.push(`UID:session-${s.id}@study-life-control`);
     lines.push(`DTSTAMP:${utcStamp(feed.updatedAt)}`);
-    lines.push(`DTSTART;TZID=${TZID}:${start}`);
-    lines.push(`DTEND;TZID=${TZID}:${end}`);
+    lines.push(`DTSTART;TZID=${tzid}:${start}`);
+    lines.push(`DTEND;TZID=${tzid}:${end}`);
     lines.push(foldLine(`SUMMARY:${icsEscape(`📚 Estudo: ${s.materia}${s.topico ? ` — ${s.topico}` : ''}`)}`));
     if (s.tipo) lines.push(foldLine(`DESCRIPTION:${icsEscape(`Tipo: ${s.tipo}`)}`));
     lines.push('BEGIN:VALARM');
@@ -215,8 +221,8 @@ function buildIcs(feed) {
     lines.push('BEGIN:VEVENT');
     lines.push(`UID:class-${a.id}@study-life-control`);
     lines.push(`DTSTAMP:${utcStamp(feed.updatedAt)}`);
-    lines.push(`DTSTART;TZID=${TZID}:${start}`);
-    lines.push(`DTEND;TZID=${TZID}:${end}`);
+    lines.push(`DTSTART;TZID=${tzid}:${start}`);
+    lines.push(`DTEND;TZID=${tzid}:${end}`);
     lines.push(`RRULE:FREQ=WEEKLY;BYDAY=${WEEKDAY_ICS[Number(a.dia) % 7]}`);
     lines.push(foldLine(`SUMMARY:${icsEscape(`🎓 Aula: ${a.materia}`)}`));
     lines.push('BEGIN:VALARM');
