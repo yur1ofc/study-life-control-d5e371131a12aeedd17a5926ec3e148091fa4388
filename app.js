@@ -624,6 +624,18 @@ class StudyLifeControl {
                 }
             });
 
+            document.getElementById('config-timezone')?.addEventListener('change', async e => {
+                const tz = e.target.value?.trim();
+                if (!tz) return;
+                const ok = await window.calendarFeed?.setTimezone(tz);
+                if (ok) {
+                    this.data.settings.timezone = tz;
+                    window.showToast?.('Fuso horário atualizado! As aulas já vão aparecer certas no calendário.', 'success');
+                } else {
+                    window.showToast?.('Não foi possível salvar o fuso horário agora.', 'error');
+                }
+            });
+
             document.getElementById('btn-copiar-calendario')?.addEventListener('click', () => {
                 const input = document.getElementById('calendario-url');
                 if (!input) return;

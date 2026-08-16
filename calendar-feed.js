@@ -46,6 +46,32 @@
     return !!getSettings()?.calendarToken;
   }
 
+  // Fuso IANA do navegador de quem está usando (ex: "America/Sao_Paulo",
+  // "Europe/Lisbon", "America/New_York"...). É isso que faz o horário das
+  // aulas ir certo pra qualquer usuário, não só pra quem mora no Brasil —
+  // cada um leva o fuso que o próprio navegador dele já sabe.
+  function browserTimezone() {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Garante que settings.timezone exista, detectando do navegador na
+  // primeira vez (silencioso — não interrompe o usuário com pergunta
+  // nenhuma). Se o usuário já escolheu manualmente um fuso diferente nas
+  // configurações, aquele valor tem prioridade e nunca é sobrescrito aqui.
+  async function ensureTimezone() {
+    const settings = getSettings();
+    if (!settings || settings.timezone) return settings?.timezone || null;
+    const detected = browserTimezone();
+    if (!detected) return null;
+    settings.timezone = detected;
+    await window.dbService?.saveData('settings', settings);
+    return detected;
+  }
+
   // Cria o token se ainda não existir e devolve ele. Só é chamado quando o
   // usuário efetivamente abre a aba de calendário — não criamos um feed
   // "de graça" pra quem nunca pediu.
@@ -122,7 +148,12 @@
       id: a.id, materia: a.materia || '', dia: a.dia, inicio: a.inicio, fim: a.fim
     }));
 
-    return { exams, tasks, sessions, classSchedule };
+    // Fuso do usuário (auto-detectado ou escolhido manualmente nas
+    // configurações). Fallback só existe pra nunca gerar um .ics sem TZID;
+    // na prática ensureTimezone() já preenche isso antes daqui.
+    const timezone = getSettings()?.timezone || browserTimezone() || 'America/Sao_Paulo';
+
+    return { exams, tasks, sessions, classSchedule, timezone };
   }
 
   async function publishNow() {
@@ -130,6 +161,7 @@
     const token = getSettings()?.calendarToken;
     if (!token) return false;
 
+    await ensureTimezone();
     const snapshot = buildSnapshot();
     try {
       await window.db.collection(FEED_COLLECTION).doc(token).set({
@@ -155,12 +187,31 @@
 
   document.addEventListener('slc-data-saved', scheduleSyncIfActive);
   document.addEventListener('app-ready', scheduleSyncIfActive);
+  // Detecta e salva o fuso do navegador cedo (mesmo antes de o usuário
+  // gerar um link de calendário), pra tela de configurações já mostrar o
+  // valor certo assim que ele abrir a aba "Calendário" pela 1ª vez.
+  document.addEventListener('app-ready', () => { ensureTimezone(); });
+
+  // Chamado pela UI de configurações quando o usuário escolhe manualmente
+  // um fuso diferente do detectado (ex: detecção errada, morador de
+  // fronteira, dispositivo compartilhado). Já republica o feed na hora.
+  async function setTimezone(tz) {
+    const settings = getSettings();
+    if (!settings || !tz) return false;
+    settings.timezone = tz;
+    const ok = await window.dbService?.saveData('settings', settings);
+    if (ok) await publishNow();
+    return !!ok;
+  }
 
   window.calendarFeed = {
     getOrCreateToken,
     regenerateToken,
     feedUrls,
     getToken: () => getSettings()?.calendarToken || null,
+    getTimezone: () => getSettings()?.timezone || browserTimezone() || 'America/Sao_Paulo',
+    detectedTimezone: browserTimezone,
+    setTimezone,
     publishNow
   };
 })();

@@ -1834,6 +1834,12 @@ class ViewRenderer {
             const reminders = s.studyReminders || {};
             const pushOk = window.pushNotifications?.isSupported?.();
 
+            const tzAtual = window.calendarFeed?.getTimezone?.() || s.timezone || 'America/Sao_Paulo';
+            const tzDetectado = window.calendarFeed?.detectedTimezone?.() || null;
+            let tzOpcoes = [];
+            try { tzOpcoes = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : []; } catch (_) { tzOpcoes = []; }
+            if (!tzOpcoes.includes(tzAtual)) tzOpcoes.unshift(tzAtual);
+
             conteudo = `
             <div class="config-section-title">📅 Calendário automático</div>
             <p style="font-size:.88rem;color:var(--text-secondary);margin-bottom:16px;">
@@ -1841,6 +1847,22 @@ class ViewRenderer {
                 como "assinar por URL". A partir daí, toda prova, tarefa, sessão de estudo e aula que
                 você cadastrar aqui aparece sozinha lá — sem precisar exportar nada de novo.
             </p>
+
+            <div class="wiz-field" style="margin-bottom:18px;">
+                <label>Fuso horário</label>
+                ${tzOpcoes.length ? `
+                <select id="config-timezone">
+                    ${tzOpcoes.map(tz => `<option value="${this.esc(tz)}" ${tz === tzAtual ? 'selected' : ''}>${this.esc(tz)}${tz === tzDetectado ? ' (detectado automaticamente)' : ''}</option>`).join('')}
+                </select>
+                ` : `
+                <input type="text" id="config-timezone" value="${this.esc(tzAtual)}" placeholder="Ex: America/Sao_Paulo">
+                `}
+                <p style="font-size:.8rem;color:var(--text-tertiary);margin-top:6px;">
+                    Detectamos automaticamente pelo seu navegador${tzDetectado ? ` (<strong>${this.esc(tzDetectado)}</strong>)` : ''}.
+                    Só mude aqui se estiver errado — isso é o que garante que o horário das aulas apareça certo
+                    no seu calendário, esteja você onde estiver.
+                </p>
+            </div>
 
             ${!token ? `
                 <button class="btn-primary" id="btn-gerar-calendario">
