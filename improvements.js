@@ -196,16 +196,16 @@
     section.id = 'slc-charts-section';
     section.style.cssText = 'padding:0 0 32px;';
     section.innerHTML = `
-      <div class="card" style="margin-bottom:20px;">
+      <div class="card" style="margin-bottom:20px;padding:20px 24px;">
         <h3 style="margin-bottom:14px;font-size:14px;font-weight:600;color:var(--text-secondary);"><i class="fas fa-clock" style="color:var(--accent-primary);margin-right:8px;"></i>Horas estudadas — últimos 14 dias</h3>
         <div style="position:relative;height:120px;"><canvas id="chart-hours"></canvas></div>
       </div>
       ${gradeLabels.length ? `
-      <div class="card" style="margin-bottom:20px;">
+      <div class="card" style="margin-bottom:20px;padding:20px 24px;">
         <h3 style="margin-bottom:16px;font-size:14px;font-weight:600;color:var(--text-secondary);"><i class="fas fa-star" style="color:var(--accent-warning);margin-right:8px;"></i>Médias por matéria</h3>
         <div id="slc-grades-list" class="slc-grade-rows"></div>
       </div>` : ''}
-      <div class="card">
+      <div class="card" style="padding:20px 24px;">
         <h3 style="margin-bottom:16px;font-size:14px;font-weight:600;color:var(--text-secondary);"><i class="fas fa-fire" style="color:var(--accent-danger);margin-right:8px;"></i>Atividade — últimas 12 semanas</h3>
         <div id="heatmap-container" style="overflow-x:auto;"></div>
       </div>
@@ -395,7 +395,7 @@
     proto.renderConfiguracoes = function (aba) {
       const html = originalConfig.call(this, aba);
       const exportSection = `
-        <div class="card" style="margin-top:20px;">
+        <div class="card" style="margin-top:20px;padding:20px 24px;">
           <h3 style="margin-bottom:16px;font-size:15px;font-weight:600;"><i class="fas fa-download" style="color:var(--accent-primary);margin-right:8px;"></i>Exportar Dados</h3>
           <p style="color:var(--text-secondary);font-size:13px;margin-bottom:16px;">Baixe seus dados acadêmicos para backup ou análise externa.</p>
           <div style="display:flex;gap:12px;flex-wrap:wrap;">
