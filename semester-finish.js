@@ -335,19 +335,32 @@
         });
     }
 
+    // Guarda uma entrada no histórico de tentativas da matéria (usado pelo
+    // "ecossistema de repescagem" para comparar notas entre tentativas).
+    // Não apaga tentativas anteriores — só acrescenta.
+    function registrarTentativa(item, entry) {
+        const lista = Array.isArray(item.tentativas) ? item.tentativas.slice() : [];
+        lista.push({ ...entry, data: new Date().toISOString() });
+        return lista;
+    }
+
     // Aplica os resultados do passo 1 sobre uma cópia de trabalho da grade
     function buildWorkingCurriculum(app) {
         const state = app._semFinState;
         const source = app.getNormalizedCurriculum ? app.getNormalizedCurriculum() : (app.data.curriculum || []);
         state.working = source.map(item => ({ ...item }));
 
+        const semestreQueEstaFechando = app.data?.user?.semestre || null;
+
         state.working.forEach(item => {
             const result = state.resultados[item.id];
             if (!result) return;
             if (result.choice === 'aprovado') {
+                item.tentativas = registrarTentativa(item, { semestre: semestreQueEstaFechando, nota: result.nota, resultado: 'aprovado' });
                 item.status = 'concluida';
                 item.nota = result.nota;
             } else if (result.choice === 'reprovado') {
+                item.tentativas = registrarTentativa(item, { semestre: semestreQueEstaFechando, nota: result.nota, resultado: 'reprovado' });
                 item.status = 'reprovada';
                 item.nota = result.nota;
             } else if (result.choice === 'trancado') {
@@ -490,7 +503,21 @@
 
         working.forEach(item => {
             if (state.selecionadas.has(item.id)) {
+                // Repescagem: matéria já reprovada antes está sendo cursada de novo.
+                if (item.status === 'reprovada' && (!Array.isArray(item.tentativas) || !item.tentativas.length)) {
+                    // Reprovação antiga, de antes dessa função existir — guarda a
+                    // nota que já estava salva como 1ª tentativa, pra não perder
+                    // a base de comparação.
+                    item.tentativas = (item.nota !== null && item.nota !== undefined)
+                        ? [{ semestre: null, nota: item.nota, resultado: 'reprovado', data: null }]
+                        : [];
+                }
                 item.status = 'cursando';
+                // Zera a nota: a matéria está sendo cursada do zero de novo.
+                // O histórico em item.tentativas guarda a(s) nota(s) antiga(s)
+                // separado, pra comparação — sem misturar com o progresso atual
+                // nem deixar a nota antiga "vazar" pro semestre novo.
+                item.nota = null;
             }
         });
 
