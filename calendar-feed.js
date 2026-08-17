@@ -148,12 +148,20 @@
       id: a.id, materia: a.materia || '', dia: a.dia, inicio: a.inicio, fim: a.fim
     }));
 
+    // Revisões espaçadas geradas pelo review-system.js (1/3/7/15/30 dias
+    // após a aula, + revisão pré-prova). Antes não entravam no feed — o
+    // usuário nunca via essas datas fora do app.
+    const reviews = (data.reviews || []).filter(r => r.data).slice(0, 1000).map(r => ({
+      id: r.id, materia: r.materia || '', topico: r.topico || '',
+      data: r.data, tipo: r.tipo || '', concluida: !!r.concluida
+    }));
+
     // Fuso do usuário (auto-detectado ou escolhido manualmente nas
     // configurações). Fallback só existe pra nunca gerar um .ics sem TZID;
     // na prática ensureTimezone() já preenche isso antes daqui.
     const timezone = getSettings()?.timezone || browserTimezone() || 'America/Sao_Paulo';
 
-    return { exams, tasks, sessions, classSchedule, timezone };
+    return { exams, tasks, sessions, classSchedule, reviews, timezone };
   }
 
   async function publishNow() {

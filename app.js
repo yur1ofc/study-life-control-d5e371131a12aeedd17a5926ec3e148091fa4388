@@ -675,8 +675,11 @@ class StudyLifeControl {
                 }
             });
 
-            ['exams', 'tasks', 'sessions'].forEach(tipo => {
-                const map = { exams: 'examsHoursBefore', tasks: 'tasksHoursBefore', sessions: 'sessionsMinutesBefore' };
+            ['exams', 'tasks', 'sessions', 'reviews', 'class'].forEach(tipo => {
+                const map = {
+                    exams: 'examsHoursBefore', tasks: 'tasksHoursBefore', sessions: 'sessionsMinutesBefore',
+                    reviews: 'reviewsHoursBefore', class: 'classMinutesBefore'
+                };
                 document.getElementById(`config-reminder-${tipo}`)?.addEventListener('change', async e => {
                     await window.pushNotifications?.saveReminderPrefs({ [map[tipo]]: parseInt(e.target.value, 10) });
                     window.showToast?.('Preferência de lembrete salva!', 'success');

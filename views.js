@@ -1448,7 +1448,7 @@ class ViewRenderer {
             ` : `
                 <div class="config-item">
                     <div class="config-info"><h4>Ativar alarmes neste dispositivo</h4>
-                        <p>Manda uma notificação mesmo com o app fechado, perto da hora de provas, tarefas e sessões</p>
+                        <p>Manda uma notificação mesmo com o app fechado, perto da hora de provas, tarefas, sessões, revisões e aulas</p>
                     </div>
                     <label class="toggle-switch">
                         <input type="checkbox" id="config-push-enabled" ${reminders.enabled ? 'checked' : ''}>
@@ -1472,6 +1472,18 @@ class ViewRenderer {
                         <label>Avisar sessão de estudo com quantos minutos de antecedência?</label>
                         <select id="config-reminder-sessions">
                             ${[5, 10, 15, 30, 60].map(m => `<option value="${m}" ${Number(reminders.sessionsMinutesBefore ?? 15) === m ? 'selected' : ''}>${m} min antes</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="wiz-field">
+                        <label>Avisar revisão espaçada com quantas horas de antecedência?</label>
+                        <select id="config-reminder-reviews">
+                            ${[6, 12, 24, 48, 72].map(h => `<option value="${h}" ${Number(reminders.reviewsHoursBefore ?? 24) === h ? 'selected' : ''}>${h}h antes</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="wiz-field">
+                        <label>Avisar aula com quantos minutos de antecedência?</label>
+                        <select id="config-reminder-class">
+                            ${[5, 10, 15, 30, 60].map(m => `<option value="${m}" ${Number(reminders.classMinutesBefore ?? 15) === m ? 'selected' : ''}>${m} min antes</option>`).join('')}
                         </select>
                     </div>
                 </div>

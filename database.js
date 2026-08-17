@@ -34,7 +34,11 @@ const DEFAULT_APP_DATA = () => ({
             enabled: false,
             examsHoursBefore: 24,
             tasksHoursBefore: 24,
-            sessionsMinutesBefore: 15
+            sessionsMinutesBefore: 15,
+            // Revisão espaçada (review-system.js) e aulas da grade horária —
+            // adicionados depois dos 3 originais; ver CALENDARIO-E-LEMBRETES.md.
+            reviewsHoursBefore: 24,
+            classMinutesBefore: 15
         }
     }
 });
