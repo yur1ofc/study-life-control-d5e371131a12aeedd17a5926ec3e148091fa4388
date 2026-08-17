@@ -5,7 +5,7 @@
 // adicione ele aqui também — senão ele só entra no cache dinâmico depois
 // do primeiro acesso online, e falha se o usuário abrir o app offline
 // (ou logo após instalar como PWA) antes disso acontecer.
-const CACHE_VERSION = 'slc-v11';
+const CACHE_VERSION = 'slc-v12';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 
@@ -84,6 +84,18 @@ function isFirebase(url) {
          url.includes('firebaseapp.com');
 }
 
+// env-config.js carrega as variáveis de ambiente (inclusive VAPID_PUBLIC_KEY)
+// injetadas NO BUILD. Elas podem mudar entre deploys mesmo quando nenhum
+// arquivo de código muda — e como o service-worker.js não muda de bytes
+// nesses casos, o navegador nunca reinstala o SW e cache-first serviria
+// esse arquivo desatualizado para sempre. Por isso ele é tratado à parte:
+// tenta a rede primeiro, só cai pro cache se estiver offline.
+const NETWORK_FIRST_ASSETS = ['/env-config.js'];
+
+function isNetworkFirst(url) {
+  return NETWORK_FIRST_ASSETS.some(path => url.endsWith(path));
+}
+
 // ── Install: pré-cacheia assets locais ──────────────────────────────────────
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -121,6 +133,22 @@ self.addEventListener('fetch', event => {
 
   // Ignora URLs de extensões do browser
   if (url.startsWith('chrome-extension://') || url.startsWith('moz-extension://')) return;
+
+  // env-config.js: rede primeiro (ver comentário acima de NETWORK_FIRST_ASSETS)
+  if (isNetworkFirst(url)) {
+    event.respondWith(
+      fetch(request)
+        .then(response => {
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(STATIC_CACHE).then(cache => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
 
   // Assets locais: Cache First (serve do cache, atualiza em background)
   event.respondWith(
