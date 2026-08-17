@@ -8,10 +8,12 @@ class ClassDiaryService {
         this.diaries = window.app?.data?.classDiaries || [];
     }
 
+    // Se diaryData.id vier preenchido, atualiza o diário existente em vez de criar
+    // um novo (usado pela edição na página de Diário).
     async registrarDiario(diaryData) {
         this.loadDiaries();
         const novoDiario = {
-            id: generateId(),
+            id: diaryData.id || generateId(),
             materia: diaryData.materia,
             data: diaryData.data || new Date().toISOString().split('T')[0],
             presenca: diaryData.presenca,
@@ -27,6 +29,15 @@ class ClassDiaryService {
             linksAnexos: diaryData.linksAnexos || ''
         };
 
+        if (diaryData.id) {
+            const success = await dbService.updateItem('classDiaries', diaryData.id, novoDiario);
+            if (success) {
+                this.loadDiaries();
+                showToast('Diário de aula atualizado!');
+            }
+            return success;
+        }
+
         const assinatura = [novoDiario.materia, novoDiario.data, novoDiario.conteudoExplicado, novoDiario.exerciciosPassados].join('|').toLowerCase().trim();
         const duplicado = this.diaries.find(item => [item.materia, item.data, item.conteudoExplicado, item.exerciciosPassados].join('|').toLowerCase().trim() === assinatura);
         if (duplicado) {
@@ -41,6 +52,16 @@ class ClassDiaryService {
                 await window.reviewSystem.gerarRevisoesFromAula(novoDiario);
             }
             showToast(novoDiario.precisoRevisar ? 'Diário salvo e revisões automáticas criadas!' : 'Diário de aula salvo!');
+        }
+        return success;
+    }
+
+    // Remover uma entrada de diário de aula (usado pelo Diário)
+    async removerDiario(id) {
+        const success = await dbService.removeItem('classDiaries', id);
+        if (success) {
+            this.loadDiaries();
+            showToast('Diário de aula removido.');
         }
         return success;
     }

@@ -30,6 +30,7 @@ const STATIC_ASSETS = [
   './database.js',
   './daily-log.js',
   './class-diary.js',
+  './diary-view.js',
   './review-system.js',
   './grade-calculator.js',
   './smart-dashboard.js',

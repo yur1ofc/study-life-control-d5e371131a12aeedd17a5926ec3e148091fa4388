@@ -1031,6 +1031,17 @@
         window.aiAssistant?.updateContext(this.data);
         return;
       }
+      if (view === 'diario') {
+        if (!this.viewRenderer) this.viewRenderer = new ViewRenderer(this);
+        this.currentView = view;
+        document.body.dataset.view = view;
+        const container = el('view-container');
+        if (!container) return;
+        container.innerHTML = window.diaryView ? window.diaryView.renderPage(this) : '<div class="card"><div class="card-body">Diário indisponível.</div></div>';
+        window.aiAssistant?.updateContext(this.data);
+        setTimeout(() => window.diaryView?.bindPageEvents(this), 30);
+        return;
+      }
       const result = originalLoadView.call(this, view);
       setTimeout(() => {
         if (view === 'foco') bindFocusButtons(this);
@@ -1343,7 +1354,7 @@
   document.addEventListener('DOMContentLoaded', () => {
     window.app = new StudyLifeControl();
     el('whats-now-btn')?.addEventListener('click', () => window.app?.whatsNow?.());
-    el('daily-log-btn')?.addEventListener('click', () => window.app?.openDailyLogModal?.());
+    el('daily-log-btn')?.addEventListener('click', () => window.diaryView?.openModal());
     el('setup-form')?.addEventListener('submit', e => { e.preventDefault(); window.app?.handleSetupSubmit?.(e); });
     el('add-materia')?.addEventListener('click', () => window.app?.addMateriaField?.());
     el('add-aula')?.addEventListener('click', () => window.app?.addAulaField?.());

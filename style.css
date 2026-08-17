@@ -4858,3 +4858,223 @@ body.sidebar-open .mobile-nav-overlay {
 
 
 
+
+/* =========================
+   DIÁRIO (diary-view.js)
+========================= */
+.modal-content.modal-lg {
+    max-width: 760px;
+}
+
+.diario-aula-block {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 16px 16px;
+    margin-bottom: 14px;
+    position: relative;
+    background: var(--bg-tertiary);
+}
+
+.diario-aula-block-remove {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    color: var(--accent-danger);
+    cursor: pointer;
+    font-size: 15px;
+    padding: 4px 8px;
+    opacity: .7;
+    transition: var(--transition);
+}
+
+.diario-aula-block-remove:hover {
+    opacity: 1;
+}
+
+.diary-filters {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.diary-filters select {
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 13.5px;
+}
+
+.diary-day-group {
+    margin-bottom: 8px;
+}
+
+.diary-day-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 13.5px;
+    color: var(--text-secondary);
+    text-transform: capitalize;
+    margin: 20px 0 10px;
+}
+
+.diary-day-label .diary-day-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+}
+
+.diary-entry-card {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent-secondary);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+}
+
+.diary-entry-card.aula {
+    border-left-color: var(--accent-primary);
+}
+
+.diary-entry-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.diary-entry-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.diary-entry-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    margin-top: 6px;
+}
+
+.diary-empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+}
+
+.diary-empty-mini {
+    color: var(--text-secondary);
+    font-size: 13.5px;
+}
+
+.diary-freq-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.diary-freq-row:last-child {
+    margin-bottom: 0;
+}
+
+.diary-freq-row .diary-freq-label {
+    width: 110px;
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.diary-freq-row .progress-bar {
+    flex: 1;
+    margin: 0;
+}
+
+.diary-freq-row .diary-freq-pct {
+    width: 38px;
+    text-align: right;
+    font-size: 12.5px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.diary-chart-days {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    overflow-x: auto;
+    padding: 10px 2px 6px;
+}
+
+.diary-chart-day {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    font-size: 10.5px;
+    color: var(--text-tertiary);
+    min-width: 22px;
+}
+
+.diary-dual-bar-group {
+    display: flex;
+    gap: 2px;
+    align-items: flex-end;
+    height: 52px;
+}
+
+.diary-dual-bar {
+    width: 7px;
+    border-radius: 3px 3px 0 0;
+    transition: var(--transition);
+}
+
+.diary-dual-bar.energia {
+    background: var(--accent-warning);
+}
+
+.diary-dual-bar.foco {
+    background: var(--accent-secondary);
+}
+
+.diary-chart-legend {
+    display: flex;
+    gap: 16px;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.diary-legend-dot {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+    margin-right: 5px;
+}
+
+.diary-legend-dot.energia {
+    background: var(--accent-warning);
+}
+
+.diary-legend-dot.foco {
+    background: var(--accent-secondary);
+}
+
+@media (max-width: 640px) {
+    .diary-freq-row .diary-freq-label {
+        width: 84px;
+    }
+}

@@ -9,19 +9,20 @@ class DailyLogService {
         this.logs = window.app?.data?.dailyLogs || [];
     }
 
-    // Registrar log do dia
+    // Registrar log do dia (ou de uma data específica, se logData.data vier preenchido —
+    // usado pela página de Diário para editar/lançar dias retroativos)
     async registrarLog(logData) {
-        const hoje = new Date().toISOString().split('T')[0];
-        
-        // Verificar se já existe log para hoje
-        const logExistente = this.logs.find(l => l.data === hoje);
+        const dataAlvo = logData.data || new Date().toISOString().split('T')[0];
+
+        // Verificar se já existe log para essa data
+        const logExistente = this.logs.find(l => l.data === dataAlvo);
         
         const estudoDuracao = logData.estudoInicio && logData.estudoFim ? 
             calcularDuracaoMinutos(logData.estudoInicio, logData.estudoFim) : 0;
         
         const novoLog = {
             id: logExistente?.id || generateId(),
-            data: hoje,
+            data: dataAlvo,
             estudo: {
                 inicio: logData.estudoInicio || '',
                 fim: logData.estudoFim || '',
@@ -57,6 +58,16 @@ class DailyLogService {
     // Obter log de uma data específica
     getLogPorData(data) {
         return this.logs.find(l => l.data === data);
+    }
+
+    // Remover um registro do dia (usado pelo Diário)
+    async removerLog(id) {
+        const success = await dbService.removeItem('dailyLogs', id);
+        if (success) {
+            this.loadLogs();
+            showToast('Registro removido.');
+        }
+        return success;
     }
 
     // Obter último log

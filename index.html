@@ -268,6 +268,7 @@
                             <kbd>Ctrl K</kbd>
                         </div>
                         <a href="#" class="nav-item active" data-view="dashboard"><i class="fas fa-chart-pie"></i><span>Dashboard</span></a>
+                        <a href="#" class="nav-item" data-view="diario"><i class="fas fa-book-open"></i><span>Diário</span></a>
                         <a href="#" class="nav-item" data-view="mentor-ia"><i class="fas fa-robot"></i><span>Mentor IA</span><span class="badge">IA</span></a>
 
                         <!-- Grupo: Acadêmico -->
@@ -360,7 +361,7 @@
                         </div>
                         <div class="header-actions">
 
-                            <button class="btn-icon" id="daily-log-btn" onclick="app.openDailyLogModal()" title="Registrar Dia">
+                            <button class="btn-icon" id="daily-log-btn" onclick="window.diaryView?.openModal()" title="Registrar Dia">
                                 <i class="fas fa-clipboard-list"></i>
                             </button>
                             <div class="notification-badge" id="notification-badge">
@@ -897,55 +898,38 @@
         </div>
     </div>
 
-    <div id="modal-daily-log" class="modal">
-        <div class="modal-content">
+    <!-- Modal unificado do Diário (substitui os antigos modal-daily-log e
+         modal-class-diary — ver diary-view.js). Data compartilhada no topo,
+         seção "Meu Dia" e um bloco por aula, podendo adicionar quantas
+         quiser. Conteúdo do formulário é montado dinamicamente. -->
+    <div id="modal-diario" class="modal">
+        <div class="modal-content modal-lg">
             <div class="modal-header">
-                <h2><i class="fas fa-clipboard-list"></i> Registro do Dia</h2>
-                <span class="close-modal" onclick="document.getElementById('modal-daily-log').style.display='none'">&times;</span>
+                <h2><i class="fas fa-book-open"></i> <span id="modal-diario-titulo">Registro do dia</span></h2>
+                <span class="close-modal" onclick="document.getElementById('modal-diario').style.display='none'">&times;</span>
             </div>
-            <form id="form-daily-log" class="modal-form" onsubmit="app.handleDailyLogSubmit(event)">
+            <form id="form-diario" class="modal-form" onsubmit="window.diaryView?.handleSubmit(event)">
+                <div class="form-group">
+                    <label>Data</label>
+                    <input type="date" id="diario-data" required>
+                </div>
+
                 <div class="form-section">
-                    <h3>📚 Estudo</h3>
+                    <h3>📚 Meu dia</h3>
                     <div class="form-row">
                         <div class="form-group">
-                            <label>Início</label>
-                            <input type="time" id="daily-log-estudo-inicio">
+                            <label>Estudo — início</label>
+                            <input type="time" id="diario-estudo-inicio">
                         </div>
                         <div class="form-group">
-                            <label>Fim</label>
-                            <input type="time" id="daily-log-estudo-fim">
+                            <label>Estudo — fim</label>
+                            <input type="time" id="diario-estudo-fim">
                         </div>
                     </div>
-                </div>
-
-                <div class="form-section">
-                    <h3>🏛️ Aula</h3>
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="daily-log-foi-aula"> Fui para a aula
-                        </label>
-                    </div>
-                </div>
-
-                <div class="form-section">
-                    <h3>💼 Trabalho</h3>
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="daily-log-trabalhou"> Trabalhei hoje
-                        </label>
-                    </div>
-                    <div class="form-group">
-                        <label>Duração (minutos)</label>
-                        <input type="number" id="daily-log-trabalho-duracao" min="0" value="0">
-                    </div>
-                </div>
-
-                <div class="form-section">
-                    <h3>⚡ Energia e Foco</h3>
                     <div class="form-row">
                         <div class="form-group">
                             <label>Energia do dia</label>
-                            <select id="daily-log-energia">
+                            <select id="diario-energia">
                                 <option value="baixa">🔴 Baixa</option>
                                 <option value="media" selected>🟡 Média</option>
                                 <option value="alta">🟢 Alta</option>
@@ -953,113 +937,38 @@
                         </div>
                         <div class="form-group">
                             <label>Foco do dia</label>
-                            <select id="daily-log-foco">
+                            <select id="diario-foco">
                                 <option value="ruim">🔴 Ruim</option>
                                 <option value="normal" selected>🟡 Normal</option>
                                 <option value="bom">🟢 Bom</option>
                             </select>
                         </div>
                     </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="diario-trabalhou"> Trabalhei hoje
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label>Duração do trabalho (min)</label>
+                            <input type="number" id="diario-trabalho-duracao" min="0" value="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Observações do dia</label>
+                        <textarea id="diario-observacoes" rows="2" placeholder="Algo relevante sobre o dia..."></textarea>
+                    </div>
                 </div>
 
-                <div class="form-section">
-                    <h3>📝 Observações</h3>
-                    <textarea id="daily-log-observacoes" rows="3" placeholder="Algo relevante sobre o dia..."></textarea>
-                </div>
+                <div id="diario-aulas-container"></div>
+
+                <button type="button" class="btn-secondary" id="diario-add-aula-btn" style="width:100%; margin-top:4px;">
+                    <i class="fas fa-plus"></i> Adicionar aula do dia
+                </button>
 
                 <div class="form-actions">
-                    <button type="submit" class="btn-primary">Salvar Registro</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div id="modal-class-diary" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2><i class="fas fa-chalkboard"></i> Diário de Aula</h2>
-                <span class="close-modal" onclick="document.getElementById('modal-class-diary').style.display='none'">&times;</span>
-            </div>
-            <form id="form-class-diary" class="modal-form" onsubmit="app.handleClassDiarySubmit(event)">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Matéria</label>
-                        <select id="class-diary-materia" required>
-                            <option value="">Selecione</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Data</label>
-                        <input type="date" id="class-diary-data" required>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>Presença</label>
-                    <select id="class-diary-presenca" required>
-                        <option value="present">✅ Fui</option>
-                        <option value="absent">❌ Faltei</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label>Conteúdo explicado</label>
-                    <textarea id="class-diary-conteudo" rows="3" placeholder="O que foi explicado hoje?"></textarea>
-                </div>
-
-                <div class="form-group">
-                    <label>Exercícios passados</label>
-                    <textarea id="class-diary-exercicios" rows="2" placeholder="Lista de exercícios, páginas..."></textarea>
-                </div>
-
-                
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>O que eu entendi</label>
-                        <textarea id="class-diary-entendi" rows="2" placeholder="Resumo do que ficou claro para você"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>O que eu não entendi</label>
-                        <textarea id="class-diary-nao-entendi" rows="2" placeholder="Parte que ficou confusa ou precisa rever"></textarea>
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Dúvida pendente</label>
-                        <input type="text" id="class-diary-duvida" placeholder="Ex: perguntar ao professor sobre integrais por partes">
-                    </div>
-                    <div class="form-group">
-                        <label>Links / anexos</label>
-                        <input type="text" id="class-diary-links" placeholder="Cole links de PDF, fotos ou drive separados por vírgula">
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>Trabalho anunciado</label>
-                    <input type="text" id="class-diary-trabalho" placeholder="Descrição do trabalho">
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Dificuldade (1-5)</label>
-                        <input type="number" id="class-diary-dificuldade" min="1" max="5" value="3">
-                    </div>
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="class-diary-revisar"> Preciso revisar
-                        </label>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>Observações</label>
-                    <textarea id="class-diary-observacoes" rows="2"></textarea>
-                </div>
-
-                <div class="form-actions">
-                    <button type="submit" class="btn-primary">Salvar Diário</button>
+                    <button type="submit" class="btn-primary">Salvar no Diário</button>
                 </div>
             </form>
         </div>
@@ -1083,7 +992,7 @@
                     <h4>Último conteúdo registrado</h4>
                     <div id="aula-detail-ultimo-conteudo" class="aula-detail-conteudo"></div>
 
-                    <button class="btn-primary" onclick="app.openClassDiaryModal()">
+                    <button class="btn-primary" onclick="window.diaryView?.openModal(null, document.getElementById('aula-detail-materia').textContent)">
                         <i class="fas fa-plus"></i> Registrar Diário
                     </button>
                 </div>
@@ -1132,6 +1041,7 @@
 <script src="database.js"></script>
 <script src="daily-log.js"></script>
 <script src="class-diary.js"></script>
+<script src="diary-view.js"></script>
 <script src="review-system.js"></script>
 <script src="grade-calculator.js"></script>
 <script src="smart-dashboard.js"></script>
