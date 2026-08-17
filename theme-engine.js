@@ -418,7 +418,10 @@
 
     const orig = window.ViewRenderer.prototype.renderConfiguracoes;
     window.ViewRenderer.prototype.renderConfiguracoes = function (aba) {
-      return orig.call(this, aba) + renderThemePanel();
+      // O painel de personalização só faz sentido dentro da aba "Tema" —
+      // antes ele era colado em toda e qualquer aba (inclusive no menu
+      // inicial de categorias).
+      return orig.call(this, aba) + (aba === 'tema' ? renderThemePanel() : '');
     };
     window.ViewRenderer.prototype.__themePanelPatched = true;
   }
