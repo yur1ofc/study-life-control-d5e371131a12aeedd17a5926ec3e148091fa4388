@@ -522,7 +522,8 @@ Quando encontrar esse formato:
     };
 
     function ensureButton() {
-        const header = document.querySelector('#btn-nova-aula')?.closest('.view-header');
+        const novaAulaBtn = document.getElementById('btn-nova-aula');
+        const header = novaAulaBtn?.closest('.view-header');
         if (!header || header.dataset.iaBtnAdded) return;
         header.dataset.iaBtnAdded = '1';
 
@@ -534,8 +535,15 @@ Quando encontrar esse formato:
         btn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Cadastrar com IA (print/PDF)';
         btn.addEventListener('click', () => window.ScheduleIAImport.openModal());
 
-        const novaAulaBtn = document.getElementById('btn-nova-aula');
-        novaAulaBtn.parentNode.insertBefore(btn, novaAulaBtn);
+        // Agrupa os dois botões num único bloco à direita do cabeçalho,
+        // um do lado do outro, em vez de ficarem espalhados pelo
+        // justify-content:space-between do .view-header.
+        const group = document.createElement('div');
+        group.className = 'header-actions';
+        group.style.cssText = 'display:flex;align-items:center;gap:10px;flex-wrap:wrap;';
+        novaAulaBtn.parentNode.insertBefore(group, novaAulaBtn);
+        group.appendChild(btn);
+        group.appendChild(novaAulaBtn);
     }
 
     new MutationObserver(ensureButton).observe(document.body, { childList: true, subtree: true });

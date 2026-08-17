@@ -70,6 +70,7 @@
       .subject-metric{padding:10px 12px;border-radius:16px;background:rgba(15,23,42,.12);}
       .subject-metric strong{display:block;font-size:1.05rem;margin-top:4px;}
       .agenda-filters{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0;}
+      .agenda-archived-note{display:block;margin-top:8px;}
       .agenda-list{display:grid;gap:10px;}
       .agenda-item{display:flex;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:16px;background:rgba(15,23,42,.12);}
       .focus-cycle-card{margin-top:18px;padding:18px;border-radius:18px;border:1px solid rgba(99,102,241,.18);background:linear-gradient(135deg,rgba(99,102,241,.1),rgba(59,130,246,.08));}
@@ -388,13 +389,19 @@
   }
 
   function renderAgendaPanel(view) {
-    const events = [
+    const eventosBrutos = [
       ...(view.app.data.sessions || []).map(item => ({ ...item, eventType: 'sessao', when: item.data, title: item.topico || item.materia, subtitle: `${item.materia} • ${item.tipo || 'estudo'}` })),
       ...(view.app.data.tasks || []).map(item => ({ ...item, eventType: 'tarefa', when: item.dataLimite, title: item.titulo, subtitle: `${item.materia} • tarefa` })),
       ...(view.app.data.exams || []).map(item => ({ ...item, eventType: 'exame', when: item.data, title: item.titulo, subtitle: `${item.materia} • ${item.tipo || 'avaliação'}` })),
       ...(view.app.data.reviews || []).map(item => ({ ...item, eventType: 'revisao', when: item.data, title: item.topico || 'Revisão', subtitle: `${item.materia} • revisão` })),
       ...(view.app.data.classDiaries || []).map(item => ({ ...item, eventType: 'aula', when: item.data, title: item.conteudoExplicado || 'Registro de aula', subtitle: `${item.materia} • diário de aula` }))
     ].filter(item => item.when).sort((a,b) => new Date(a.when) - new Date(b.when));
+
+    // Mesmo filtro de "semestre atual" usado em Tarefas/Provas/Calendário —
+    // matérias arquivadas (fora do semestre em curso) não poluem a agenda.
+    const { atuais: events, arquivadas } = typeof view.app.filterSemestreAtual === 'function'
+      ? view.app.filterSemestreAtual(eventosBrutos, 'materia')
+      : { atuais: eventosBrutos, arquivadas: 0 };
 
     const filters = ['todos', 'sessao', 'tarefa', 'exame', 'revisao', 'aula'];
     const buttons = filters.map(filter => `<button class="calendar-filter-btn ${filter === 'todos' ? 'active' : ''}" data-filter="${filter}">${filter === 'todos' ? 'Todos' : filter}</button>`).join('');
@@ -403,7 +410,8 @@
         <div><strong>${view.esc(item.title)}</strong><small>${view.esc(item.subtitle)} • ${formatarData(item.when)}</small></div>
         <span class="risk-pill ${item.eventType === 'exame' ? 'alto' : item.eventType === 'tarefa' ? 'medio' : 'baixo'}">${item.eventType}</span>
       </div>`).join('') || '<p class="text-secondary">Nenhum evento cadastrado.</p>';
-    return `<div class="agenda-card"><div class="agenda-head"><div><h3><i class="fas fa-calendar-check"></i> Agenda acadêmica completa</h3><small>Provas, trabalhos, revisões, sessões e diários.</small></div></div><div class="agenda-filters">${buttons}</div><div class="agenda-list" id="agenda-list">${list}</div></div>`;
+    const nota = arquivadas ? `<small class="text-secondary agenda-archived-note"><i class="fas fa-box-archive"></i> ${arquivadas} matéria${arquivadas > 1 ? 's' : ''} arquivada${arquivadas > 1 ? 's' : ''} escondida${arquivadas > 1 ? 's' : ''} da agenda</small>` : '';
+    return `<div class="agenda-card"><div class="agenda-head"><div><h3><i class="fas fa-calendar-check"></i> Agenda acadêmica completa</h3><small>Provas, trabalhos, revisões, sessões e diários.</small></div></div>${nota}<div class="agenda-filters">${buttons}</div><div class="agenda-list" id="agenda-list">${list}</div></div>`;
   }
 
   function ensureLaunchData(app) {
@@ -977,7 +985,11 @@
     };
 
     proto.renderConfiguracoes = function (aba) {
-      return `${originalConfig.call(this, aba)}<div class="card"><div class="card-header"><h3><i class="fas fa-bullseye"></i> Metas rápidas</h3></div><div class="card-body"><p>Você também pode editar suas metas diretamente no Dashboard, na seção de metas semanais e mensais.</p></div></div>`;
+      const html = originalConfig.call(this, aba);
+      // Essa dica só faz sentido dentro da aba "Geral" — no menu de categorias
+      // e nas outras abas ela não deve aparecer.
+      if (aba !== 'geral') return html;
+      return `${html}<div class="card"><div class="card-header"><h3><i class="fas fa-bullseye"></i> Metas rápidas</h3></div><div class="card-body"><p>Você também pode editar suas metas diretamente no Dashboard, na seção de metas semanais e mensais.</p></div></div>`;
     };
 
     proto[PATCH_FLAG] = true;
@@ -991,6 +1003,7 @@
       if (view === 'ajuda') {
         if (!this.viewRenderer) this.viewRenderer = new ViewRenderer(this);
         this.currentView = view;
+        document.body.dataset.view = view;
         const container = el('view-container');
         if (!container) return;
         container.innerHTML = window.renderHelpPage ? window.renderHelpPage() : '<div class="card"><div class="card-body">Ajuda indisponível.</div></div>';
@@ -1001,6 +1014,7 @@
       if (view === 'gamificacao') {
         if (!this.viewRenderer) this.viewRenderer = new ViewRenderer(this);
         this.currentView = view;
+        document.body.dataset.view = view;
         const container = el('view-container');
         if (!container) return;
         container.innerHTML = renderGamificationPage(this.viewRenderer);
@@ -1010,6 +1024,7 @@
       if (view === 'situacao-academica') {
         if (!this.viewRenderer) this.viewRenderer = new ViewRenderer(this);
         this.currentView = view;
+        document.body.dataset.view = view;
         const container = el('view-container');
         if (!container) return;
         container.innerHTML = renderSituationPage(this.viewRenderer);
@@ -1364,8 +1379,12 @@
     if (window.scheduleManager && window.app?.currentView === 'grade-horaria') {
       window.scheduleManager.ALTURA_POR_HORA = calculateCompactHourHeight(window.scheduleManager);
       const current = document.querySelector('[id^="schedule-vertical-container-"]');
-      if (current && window.app?.viewRenderer?.renderGradeSemanalComHoras) {
-        window.app.viewRenderer.renderGradeSemanalComHoras(current.id);
+      if (current) {
+        if (window.scheduleManager.viewMode === 'week') {
+          window.scheduleManager.renderGradeSemanalGrid(current.id);
+        } else {
+          window.scheduleManager.renderGradeDia(window.scheduleManager.selectedDay, current.id);
+        }
       }
     }
   });

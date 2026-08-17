@@ -194,7 +194,7 @@
 
     const section = document.createElement('div');
     section.id = 'slc-charts-section';
-    section.style.cssText = 'padding:0 0 32px;';
+    section.style.cssText = 'padding:20px 0 32px;';
     section.innerHTML = `
       <div class="card" style="margin-bottom:20px;padding:20px 24px;">
         <h3 style="margin-bottom:14px;font-size:14px;font-weight:600;color:var(--text-secondary);"><i class="fas fa-clock" style="color:var(--accent-primary);margin-right:8px;"></i>Horas estudadas — últimos 14 dias</h3>
@@ -394,6 +394,9 @@
 
     proto.renderConfiguracoes = function (aba) {
       const html = originalConfig.call(this, aba);
+      // Só mostra o bloco extra de exportação dentro da própria aba "Dados" —
+      // no menu de categorias e nas outras abas ele não deve aparecer.
+      if (aba !== 'dados') return html;
       const exportSection = `
         <div class="card" style="margin-top:20px;padding:20px 24px;">
           <h3 style="margin-bottom:16px;font-size:15px;font-weight:600;"><i class="fas fa-download" style="color:var(--accent-primary);margin-right:8px;"></i>Exportar Dados</h3>

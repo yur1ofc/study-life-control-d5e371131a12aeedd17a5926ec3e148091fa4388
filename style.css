@@ -126,6 +126,19 @@ textarea {
     padding: 20px;
 }
 
+.archived-note {
+    text-align: left;
+    padding: 10px 14px;
+    margin: 12px 0 0;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: .88rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .big-number {
     font-size: 48px;
     font-weight: 700;
@@ -752,10 +765,12 @@ button:active,
 }
 
 .main-content {
-    flex: 1;
     margin-left: var(--sidebar-width);
+    width: calc(100% - var(--sidebar-width));
     min-height: 100vh;
     background: var(--bg-primary);
+    box-sizing: border-box;
+    overflow-x: hidden;
 }
 
 .content-header {
@@ -1315,6 +1330,11 @@ button:active,
 ========================= */
 .calendar-grid {
     width: 100%;
+    /* Tamanho da célula em função da altura visível da tela (dvh), não de um
+       valor fixo em px — assim o mês inteiro cabe sem rolar, seja no
+       celular, tablet, PC ou numa TV. Os breakpoints abaixo só ajustam os
+       limites do clamp() para cada faixa de tela. */
+    --cal-cell: clamp(38px, 7.2dvh, 92px);
 }
 
 .calendar-weekdays {
@@ -1333,13 +1353,13 @@ button:active,
 }
 
 .calendar-day {
-    aspect-ratio: 1;
+    height: var(--cal-cell);
     background: var(--bg-tertiary);
     border-radius: 8px;
     padding: 8px;
     position: relative;
     border: 1px solid var(--border);
-    min-height: 90px;
+    overflow: hidden;
 }
 
 .calendar-day.empty {
@@ -1381,6 +1401,23 @@ button:active,
 .more-events {
     font-size: 10px;
     color: var(--text-tertiary);
+}
+
+/* Telas grandes / TV: mais espaço por célula, sem estourar a altura da tela */
+@media (min-width: 1600px) {
+    .calendar-grid {
+        --cal-cell: clamp(70px, 8.5dvh, 140px);
+    }
+
+    .day-number {
+        font-size: 16px;
+    }
+
+    .event-indicator {
+        width: 24px;
+        height: 24px;
+        font-size: 12px;
+    }
 }
 
 /* =========================
@@ -1495,6 +1532,48 @@ button:active,
     grid-template-columns: 1fr 300px;
     gap: 24px;
     height: calc(100vh - 200px);
+}
+
+/* Mentor IA como app de chat de verdade: o cabeçalho e o card de
+   "Prioridade do dia" ficam fixos no topo, e só as mensagens rolam —
+   o campo de digitar sempre visível, sem precisar rolar a página. */
+body[data-view="mentor-ia"] .main-content {
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+body[data-view="mentor-ia"] .content-header {
+    flex-shrink: 0;
+}
+body[data-view="mentor-ia"] .view-container {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 16px;
+    overflow: hidden;
+}
+body[data-view="mentor-ia"] .view-header,
+body[data-view="mentor-ia"] .mentor-highlight-box {
+    flex-shrink: 0;
+}
+body[data-view="mentor-ia"] .mentor-ia-container {
+    flex: 1;
+    min-height: 0;
+    height: auto;
+}
+body[data-view="mentor-ia"] .sugestoes-container {
+    max-height: 100%;
+}
+@media (max-width: 980px) {
+    body[data-view="mentor-ia"] .main-content {
+        height: auto;
+        overflow: visible;
+    }
+    body[data-view="mentor-ia"] .view-container {
+        min-height: calc(100vh - 60px);
+    }
 }
 
 .chat-container {
@@ -2054,6 +2133,15 @@ input:checked + .toggle-slider:before {
     width: 100%;
 }
 
+/* Grade semanal em grid: a altura vem do JS (cabe tudo sem rolar), então
+   destrava a altura fixa de 600px herdada da visão "por dia". */
+[id^="schedule-vertical-container"].has-week-grid {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    background: transparent;
+}
+
 .schedule-vertical {
     position: relative;
     width: 100%;
@@ -2134,8 +2222,150 @@ input:checked + .toggle-slider:before {
 }
 
 /* =========================
-   GRADE SEMANAL
+   GRADE SEMANAL — CALENDÁRIO REAL (colunas x eixo de horas)
 ========================= */
+.wgrid-wrap {
+    display: flex;
+    width: 100%;
+    background: var(--bg-tertiary);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+}
+
+.wgrid-hours-col {
+    flex-shrink: 0;
+    width: 52px;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
+}
+
+.wgrid-hour-corner {
+    height: 40px;
+    border-bottom: 1px solid var(--border);
+}
+
+.wgrid-hour-label {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    padding: 2px 4px 0;
+    box-sizing: border-box;
+    border-bottom: 1px solid transparent;
+    transform: translateY(-6px);
+}
+
+.wgrid-days {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    min-width: 0;
+}
+
+.wgrid-day-col {
+    border-right: 1px solid var(--border);
+    min-width: 0;
+}
+
+.wgrid-day-col:last-child {
+    border-right: none;
+}
+
+.wgrid-day-col.is-today {
+    background: rgba(59, 130, 246, 0.06);
+}
+
+.wgrid-day-header {
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+}
+
+.wgrid-day-col.is-today .wgrid-day-header {
+    color: var(--accent-primary);
+}
+
+.wgrid-day-body {
+    position: relative;
+}
+
+.wgrid-hline {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-top: 1px solid var(--border);
+    opacity: .6;
+}
+
+.wgrid-event {
+    position: absolute;
+    left: 3px;
+    right: 3px;
+    border-left: 3px solid;
+    border-radius: 6px;
+    padding: 3px 6px;
+    font-size: 10px;
+    line-height: 1.3;
+    overflow: hidden;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    transition: transform .15s, box-shadow .15s;
+    z-index: 2;
+}
+
+.wgrid-event strong {
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 10.5px;
+}
+
+.wgrid-event span {
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.wgrid-event:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 5;
+}
+
+/* Telas médias/pequenas: menos colunas visíveis por vez fica ilegível —
+   em vez disso, encolhe fonte e usa dia abreviado, mantendo tudo visível
+   sem rolagem lateral nem vertical. */
+@media (max-width: 900px) {
+    .wgrid-hours-col { width: 40px; }
+    .wgrid-hour-label { font-size: 9px; }
+    .wgrid-day-header { font-size: 10.5px; height: 34px; }
+    .wgrid-hour-corner { height: 34px; }
+    .wgrid-event { font-size: 9px; padding: 2px 4px; }
+    .wgrid-event strong { font-size: 9px; }
+}
+
+@media (max-width: 640px) {
+    .wgrid-event span { display: none; }
+}
+
+/* Telas grandes / TV: aumenta um pouco a fonte pra ficar legível de longe */
+@media (min-width: 1600px) {
+    .wgrid-hour-label { font-size: 13px; }
+    .wgrid-day-header { font-size: 15px; }
+    .wgrid-event { font-size: 13px; padding: 6px 10px; }
+    .wgrid-event strong { font-size: 13.5px; }
+    .wgrid-event span { font-size: 12px; }
+}
+
+
 .weekly-schedule,
 .weekly-schedule-grid {
     display: grid;
@@ -2306,6 +2536,7 @@ input:checked + .toggle-slider:before {
 
     .main-content {
         margin-left: var(--sidebar-width-collapsed);
+        width: calc(100% - var(--sidebar-width-collapsed));
     }
 
     .semana-grid {
@@ -2536,15 +2767,22 @@ input:checked + .toggle-slider:before {
         width: 100%;
     }
 
+    .calendar-grid {
+        --cal-cell: clamp(30px, 6.4dvh, 60px);
+    }
+
     .calendar-day {
-        min-height: 72px;
-        padding: 6px;
+        padding: 4px;
+    }
+
+    .day-number {
+        font-size: 11px;
     }
 
     .event-indicator {
-        width: 18px;
-        height: 18px;
-        font-size: 9px;
+        width: 16px;
+        height: 16px;
+        font-size: 8px;
     }
 
     .message-content {
@@ -4451,11 +4689,11 @@ body.sidebar-open .mobile-nav-overlay {
   }
   /* Esconde quick add padrão em mobile (usa bottom nav) */
   #slc-quick-add-btn {
-    bottom: 90px;
-    right: 20px;
-    width: 46px;
-    height: 46px;
-    font-size: 18px;
+    bottom: 78px;
+    right: 12px;
+    width: 42px;
+    height: 42px;
+    font-size: 16px;
   }
 }
 
@@ -4478,62 +4716,94 @@ body.sidebar-open .mobile-nav-overlay {
   animation-duration: 0.3s;
 }
 
-/* ── Configurações em abas ───────────────────────────────────────────── */
-.config-layout {
-    display: grid;
-    grid-template-columns: 200px 1fr;
-    gap: 20px;
-    align-items: start;
+/* ── Configurações: menu de categorias + tela de detalhe ────────────────
+   Item 12: a tela inicial mostra só a lista de categorias; os detalhes
+   (Geral, Perfil, Calendário, Tema, Dados, Sobre) só aparecem depois que a
+   pessoa clica em uma categoria, junto com um botão de voltar. Isso vale
+   igual para celular, tablet, PC e TV — não é um layout responsivo com
+   coluna lateral fixa, é literalmente uma navegação em duas etapas. ── */
+.config-menu-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: 640px;
 }
-@media (max-width: 640px) {
-    .config-layout {
-        grid-template-columns: 1fr;
-    }
-    .config-nav {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-    }
-}
-.config-nav {
+.config-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    padding: 16px 18px;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    padding: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    position: sticky;
-    top: 80px;
+    color: var(--text-primary);
+    cursor: pointer;
+    text-align: left;
+    transition: all .15s;
 }
-.config-nav-item {
+.config-menu-item:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--accent-primary);
+}
+.config-menu-icon {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    background: var(--bg-tertiary);
+    color: var(--accent-primary);
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 10px 14px;
-    border-radius: var(--radius-sm);
-    border: none;
-    background: transparent;
-    color: var(--text-secondary);
-    font-size: .9rem;
+    justify-content: center;
+    font-size: 1.05rem;
+}
+.config-menu-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.config-menu-label {
+    font-size: .96rem;
     font-weight: 600;
-    cursor: pointer;
-    transition: all .2s;
-    text-align: left;
-    width: 100%;
 }
-.config-nav-item:hover {
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
+.config-menu-desc {
+    font-size: .8rem;
+    color: var(--text-tertiary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
-.config-nav-item.active {
-    background: var(--accent-primary);
-    color: #fff;
-}
-.config-nav-item i {
-    width: 18px;
-    text-align: center;
+.config-menu-arrow {
     flex-shrink: 0;
+    color: var(--text-tertiary);
+    font-size: .8rem;
+}
+.config-detail-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.config-back-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all .15s;
+}
+.config-back-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--accent-primary);
+    border-color: var(--accent-primary);
 }
 .config-content {
     background: var(--bg-secondary);
@@ -4541,6 +4811,10 @@ body.sidebar-open .mobile-nav-overlay {
     border-radius: var(--radius-md);
     padding: 24px;
     min-height: 300px;
+}
+@media (max-width: 640px) {
+    .config-content { padding: 18px; }
+    .config-menu-desc { white-space: normal; }
 }
 .config-section-title {
     font-size: .78rem;
@@ -4583,123 +4857,4 @@ body.sidebar-open .mobile-nav-overlay {
 }
 
 
-/* ===========================
-   CONFIGURAÇÕES — LAYOUT SIDEBAR
-=========================== */
-.config-layout {
-    display: grid;
-    grid-template-columns: 220px 1fr;
-    gap: 0;
-    min-height: 500px;
-    background: var(--bg-secondary);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border);
-    overflow: hidden;
-}
-@media (max-width: 700px) {
-    .config-layout { grid-template-columns: 1fr; }
-    .config-sidebar { border-right: none; border-bottom: 1px solid var(--border); }
-}
 
-.config-sidebar {
-    background: var(--bg-tertiary);
-    border-right: 1px solid var(--border);
-    padding: 0;
-}
-.config-sidebar-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 20px 16px 16px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: .06em;
-    border-bottom: 1px solid var(--border);
-}
-.config-sidebar-item {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
-    background: none;
-    border: none;
-    border-left: 3px solid transparent;
-    cursor: pointer;
-    text-align: left;
-    font-family: inherit;
-    transition: all 0.15s;
-    color: var(--text-primary);
-}
-.config-sidebar-item:hover {
-    background: var(--bg-secondary);
-}
-.config-sidebar-item.active {
-    background: var(--bg-secondary);
-    border-left-color: var(--accent-primary);
-}
-.config-sidebar-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    background: var(--bg-secondary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    font-size: 13px;
-    color: var(--text-secondary);
-    transition: all 0.15s;
-}
-.config-sidebar-item.active .config-sidebar-icon {
-    background: rgba(59,130,246,.15);
-    color: var(--accent-primary);
-}
-.config-sidebar-text {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    min-width: 0;
-}
-.config-sidebar-label {
-    font-size: 13px;
-    font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.config-sidebar-desc {
-    font-size: 11px;
-    color: var(--text-tertiary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.config-sidebar-arrow {
-    font-size: 10px;
-    color: var(--text-tertiary);
-    flex-shrink: 0;
-}
-.config-sidebar-item.active .config-sidebar-arrow {
-    color: var(--accent-primary);
-}
-
-.config-main {
-    display: flex;
-    flex-direction: column;
-}
-.config-main-header {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 20px 24px 16px;
-    border-bottom: 1px solid var(--border);
-}
-.config-main-body {
-    padding: 24px;
-    flex: 1;
-    overflow-y: auto;
-}

@@ -16,7 +16,7 @@ body{background:linear-gradient(180deg,#08111f 0%,#0a1222 100%)}
 .slc-briefing-line button{background:none;border:none;color:var(--text-tertiary);cursor:pointer;padding:4px;flex-shrink:0;font-size:12px;transition:color .15s,transform .4s}
 .slc-briefing-line button:hover{color:var(--text-primary);transform:rotate(70deg)}
 .slc-grade-rows{display:flex;flex-direction:column;gap:12px}
-.slc-grade-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(80px,140px) 32px;align-items:center;gap:12px}
+.slc-grade-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(80px,140px) 38px;align-items:center;gap:12px}
 .slc-grade-label{font-size:12px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .slc-grade-track{height:6px;border-radius:999px;background:rgba(148,163,184,.14);overflow:hidden}
 .slc-grade-fill{height:100%;border-radius:999px;transition:width .3s ease}

@@ -84,7 +84,6 @@
             <h2>Olá, ${esc(user.nome||'Estudante')} 👋</h2>
             <p>${esc(todayText)} • visão rápida do dia</p>
           </div>
-          <span class="setup-fast-pill"><i class="fas fa-bolt"></i> Painel rápido</span>
         </div>
 
         <div class="dashboard-top-grid">

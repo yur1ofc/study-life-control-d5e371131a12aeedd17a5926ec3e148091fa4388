@@ -59,9 +59,9 @@
     }
   }
 
-  document.addEventListener('app-ready', buildExportButton);
-  document.addEventListener('DOMContentLoaded', () => {
-    // Caso app-ready já tenha disparado antes deste script carregar
-    if (window.app?.initialized) buildExportButton();
-  });
+  // O botão "Exportar meus dados" não é mais injetado na barra lateral:
+  // ele duplicava o botão "Exportar todos os dados (JSON)" que já existe em
+  // Configurações > Dados (app.exportarDados()). exportData() fica disponível
+  // aqui só como utilitário interno, sem criar um botão duplicado.
+  window.__exportDataUtil = exportData;
 })();

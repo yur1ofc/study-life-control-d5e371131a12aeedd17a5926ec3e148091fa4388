@@ -388,14 +388,14 @@
     line.className = 'slc-briefing-line';
     line.innerHTML = `
       <i class="fas fa-robot"></i>
-      <span id="slc-briefing-text">${saved ? saved : '<span style="opacity:.6">Gerando briefing...</span>'}</span>
-      <button id="slc-refresh-briefing" title="Atualizar briefing" aria-label="Atualizar briefing"><i class="fas fa-rotate-right"></i></button>`;
+      <span id="slc-briefing-text">${saved ? saved : '<span style="opacity:.6">Gerando briefing...</span>'}</span>`;
 
     header.insertAdjacentElement('afterend', line);
 
+    // Sem botão de recarregar próprio aqui — já existe o ícone de recarregar
+    // no cabeçalho da página (mesma função, não precisa duplicar). O
+    // briefing se regenera sozinho quando muda o dia.
     if (!saved || shouldRegenerateBriefing()) generateBriefing();
-
-    document.getElementById('slc-refresh-briefing')?.addEventListener('click', () => generateBriefing(true));
   }
 
   async function generateBriefing(force = false) {
@@ -438,8 +438,8 @@
     btn.innerHTML = '<i class="fas fa-plus"></i>';
     btn.setAttribute('title', 'Adicionar rápido (Q)');
     btn.style.cssText = `
-      position:fixed;bottom:28px;right:88px;z-index:997;
-      width:48px;height:48px;border-radius:50%;
+      position:fixed;bottom:20px;right:20px;z-index:997;
+      width:44px;height:44px;border-radius:50%;
       background:var(--accent-primary);color:#fff;border:none;
       font-size:18px;cursor:pointer;
       box-shadow:0 8px 24px rgba(59,130,246,.4);
@@ -456,7 +456,7 @@
     menu.id = 'slc-quick-menu';
     menu.hidden = true;
     menu.style.cssText = `
-      position:fixed;bottom:88px;right:88px;z-index:996;
+      position:fixed;bottom:76px;right:20px;z-index:996;
       display:flex;flex-direction:column;align-items:flex-end;gap:10px;
     `;
 
@@ -591,7 +591,7 @@
 
     const tabs = [
       { view: 'dashboard',  icon: 'fa-chart-pie',      label: 'Início' },
-      { view: 'meu-dia',    icon: 'fa-calendar-day',   label: 'Hoje' },
+      { view: 'grade-horaria', icon: 'fa-calendar-week', label: 'Horário' },
       { view: 'tarefas',    icon: 'fa-tasks',           label: 'Tarefas' },
       { view: 'mentor-ia',  icon: 'fa-robot',           label: 'IA' },
       { view: 'sessoes',    icon: 'fa-clock',           label: 'Sessões' },
@@ -663,7 +663,8 @@
     }
 
     if (app) {
-      injectMeuDiaNav();
+      // "Meu Dia" foi removido da sidebar por duplicar o Dashboard visualmente.
+      // injectMeuDiaNav();
       injectQuickAdd();
       enableOfflinePersistence();
 
@@ -700,7 +701,7 @@
     if (window.app?.currentView === 'dashboard') {
       setTimeout(injectBriefingCard, 400);
     }
-    setTimeout(injectMeuDiaNav, 100);
+    // setTimeout(injectMeuDiaNav, 100); // desativado — duplicava o Dashboard
   }
 
   document.addEventListener('DOMContentLoaded', () => {

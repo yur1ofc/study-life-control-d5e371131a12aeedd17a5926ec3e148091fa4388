@@ -391,7 +391,7 @@ class ViewRenderer {
             </div>
 
             <div class="schedule-container card" style="padding: 20px; margin-bottom: 24px;">
-                <div id="${containerId}" style="min-height: 600px;"></div>
+                <div id="${containerId}"></div>
             </div>
 
             <div class="dashboard-grid">
@@ -475,7 +475,7 @@ class ViewRenderer {
             }
 
             if (modo === 'semana') {
-                this.renderGradeSemanalComHoras(containerId);
+                window.scheduleManager.renderGradeSemanalGrid(containerId);
             } else {
                 window.scheduleManager.renderGradeDia(diaSelecionado, containerId);
             }
@@ -665,11 +665,13 @@ class ViewRenderer {
     }
 
     renderTarefas() {
-        const pendentes = this.app.data.tasks
+        const { atuais: tasksAtuais, arquivadas } = this.app.filterSemestreAtual(this.app.data.tasks, 'materia');
+
+        const pendentes = tasksAtuais
             .filter(t => !t.concluida)
             .sort((a, b) => new Date(a.dataLimite) - new Date(b.dataLimite));
 
-        const concluidas = this.app.data.tasks
+        const concluidas = tasksAtuais
             .filter(t => t.concluida)
             .sort((a, b) => new Date(b.dataLimite) - new Date(a.dataLimite));
 
@@ -678,6 +680,7 @@ class ViewRenderer {
                 <h2><i class="fas fa-tasks"></i> Tarefas</h2>
                 <button class="btn-primary" id="btn-nova-tarefa"><i class="fas fa-plus"></i> Nova Tarefa</button>
             </div>
+            ${arquivadas ? `<p class="text-secondary archived-note"><i class="fas fa-box-archive"></i> ${arquivadas} matéria${arquivadas > 1 ? 's' : ''} arquivada${arquivadas > 1 ? 's' : ''} (fora do semestre atual) — as tarefas continuam salvas em Configurações › Grade Curricular › Semestres anteriores.</p>` : ''}
 
             <div class="dashboard-grid">
                 <div class="card">
@@ -740,12 +743,13 @@ class ViewRenderer {
 
     renderProvas() {
         const agora = toDateOnly(new Date());
+        const { atuais: examsAtuais, arquivadas } = this.app.filterSemestreAtual(this.app.data.exams, 'materia');
 
-        const proximas = this.app.data.exams
+        const proximas = examsAtuais
             .filter(e => toDateOnly(e.data) >= agora && !e.concluida)
             .sort((a, b) => new Date(a.data) - new Date(b.data));
 
-        const passadas = this.app.data.exams
+        const passadas = examsAtuais
             .filter(e => toDateOnly(e.data) < agora || e.concluida)
             .sort((a, b) => new Date(b.data) - new Date(a.data))
             .slice(0, 10);
@@ -755,6 +759,7 @@ class ViewRenderer {
                 <h2><i class="fas fa-graduation-cap"></i> Provas e Trabalhos</h2>
                 <button class="btn-primary" id="btn-nova-prova"><i class="fas fa-plus"></i> Novo Evento</button>
             </div>
+            ${arquivadas ? `<p class="text-secondary archived-note"><i class="fas fa-box-archive"></i> ${arquivadas} matéria${arquivadas > 1 ? 's' : ''} arquivada${arquivadas > 1 ? 's' : ''} (fora do semestre atual) — as provas continuam salvas em Configurações › Grade Curricular › Semestres anteriores.</p>` : ''}
 
             <div class="dashboard-grid">
                 <div class="card">
@@ -929,14 +934,16 @@ class ViewRenderer {
         for (let i = 0; i < primeiroDiaSemana; i++) dias.push(null);
         for (let i = 1; i <= diasNoMes; i++) dias.push(i);
 
-        const eventos = [
+        const eventosBrutos = [
             ...this.app.data.sessions.map(s => ({ ...s, tipo: 'sessao', data: s.data, label: s.topico || s.materia })),
             ...this.app.data.tasks.map(t => ({ ...t, tipo: 'tarefa', data: t.dataLimite, label: t.titulo })),
             ...this.app.data.exams.map(e => ({ ...e, tipo: 'exame', data: e.data, label: e.titulo }))
         ];
+        const { atuais: eventos, arquivadas } = this.app.filterSemestreAtual(eventosBrutos, 'materia');
 
         return `
             <h2><i class="fas fa-calendar"></i> Calendário</h2>
+            ${arquivadas ? `<p class="text-secondary archived-note"><i class="fas fa-box-archive"></i> ${arquivadas} matéria${arquivadas > 1 ? 's' : ''} arquivada${arquivadas > 1 ? 's' : ''} (fora do semestre atual) escondida${arquivadas > 1 ? 's' : ''} do calendário.</p>` : ''}
 
             <div class="card">
                 <div class="card-header">
@@ -982,14 +989,22 @@ class ViewRenderer {
     }
 
     renderPrevisaoNotas() {
+        // app.data.subjects já é sincronizado automaticamente com a Grade
+        // Curricular (subjects-curriculum-sync.js) e só contém matérias
+        // "cursando" (+ matérias criadas manualmente, fora do plano). O
+        // filtro abaixo é uma segunda camada de proteção, caso o status de
+        // uma matéria mude sem passar por esse sincronismo.
+        const { atuais: subjectsAtuais, arquivadas } = this.app.filterSemestreAtual(this.app.data.subjects, 'nome');
+
         return `
             <div class="view-header">
                 <h2><i class="fas fa-chart-line"></i> Previsão de Notas</h2>
                 <button class="btn-primary" id="btn-registrar-nota"><i class="fas fa-plus"></i> Registrar Nota</button>
             </div>
+            ${arquivadas ? `<p class="text-secondary archived-note"><i class="fas fa-box-archive"></i> ${arquivadas} matéria${arquivadas > 1 ? 's' : ''} arquivada${arquivadas > 1 ? 's' : ''} (fora do semestre atual) — as notas continuam salvas em Configurações › Grade Curricular › Semestres anteriores.</p>` : ''}
 
             <div class="dashboard-grid">
-                ${this.app.data.subjects.map(s => {
+                ${subjectsAtuais.map(s => {
                     const notas = this.app.data.grades.filter(g => g.materia === s.nome);
                     const media = this.app.calcularMedia(notas);
                     const previsao = this.app.calcularPrevisaoNota(s, notas);
@@ -1247,535 +1262,40 @@ class ViewRenderer {
         `;
     }
 
-    renderProvas() {
-        const agora = toDateOnly(new Date());
-
-        const proximas = this.app.data.exams
-            .filter(e => toDateOnly(e.data) >= agora && !e.concluida)
-            .sort((a, b) => new Date(a.data) - new Date(b.data));
-
-        const passadas = this.app.data.exams
-            .filter(e => toDateOnly(e.data) < agora || e.concluida)
-            .sort((a, b) => new Date(b.data) - new Date(a.data))
-            .slice(0, 10);
-
-        return `
-            <div class="view-header">
-                <h2><i class="fas fa-graduation-cap"></i> Provas e Trabalhos</h2>
-                <button class="btn-primary" id="btn-nova-prova"><i class="fas fa-plus"></i> Novo Evento</button>
-            </div>
-
-            <div class="dashboard-grid">
-                <div class="card">
-                    <div class="card-header"><h3>📅 Próximos (${proximas.length})</h3></div>
-                    <div class="card-body">
-                        <ul class="item-list">
-                            ${proximas.map(e => `
-                                <li>
-                                    <div>
-                                        <strong>${this.esc(e.titulo)}</strong>
-                                        <small>${this.esc(e.materia)} • ${this.esc(e.tipo)} • ${formatarData(e.data)}</small>
-                                    </div>
-                                    <div style="display:flex; gap:8px;">
-                                        <span class="tag ${this.app.getExamRiskClass(e)}">${diasAte(e.data)} dias</span>
-                                        <button class="btn-icon btn-editar-prova" data-id="${this.esc(e.id)}" title="Editar evento">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <button class="btn-icon btn-excluir-prova" data-id="${this.esc(e.id)}" title="Excluir evento" style="color: var(--accent-danger);">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </li>
-                            `).join('')}
-                            ${!proximas.length ? '<li>Nenhum evento próximo</li>' : ''}
-                        </ul>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header"><h3>📜 Eventos Passados</h3></div>
-                    <div class="card-body">
-                        <ul class="item-list">
-                            ${passadas.map(e => `
-                                <li>
-                                    <div>
-                                        <strong>${this.esc(e.titulo)}</strong>
-                                        <small>${this.esc(e.materia)} • ${formatarData(e.data)}</small>
-                                    </div>
-                                    <div style="display:flex; gap:8px;">
-                                        <span class="tag success">Concluído</span>
-                                        <button class="btn-icon btn-editar-prova" data-id="${this.esc(e.id)}" title="Editar evento">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <button class="btn-icon btn-excluir-prova" data-id="${this.esc(e.id)}" title="Excluir evento" style="color: var(--accent-danger);">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </li>
-                            `).join('')}
-                            ${!passadas.length ? '<li>Nenhum evento passado</li>' : ''}
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    renderMapaAprendizado() {
-        return `
-            <div class="view-header">
-                <h2><i class="fas fa-map"></i> Mapa de Aprendizado</h2>
-                <button class="btn-primary" id="btn-novo-topico"><i class="fas fa-plus"></i> Novo Tópico</button>
-            </div>
-
-            <div class="mapa-grid">
-                ${this.app.data.subjects.map(s => {
-                    const topicos = this.app.data.learningMap.filter(t => t.materia === s.nome);
-                    return `
-                        <div class="card materia-map">
-                            <div class="card-header">
-                                <h3>${this.esc(s.nome)}</h3>
-                                <span class="badge">${topicos.length} tópicos</span>
-                            </div>
-                            <div class="card-body">
-                                ${topicos.map(t => `
-                                    <div class="topico-item">
-                                        <div class="topico-info">
-                                            <strong>${this.esc(t.nome)}</strong>
-                                            <span class="tag ${this.esc(t.status)}">${this.esc(t.status)}</span>
-                                        </div>
-                                        <div class="topico-meta">
-                                            <span>📊 ${this.esc(t.dificuldade)}/5</span>
-                                            <span>🎯 ${this.esc(t.confianca)}/5</span>
-                                            <span>🔄 ${t.ultimaRevisao ? diasDesde(t.ultimaRevisao) : 0}d</span>
-                                        </div>
-                                        <div style="margin-top:10px; display:flex; justify-content:flex-end; gap:8px;">
-                                            <button class="btn-icon btn-editar-topico" data-id="${this.esc(t.id)}" title="Editar tópico">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                            <button class="btn-icon btn-excluir-topico" data-id="${this.esc(t.id)}" title="Excluir tópico" style="color: var(--accent-danger);">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                                ${!topicos.length ? '<p class="text-secondary">Nenhum tópico cadastrado</p>' : ''}
-                            </div>
-                        </div>
-                    `;
-                }).join('')}
-            </div>
-        `;
-    }
-
-    renderMateriais() {
-        return `
-            <div class="view-header">
-                <h2><i class="fas fa-folder"></i> Materiais de Estudo</h2>
-                <button class="btn-primary" id="btn-novo-material"><i class="fas fa-plus"></i> Novo Material</button>
-            </div>
-
-            <div class="materiais-grid">
-                ${this.app.data.subjects.map(s => {
-                    const materiais = this.app.data.materials.filter(m => m.materia === s.nome);
-                    return `
-                        <div class="card">
-                            <div class="card-header">
-                                <h3>${this.esc(s.nome)}</h3>
-                                <span>${materiais.length} itens</span>
-                            </div>
-                            <div class="card-body">
-                                <ul class="item-list">
-                                    ${materiais.map(m => {
-                                        const isExternal = ['link', 'pdf', 'video'].includes(m.tipo);
-                                        const contentPreview = m.tipo === 'anotacao'
-                                            ? `<small>${this.esc(String(m.conteudo || '').slice(0, 80))}${String(m.conteudo || '').length > 80 ? '...' : ''}</small>`
-                                            : `<small>${this.esc(m.tipo)}</small>`;
-
-                                        return `
-                                            <li>
-                                                <div style="display:flex; align-items:center; gap:8px;">
-                                                    <i class="fas ${this.getMaterialIcon(m.tipo)}"></i>
-                                                    <div>
-                                                        <strong>${this.esc(m.titulo)}</strong><br>
-                                                        ${contentPreview}
-                                                    </div>
-                                                </div>
-                                                <div style="display:flex; gap:8px;">
-                                                    ${isExternal ? `
-                                                        <a href="${this.esc(m.conteudo)}" target="_blank" rel="noopener noreferrer" class="btn-icon" title="Abrir material">
-                                                            <i class="fas fa-external-link-alt"></i>
-                                                        </a>
-                                                    ` : ''}
-                                                    <button class="btn-icon btn-editar-material" data-id="${this.esc(m.id)}" title="Editar material">
-                                                        <i class="fas fa-edit"></i>
-                                                    </button>
-                                                    <button class="btn-icon btn-excluir-material" data-id="${this.esc(m.id)}" title="Excluir material" style="color: var(--accent-danger);">
-                                                        <i class="fas fa-trash"></i>
-                                                    </button>
-                                                </div>
-                                            </li>
-                                        `;
-                                    }).join('')}
-                                    ${!materiais.length ? '<li>Nenhum material cadastrado</li>' : ''}
-                                </ul>
-                            </div>
-                        </div>
-                    `;
-                }).join('')}
-            </div>
-        `;
-    }
-
-    renderCalendario() {
-        const hoje = new Date();
-        const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-        const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
-        const diasNoMes = ultimoDia.getDate();
-        const primeiroDiaSemana = primeiroDia.getDay();
-
-        const dias = [];
-        for (let i = 0; i < primeiroDiaSemana; i++) dias.push(null);
-        for (let i = 1; i <= diasNoMes; i++) dias.push(i);
-
-        const eventos = [
-            ...this.app.data.sessions.map(s => ({ ...s, tipo: 'sessao', data: s.data, label: s.topico || s.materia })),
-            ...this.app.data.tasks.map(t => ({ ...t, tipo: 'tarefa', data: t.dataLimite, label: t.titulo })),
-            ...this.app.data.exams.map(e => ({ ...e, tipo: 'exame', data: e.data, label: e.titulo }))
-        ];
-
-        return `
-            <h2><i class="fas fa-calendar"></i> Calendário</h2>
-
-            <div class="card">
-                <div class="card-header">
-                    <h3>${hoje.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</h3>
-                </div>
-                <div class="card-body">
-                    <div class="calendar-grid">
-                        <div class="calendar-weekdays">
-                            <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
-                        </div>
-                        <div class="calendar-days">
-                            ${dias.map(d => {
-                                if (!d) return '<div class="calendar-day empty"></div>';
-
-                                const eventosDia = eventos.filter(e => {
-                                    const data = new Date(e.data);
-                                    return data.getDate() === d &&
-                                        data.getMonth() === hoje.getMonth() &&
-                                        data.getFullYear() === hoje.getFullYear();
-                                });
-
-                                return `
-                                    <div class="calendar-day ${eventosDia.length ? 'has-events' : ''}">
-                                        <span class="day-number">${d}</span>
-                                        ${eventosDia.length ? `
-                                            <div class="day-events">
-                                                ${eventosDia.slice(0, 3).map(e => `
-                                                    <div class="event-indicator" title="${this.esc(e.label)}">
-                                                        <i class="fas ${this.getEventIcon(e.tipo)}"></i>
-                                                    </div>
-                                                `).join('')}
-                                                ${eventosDia.length > 3 ? `<span class="more-events">+${eventosDia.length - 3}</span>` : ''}
-                                            </div>
-                                        ` : ''}
-                                    </div>
-                                `;
-                            }).join('')}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    renderPrevisaoNotas() {
-        return `
-            <div class="view-header">
-                <h2><i class="fas fa-chart-line"></i> Previsão de Notas</h2>
-                <button class="btn-primary" id="btn-registrar-nota"><i class="fas fa-plus"></i> Registrar Nota</button>
-            </div>
-
-            <div class="dashboard-grid">
-                ${this.app.data.subjects.map(s => {
-                    const notas = this.app.data.grades.filter(g => g.materia === s.nome);
-                    const media = this.app.calcularMedia(notas);
-                    const previsao = this.app.calcularPrevisaoNota(s, notas);
-
-                    return `
-                        <div class="card subject-grade-card">
-                            <div class="card-header">
-                                <h3>${this.esc(s.nome)}</h3>
-                                <span class="risk-indicator risk-${this.esc(previsao.risco)}">${this.esc(previsao.risco)}</span>
-                            </div>
-                            <div class="card-body">
-                                <div class="grade-stats">
-                                    <div class="grade-item">
-                                        <span class="grade-label">Média atual</span>
-                                        <span class="grade-value">${media.toFixed(1)}</span>
-                                    </div>
-                                    <div class="grade-item">
-                                        <span class="grade-label">Nota desejada</span>
-                                        <span class="grade-value">${this.esc(s.notaDesejada)}</span>
-                                    </div>
-                                    <div class="grade-item">
-                                        <span class="grade-label">Necessário</span>
-                                        <span class="grade-value">${this.esc(previsao.notaNecessaria)}</span>
-                                    </div>
-                                </div>
-                                <div class="progress-container">
-                                    <div class="progress-label">
-                                        <span>Chance de aprovação</span>
-                                        <span>${previsao.chance}%</span>
-                                    </div>
-                                    <div class="progress-bar">
-                                        <div class="progress-fill" style="width: ${previsao.chance}%"></div>
-                                    </div>
-                                </div>
-                                <p class="previsao-motivo">💡 ${this.esc(previsao.motivo)}</p>
-                                
-                                <div style="margin-top:16px;">
-                                    <h4>Notas Registradas</h4>
-                                    <ul class="item-list">
-                                        ${notas.map(n => `
-                                            <li>
-                                                <div>
-                                                    <strong>${this.esc(n.avaliacao)}</strong>
-                                                    <small>Nota: ${this.esc(n.valor)} • Peso: ${this.esc(n.peso)}%</small>
-                                                </div>
-                                                <div style="display:flex; gap:8px;">
-                                                    <button class="btn-icon btn-editar-nota" data-id="${this.esc(n.id)}" title="Editar nota">
-                                                        <i class="fas fa-edit"></i>
-                                                    </button>
-                                                    <button class="btn-icon btn-excluir-nota" data-id="${this.esc(n.id)}" title="Excluir nota" style="color: var(--accent-danger);">
-                                                        <i class="fas fa-trash"></i>
-                                                    </button>
-                                                </div>
-                                            </li>
-                                        `).join('')}
-                                        ${!notas.length ? '<li>Nenhuma nota registrada</li>' : ''}
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                }).join('')}
-            </div>
-        `;
-    }
-
-    renderHabitos() {
-        const habitos = [
-            { id: 'estudar', nome: 'Estudar', icone: 'fa-book' },
-            { id: 'revisar', nome: 'Revisar conteúdo', icone: 'fa-sync-alt' },
-            { id: 'dormir', nome: 'Dormir bem', icone: 'fa-bed' },
-            { id: 'aula', nome: 'Ir para aula', icone: 'fa-university' },
-            { id: 'exercicio', nome: 'Fazer exercícios', icone: 'fa-dumbbell' },
-            { id: 'agua', nome: 'Beber água', icone: 'fa-tint' },
-            { id: 'anotacoes', nome: 'Ler anotações', icone: 'fa-sticky-note' }
-        ];
-
-        const hoje = toDateString();
-
-        return `
-            <h2><i class="fas fa-heart"></i> Hábitos e Rotina</h2>
-
-            <div class="dashboard-grid">
-                <div class="card">
-                    <div class="card-header">
-                        <h3>📋 Hábitos Diários</h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="habitos-list">
-                            ${habitos.map(h => {
-                                const feito = this.app.data.habits.some(hb => hb.id === h.id && toDateString(hb.data) === hoje);
-                                return `
-                                    <div class="habito-item">
-                                        <div class="habito-info">
-                                            <i class="fas ${h.icone}"></i>
-                                            <span>${this.esc(h.nome)}</span>
-                                        </div>
-                                        <button class="btn-icon toggle-habito ${feito ? 'active' : ''}" data-habito="${this.esc(h.id)}">
-                                            <i class="fas ${feito ? 'fa-check-circle' : 'fa-circle'}"></i>
-                                        </button>
-                                    </div>
-                                `;
-                            }).join('')}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <h3>📊 Consistência Semanal</h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="consistency-chart">
-                            ${this.renderConsistencyChart()}
-                        </div>
-                        <div class="consistency-stats">
-                            <div class="stat-item">
-                                <span class="stat-value">${this.app.calcularConsistencia()}%</span>
-                                <span class="stat-label">esta semana</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-value">${this.esc(this.app.data.user?.streak || 0)}</span>
-                                <span class="stat-label">dias seguidos</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    renderEstatisticas() {
-        const horasPorMateria = this.app.calcularHorasPorMateria();
-        const horasPorTipo = this.app.calcularHorasPorTipo();
-        const total = this.app.data.sessions.filter(s => s.concluida)
-            .reduce((a, s) => a + s.duracao / 60, 0);
-
-        const maxHorasMateria = horasPorMateria.length ? Math.max(...horasPorMateria.map(h => h.horas)) : 1;
-        const maxHorasTipo = horasPorTipo.length ? Math.max(...horasPorTipo.map(t => t.horas)) : 1;
-
-        return `
-            <h2><i class="fas fa-chart-bar"></i> Estatísticas</h2>
-
-            <div class="dashboard-grid">
-                <div class="card">
-                    <div class="card-header"><h3>⏱️ Total Estudado</h3></div>
-                    <div class="card-body text-center">
-                        <div class="big-number">${total.toFixed(1)}</div>
-                        <p>horas no total</p>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header"><h3>📊 Média Diária</h3></div>
-                    <div class="card-body text-center">
-                        <div class="big-number">${this.app.calcularMediaDiaria()}</div>
-                        <p>horas por dia</p>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header"><h3>🔥 Melhor Dia</h3></div>
-                    <div class="card-body text-center">
-                        <div class="big-number">${this.esc(this.app.calcularMelhorDia())}</div>
-                        <p>${this.app.calcularMelhorDiaHoras()}h</p>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header"><h3>✅ Tarefas</h3></div>
-                    <div class="card-body text-center">
-                        <div class="big-number">${this.app.calcularTaxaConclusaoTarefas()}%</div>
-                        <p>concluídas</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-header"><h3>📚 Horas por Matéria</h3></div>
-                <div class="card-body">
-                    ${horasPorMateria.map(item => `
-                        <div class="stat-row">
-                            <div class="stat-label">${this.esc(item.materia)}</div>
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: ${(item.horas / maxHorasMateria) * 100}%"></div>
-                            </div>
-                            <div class="stat-value">${item.horas.toFixed(1)}h</div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-header"><h3>📖 Tipos de Estudo</h3></div>
-                <div class="card-body">
-                    <div class="tipos-grid">
-                        ${horasPorTipo.map(t => `
-                            <div class="tipo-item">
-                                <div class="tipo-header">
-                                    <span>${this.esc(t.tipo)}</span>
-                                    <span>${t.horas.toFixed(1)}h</span>
-                                </div>
-                                <div class="progress-bar">
-                                    <div class="progress-fill" style="width: ${(t.horas / maxHorasTipo) * 100}%"></div>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    renderModoFoco() {
-        return `
-            <h2><i class="fas fa-clock"></i> Modo Foco</h2>
-
-            <div class="card timer-card">
-                <div class="card-body text-center">
-                    <div class="timer-display" id="timer-display">25:00</div>
-
-                    <div class="timer-settings">
-                        <select id="timer-duracao" class="timer-select">
-                            <option value="25">Pomodoro (25 min)</option>
-                            <option value="50">Estudo longo (50 min)</option>
-                            <option value="90">Bloco pesado (90 min)</option>
-                            <option value="15">Pausa curta (15 min)</option>
-                        </select>
-                    </div>
-
-                    <div class="timer-controls">
-                        <button class="timer-btn start" id="timer-start">
-                            <i class="fas fa-play"></i> Iniciar
-                        </button>
-                        <button class="timer-btn pause" id="timer-pause" style="display: none;">
-                            <i class="fas fa-pause"></i> Pausar
-                        </button>
-                        <button class="timer-btn reset" id="timer-reset">
-                            <i class="fas fa-undo"></i> Reset
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-header">
-                    <h3>📊 Sessões de Foco Hoje</h3>
-                </div>
-                <div class="card-body">
-                    <ul class="item-list" id="sessoes-foco-hoje">
-                        ${this.renderSessoesFocoHoje()}
-                    </ul>
-                </div>
-            </div>
-        `;
-    }
-
-    renderConfiguracoes(aba = 'geral') {
+    renderConfiguracoes(aba = null) {
         const s = this.app.data.settings || {};
         const user = this.app.data.user || {};
         const email = this.esc(auth.currentUser?.email || 'Não conectado');
 
         const abas = [
-            { id: 'geral',    icon: 'fa-sliders-h',  label: 'Geral' },
-            { id: 'perfil',   icon: 'fa-user',        label: 'Perfil' },
-            { id: 'calendario', icon: 'fa-calendar-alt', label: 'Calendário' },
-            { id: 'tema',     icon: 'fa-palette',     label: 'Tema' },
-            { id: 'dados',    icon: 'fa-database',    label: 'Dados' },
-            { id: 'sobre',    icon: 'fa-info-circle', label: 'Sobre' },
+            { id: 'geral',    icon: 'fa-sliders-h',   label: 'Geral',      desc: 'Notificações, planejamento e modo pesado' },
+            { id: 'perfil',   icon: 'fa-user',        label: 'Perfil e conta', desc: 'Dados pessoais, semestre atual e sair da conta' },
+            { id: 'calendario', icon: 'fa-calendar-alt', label: 'Calendário', desc: 'Assinatura de calendário e alarmes de estudo' },
+            { id: 'tema',     icon: 'fa-palette',     label: 'Tema',       desc: 'Aparência e tamanho da fonte' },
+            { id: 'dados',    icon: 'fa-database',    label: 'Dados',      desc: 'Backup, restauração e limpeza de dados' },
+            { id: 'sobre',    icon: 'fa-info-circle', label: 'Sobre',      desc: 'Versão do app e conta conectada' },
         ];
 
-        const navAbas = abas.map(a => `
-            <button class="config-nav-item ${aba === a.id ? 'active' : ''}" data-config-aba="${a.id}">
-                <i class="fas ${a.icon}"></i>
-                <span>${a.label}</span>
-            </button>`).join('');
+        // Tela inicial: só o menu de categorias, sem detalhes.
+        if (!aba) {
+            const itensMenu = abas.map(a => `
+                <button class="config-menu-item" data-config-aba="${a.id}">
+                    <span class="config-menu-icon"><i class="fas ${a.icon}"></i></span>
+                    <span class="config-menu-text">
+                        <span class="config-menu-label">${a.label}</span>
+                        <span class="config-menu-desc">${a.desc}</span>
+                    </span>
+                    <i class="fas fa-chevron-right config-menu-arrow"></i>
+                </button>`).join('');
 
+            return `
+            <div class="view-header">
+                <h2><i class="fas fa-cog"></i> Configurações</h2>
+            </div>
+            <div class="config-menu-list">${itensMenu}</div>`;
+        }
+
+        const abaAtual = abas.find(a => a.id === aba) || abas[0];
         let conteudo = '';
 
         if (aba === 'geral') {
@@ -1825,7 +1345,14 @@ class ViewRenderer {
                 <button class="btn-primary" id="btn-salvar-perfil" style="margin-top:8px;">
                     <i class="fas fa-save"></i> Salvar alterações
                 </button>
-            </div>`;
+            </div>
+            <div class="config-section-title" style="margin-top:28px;">🔐 Conta</div>
+            <div class="config-item">
+                <div class="config-info"><h4>Conectado como</h4><p>${email}</p></div>
+            </div>
+            <button class="btn-danger" id="config-logout-btn" style="margin-top:12px;">
+                <i class="fas fa-sign-out-alt"></i> Sair da conta
+            </button>`;
         }
 
         if (aba === 'calendario') {
@@ -2037,13 +1564,13 @@ class ViewRenderer {
         }
 
         return `
-        <div class="view-header">
-            <h2><i class="fas fa-cog"></i> Configurações</h2>
+        <div class="view-header config-detail-header">
+            <button class="config-back-btn" data-config-aba="" aria-label="Voltar para Configurações">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h2><i class="fas ${abaAtual.icon}"></i> ${abaAtual.label}</h2>
         </div>
-        <div class="config-layout">
-            <nav class="config-nav">${navAbas}</nav>
-            <div class="config-content">${conteudo}</div>
-        </div>`;
+        <div class="config-content">${conteudo}</div>`;
     }
 
     renderMaterias() {
@@ -2376,6 +1903,10 @@ class ViewRenderer {
                     </button>
                     <button class="btn-secondary btn-finalizar-semestre-cta" id="btn-finalizar-semestre" title="Encerrar o semestre atual, registrar aprovações/reprovações e escolher as matérias do próximo">
                         <i class="fas fa-flag-checkered"></i> Finalizar Semestre
+                    </button>
+                    <button class="btn-secondary" id="btn-semestres-anteriores" title="Ver o histórico de tarefas, provas, sessões e notas dos semestres já finalizados">
+                        <i class="fas fa-box-archive"></i> Semestres anteriores
+                        ${(this.app.data.archivedSemesters || []).length ? `<span class="badge badge-soft">${this.app.data.archivedSemesters.length}</span>` : ''}
                     </button>
                     <button class="btn-primary" id="btn-novo-curriculum">
                         <i class="fas fa-plus"></i> Novo Componente

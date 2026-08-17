@@ -108,6 +108,7 @@ class ScheduleManager {
         const container = document.getElementById(containerId);
         if (!container) return;
 
+        container.classList.remove('has-week-grid');
         container.innerHTML = '';
 
         if (!aulas.length) {
@@ -217,6 +218,99 @@ class ScheduleManager {
         container.appendChild(weeklyGrid);
 
         container.querySelectorAll('.weekly-event').forEach(el => {
+            el.addEventListener('click', e => {
+                const aulaId = e.currentTarget.dataset.aulaId;
+                if (window.app) window.app.openAulaModal(aulaId);
+            });
+        });
+    }
+
+    // ── Calendário semanal com eixo de horas real ──────────────────────────
+    // Colunas = dias da semana, cada aula posicionada no ponto exato da
+    // hora/duração dela (igual um Google Calendar). A altura de cada hora
+    // se ajusta ao espaço disponível na tela para que a semana toda caiba
+    // sem precisar rolar (em telas muito pequenas, pode rolar só um pouco).
+    renderGradeSemanalGrid(containerId) {
+        this.loadAulas();
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.classList.add('has-week-grid');
+
+        const dias = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+        const hoje = new Date().getDay();
+
+        if (!this.aulas.length) {
+            container.innerHTML = `
+                <div class="no-classes-message">
+                    <i class="fas fa-calendar-times"></i>
+                    <p>Nenhuma aula cadastrada</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Faixa de horário: só o intervalo onde realmente há aulas (+1h de
+        // folga de cada lado), pra não desperdiçar espaço com horas vazias.
+        const horarios = this.aulas.map(a => [a.inicio, a.fim]).flat().filter(Boolean)
+            .map(v => String(v).split(':').map(Number)).filter(p => p.length === 2 && p.every(Number.isFinite));
+        const earliest = Math.max(0, Math.min(...horarios.map(([h]) => h)) - 1);
+        const latest = Math.min(23, Math.max(...horarios.map(([h]) => h)) + 1);
+        const totalHoras = Math.max(6, latest - earliest + 1);
+
+        // Altura de hora dinâmica: cabe tudo na tela disponível sem rolar.
+        const headerChrome = container.closest('.card')?.previousElementSibling ? 260 : 240;
+        const available = Math.max(360, window.innerHeight - headerChrome);
+        const alturaHora = Math.max(28, Math.min(64, Math.floor(available / totalHoras)));
+        const alturaTotal = totalHoras * alturaHora;
+
+        const top = (horario) => {
+            const [h, m] = String(horario).split(':').map(Number);
+            return Math.max(0, ((h - earliest) * 60 + (m || 0)) / 60 * alturaHora);
+        };
+        const altura = (inicio, fim) => Math.max(20, calcularDuracaoMinutos(inicio, fim) / 60 * alturaHora);
+
+        let horasHtml = '';
+        for (let h = earliest; h <= latest; h++) {
+            horasHtml += `<div class="wgrid-hour-label" style="height:${alturaHora}px">${String(h).padStart(2, '0')}:00</div>`;
+        }
+
+        let colsHtml = '';
+        for (let dia = 0; dia < 7; dia++) {
+            const aulasDia = this.getAulasPorDia(dia);
+            let linesHtml = '';
+            for (let h = earliest; h <= latest; h++) {
+                linesHtml += `<div class="wgrid-hline" style="top:${(h - earliest) * alturaHora}px"></div>`;
+            }
+            const eventsHtml = aulasDia.map(aula => {
+                const cor = aula.cor || '#3b82f6';
+                return `
+                    <div class="wgrid-event" data-aula-id="${aula.id}" title="${escapeHtml(aula.materia)} • ${escapeHtml(aula.inicio)}-${escapeHtml(aula.fim)}"
+                         style="top:${top(aula.inicio)}px;height:${altura(aula.inicio, aula.fim)}px;background:${cor}22;border-left-color:${cor};">
+                        <strong>${escapeHtml(aula.materia)}</strong>
+                        <span>${escapeHtml(aula.inicio)}–${escapeHtml(aula.fim)}${aula.sala ? ` • ${escapeHtml(aula.sala)}` : ''}</span>
+                    </div>`;
+            }).join('');
+
+            colsHtml += `
+                <div class="wgrid-day-col ${dia === hoje ? 'is-today' : ''}">
+                    <div class="wgrid-day-header">${dias[dia]}</div>
+                    <div class="wgrid-day-body" style="height:${alturaTotal}px">
+                        ${linesHtml}
+                        ${eventsHtml}
+                    </div>
+                </div>`;
+        }
+
+        container.innerHTML = `
+            <div class="wgrid-wrap">
+                <div class="wgrid-hours-col">
+                    <div class="wgrid-hour-corner"></div>
+                    ${horasHtml}
+                </div>
+                <div class="wgrid-days">${colsHtml}</div>
+            </div>`;
+
+        container.querySelectorAll('.wgrid-event').forEach(el => {
             el.addEventListener('click', e => {
                 const aulaId = e.currentTarget.dataset.aulaId;
                 if (window.app) window.app.openAulaModal(aulaId);

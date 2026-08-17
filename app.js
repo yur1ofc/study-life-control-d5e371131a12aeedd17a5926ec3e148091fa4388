@@ -405,6 +405,7 @@ class StudyLifeControl {
         }
 
         this.currentView = view;
+        document.body.dataset.view = view;
         const container = document.getElementById('view-container');
         if (!container) return;
 
@@ -597,6 +598,12 @@ class StudyLifeControl {
                 this.applyHeavyMode?.();
             });
 
+            // Aba Perfil — sair da conta
+            document.getElementById('config-logout-btn')?.addEventListener('click', async () => {
+                if (!confirm('Deseja realmente sair da sua conta?')) return;
+                await window.authService?.logout();
+            });
+
             // Aba Calendário — link .ics assinável
             document.getElementById('btn-gerar-calendario')?.addEventListener('click', async () => {
                 const btn = document.getElementById('btn-gerar-calendario');
@@ -728,6 +735,7 @@ class StudyLifeControl {
             document.getElementById('btn-importar-ufob')?.addEventListener('click', () => this.importarGradeUfob());
             document.getElementById('btn-finalizar-semestre')?.addEventListener('click', () => this.abrirFinalizarSemestre());
             document.getElementById('btn-editar-semestre-atual')?.addEventListener('click', () => this.abrirGerenciarSemestreAtual());
+            document.getElementById('btn-semestres-anteriores')?.addEventListener('click', () => this.abrirSemestresAnteriores());
 
             document.querySelectorAll('.btn-editar-curriculum').forEach(btn => {
                 btn.addEventListener('click', e => this.editarCurriculum(e.currentTarget.dataset.id));
@@ -2303,6 +2311,42 @@ StudyLifeControl.prototype.normalizeCurriculumInMemory = function() {
 StudyLifeControl.prototype.getNormalizedCurriculum = function() {
     this.normalizeCurriculumInMemory();
     return this.data.curriculum;
+};
+
+// --- Filtro de "semestre atual" (itens 7-10) ---
+// Uma matéria só é considerada "semestre atual" se a Grade Curricular não a
+// controla (criada manualmente, fora do plano de estudos) OU se o status dela
+// na Grade Curricular é "cursando". Qualquer matéria controlada pela Grade
+// Curricular com outro status (concluída, reprovada, trancada, não cursada)
+// é tratada como semestre passado e escondida das telas de uso diário —
+// mas os dados continuam existindo (nada é apagado por este filtro).
+StudyLifeControl.prototype.getCurrentSemesterMateriaNames = function() {
+    const curriculum = this.getNormalizedCurriculum();
+    return new Set(curriculum.filter(item => item.status === 'cursando').map(item => this.slugifyName(item.nome)));
+};
+
+StudyLifeControl.prototype.isMateriaSemestrePassado = function(materiaNome) {
+    const key = this.slugifyName(materiaNome || '');
+    if (!key) return false;
+    const curriculum = this.getNormalizedCurriculum();
+    const controlada = curriculum.find(item => this.slugifyName(item.nome) === key);
+    if (!controlada) return false;
+    return controlada.status !== 'cursando';
+};
+
+// Recebe uma lista de itens (tarefas, provas, sessões...) e devolve só os do
+// semestre atual, junto com a contagem do que ficou de fora (para mostrar o
+// aviso "N matérias arquivadas" nas telas).
+StudyLifeControl.prototype.filterSemestreAtual = function(list, materiaField = 'materia') {
+    const items = Array.isArray(list) ? list : [];
+    const atuais = [];
+    const materiasArquivadas = new Set();
+    items.forEach(item => {
+        const nome = item ? item[materiaField] : null;
+        if (this.isMateriaSemestrePassado(nome)) materiasArquivadas.add(this.slugifyName(nome));
+        else atuais.push(item);
+    });
+    return { atuais, arquivadas: materiasArquivadas.size };
 };
 
 
