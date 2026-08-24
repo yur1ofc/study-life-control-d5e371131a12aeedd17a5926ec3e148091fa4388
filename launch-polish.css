@@ -33,6 +33,8 @@ body{background:linear-gradient(180deg,#08111f 0%,#0a1222 100%)}
 .dashboard-hero-top{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap}
 .dashboard-hero-title h3{font-size:1.35rem;margin:0 0 6px}
 .dashboard-hero-title p{color:var(--text-secondary);margin:0}
+.dashboard-hero-next{margin-top:10px!important;padding-top:10px;border-top:1px dashed var(--soft-border);color:var(--accent-primary)!important;font-size:.9rem;font-weight:600}
+.dashboard-hero-next i{margin-right:6px;font-size:.8em}
 .dashboard-goal{min-width:180px;background:rgba(59,130,246,.08);border:1px solid rgba(96,165,250,.22);padding:14px 16px;border-radius:18px}
 .dashboard-goal strong{display:block;font-size:1.5rem}
 .dashboard-progress{margin-top:16px}

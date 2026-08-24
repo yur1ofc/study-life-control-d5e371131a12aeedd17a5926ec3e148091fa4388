@@ -316,6 +316,20 @@ class ScheduleManager {
                 if (window.app) window.app.openAulaModal(aulaId);
             });
         });
+
+        // No celular a grade rola na horizontal (ver CSS) — já abre
+        // posicionada no dia de hoje em vez de sempre começar no Domingo.
+        if (window.innerWidth <= 640) {
+            const wrap = container.querySelector('.wgrid-wrap');
+            const todayCol = container.querySelector('.wgrid-day-col.is-today');
+            const hoursCol = container.querySelector('.wgrid-hours-col');
+            if (wrap && todayCol) {
+                const wrapRect = wrap.getBoundingClientRect();
+                const colRect = todayCol.getBoundingClientRect();
+                const hoursW = hoursCol ? hoursCol.offsetWidth : 0;
+                wrap.scrollLeft = Math.max(0, (colRect.left - wrapRect.left) - hoursW - 6);
+            }
+        }
     }
 
     getProximaAula() {

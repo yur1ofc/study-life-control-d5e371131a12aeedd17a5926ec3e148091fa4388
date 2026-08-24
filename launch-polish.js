@@ -92,6 +92,7 @@
               <div class="dashboard-hero-title">
                 <h3>${current ? `Agora: ${esc(current.materia)}` : next ? `Próxima aula: ${esc(next.materia)}` : 'Seu foco de hoje'}</h3>
                 <p>${current ? `${esc(current.inicio)} - ${esc(current.fim)}${current.sala ? ` • Sala ${esc(current.sala)}` : ''}` : next ? `${fullDays[parseInt(next.dia,10)]||''} • ${esc(next.inicio)} - ${esc(next.fim)}${next.sala ? ` • Sala ${esc(next.sala)}` : ''}` : 'Cadastre aulas, tarefas ou sessões para começar a receber prioridades automáticas.'}</p>
+                ${current && next ? `<p class="dashboard-hero-next"><i class="fas fa-arrow-right"></i> A seguir: ${esc(next.materia)} • ${esc(next.inicio)}${next.sala ? ` • Sala ${esc(next.sala)}` : ''}${parseInt(next.dia,10) !== new Date().getDay() ? ` • ${fullDays[parseInt(next.dia,10)]||''}` : ''}</p>` : ''}
               </div>
               <div class="dashboard-goal">
                 <span>Meta do dia</span>

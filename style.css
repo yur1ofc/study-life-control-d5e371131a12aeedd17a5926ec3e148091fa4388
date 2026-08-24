@@ -2340,9 +2340,7 @@ input:checked + .toggle-slider:before {
     z-index: 5;
 }
 
-/* Telas médias/pequenas: menos colunas visíveis por vez fica ilegível —
-   em vez disso, encolhe fonte e usa dia abreviado, mantendo tudo visível
-   sem rolagem lateral nem vertical. */
+/* Telas médias: ainda cabem 7 colunas iguais, só encolhe um pouco a fonte. */
 @media (max-width: 900px) {
     .wgrid-hours-col { width: 40px; }
     .wgrid-hour-label { font-size: 9px; }
@@ -2352,8 +2350,34 @@ input:checked + .toggle-slider:before {
     .wgrid-event strong { font-size: 9px; }
 }
 
+/* Celular: espremer 7 colunas na largura da tela deixa o texto ilegível
+   (nome da matéria cortado tipo "FÍS..."). Em vez disso, cada dia ganha
+   uma largura mínima que cabe o nome, e a semana toda rola na horizontal
+   — igual Google Calendar. A coluna de horas fica fixa (sticky) enquanto
+   os dias rolam, e o JS já centraliza no dia de hoje ao abrir. */
 @media (max-width: 640px) {
-    .wgrid-event span { display: none; }
+    .wgrid-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scroll-snap-type: x proximity;
+    }
+    .wgrid-hours-col {
+        position: sticky;
+        left: 0;
+        z-index: 4;
+    }
+    .wgrid-days {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(108px, 1fr));
+    }
+    .wgrid-day-col {
+        scroll-snap-align: start;
+    }
+    .wgrid-day-header { font-size: 11.5px; height: 36px; }
+    .wgrid-hour-corner { height: 36px; }
+    .wgrid-event { font-size: 10.5px; padding: 3px 6px; }
+    .wgrid-event strong { font-size: 11px; }
+    .wgrid-event span { font-size: 9.5px; display: block; }
 }
 
 /* Telas grandes / TV: aumenta um pouco a fonte pra ficar legível de longe */
