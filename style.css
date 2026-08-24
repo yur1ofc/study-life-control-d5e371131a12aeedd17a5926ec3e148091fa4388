@@ -2369,6 +2369,7 @@ input:checked + .toggle-slider:before {
     .wgrid-days {
         display: grid;
         grid-template-columns: repeat(7, minmax(108px, 1fr));
+        flex-shrink: 0;
     }
     .wgrid-day-col {
         scroll-snap-align: start;
