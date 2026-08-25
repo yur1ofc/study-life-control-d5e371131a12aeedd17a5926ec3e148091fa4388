@@ -66,48 +66,32 @@ function setupWebPush() {
   return webpush;
 }
 
-// Datas "só dia" (exams.data / tasks.dataLimite) são tratadas como meia-noite
-// UTC — uma simplificação (o app não guarda fuso horário do usuário), então
-// o aviso pode chegar algumas horas mais cedo/tarde dependendo do fuso de
-// quem está usando. Documentado em CALENDARIO-E-LEMBRETES.md.
+// Datas e horários salvos pelo app (exams.data, tasks.dataLimite,
+// sessions.data) não guardam fuso horário — vêm de campos <input
+// type="date"> / type="datetime-local">, que só têm os dígitos da hora
+// LOCAL do navegador de quem preencheu.
+//
+// Até aqui, este arquivo assumia esses valores como UTC (acrescentando
+// "Z"). Isso é um bug real, não só uma imprecisão: pra quem está no
+// Brasil (UTC-3), o servidor interpretava qualquer horário futuro
+// próximo como se já tivesse acontecido ~3h atrás — e como a janela de
+// aviso de sessão é de só 15 min, isso fazia a notificação NUNCA
+// disparar. Corrigido assumindo horário de Brasília (UTC-3) para todo
+// mundo, já que o Brasil não tem mais horário de verão desde 2019 (esse
+// offset é fixo o ano todo). Se algum dia o app passar a atender fora
+// do Brasil, isso precisa virar um fuso por usuário salvo no cadastro.
+const FUSO_BRASIL = '-03:00';
+
 function dateOnlyToMs(yyyyMmDd) {
   if (!yyyyMmDd) return null;
-  const t = Date.parse(`${yyyyMmDd}T00:00:00Z`);
+  const t = Date.parse(`${yyyyMmDd}T00:00:00${FUSO_BRASIL}`);
   return Number.isNaN(t) ? null : t;
 }
 
 function localDateTimeToMs(isoLocal) {
   if (!isoLocal) return null;
-  const t = Date.parse(isoLocal.length === 16 ? `${isoLocal}:00Z` : isoLocal);
+  const t = Date.parse(isoLocal.length === 16 ? `${isoLocal}:00${FUSO_BRASIL}` : isoLocal);
   return Number.isNaN(t) ? null : t;
-}
-
-// Devolve o dia da semana (0=domingo...6=sábado, mesma convenção usada em
-// classSchedule/DIA_MAP no front) e o minuto do dia "agora", já convertidos
-// pro fuso horário do usuário (data.settings.timezone). Necessário porque
-// aulas são recorrentes semanais, sem uma data absoluta salva — diferente
-// de prova/tarefa/sessão/revisão, que têm um campo de data real.
-const WEEKDAY_FROM_SHORT = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-function nowPartsInTimezone(ms, tz) {
-  try {
-    const dtf = new Intl.DateTimeFormat('en-US', {
-      timeZone: tz || 'America/Sao_Paulo',
-      weekday: 'short', year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', hour12: false
-    });
-    const parts = {};
-    dtf.formatToParts(new Date(ms)).forEach(p => { parts[p.type] = p.value; });
-    let hour = Number(parts.hour);
-    if (hour === 24) hour = 0; // Intl às vezes devolve "24" em vez de "00" com hour12:false
-    return {
-      weekday: WEEKDAY_FROM_SHORT[parts.weekday] ?? new Date(ms).getUTCDay(),
-      minutesOfDay: hour * 60 + Number(parts.minute),
-      dateStr: `${parts.year}-${parts.month}-${parts.day}`
-    };
-  } catch (_) {
-    const d = new Date(ms);
-    return { weekday: d.getUTCDay(), minutesOfDay: d.getUTCHours() * 60 + d.getUTCMinutes(), dateStr: d.toISOString().slice(0, 10) };
-  }
 }
 
 // Descobre quais itens de um usuário "vencem" dentro da janela de aviso e
@@ -154,43 +138,6 @@ function findDueReminders(data, now) {
     if (now >= triggerMs && now < sessionMs) {
       due.push({ key, title: '📚 Sessão de estudo já já', body: `${s.materia}${s.topico ? ` — ${s.topico}` : ''}` });
     }
-  });
-
-  // Revisões espaçadas (review-system.js) — mesma lógica de prova/tarefa,
-  // já que r.data é uma data fixa (YYYY-MM-DD), não recorrente.
-  const reviewsHoursBefore = Number(prefs.reviewsHoursBefore ?? 24);
-  (data.reviews || []).forEach(r => {
-    if (r.concluida) return;
-    const key = `review:${r.id}`;
-    if (already.has(key)) return;
-    const reviewMs = dateOnlyToMs(r.data);
-    if (reviewMs == null) return;
-    const triggerMs = reviewMs - reviewsHoursBefore * 3600000;
-    if (now >= triggerMs && now < reviewMs) {
-      due.push({ key, title: '🔁 Revisão chegando', body: `${r.materia}${r.topico ? ` — ${r.topico}` : ''}` });
-    }
-  });
-
-  // Aulas da grade horária — recorrentes semanais, sem data absoluta salva.
-  // Só dispara no próprio dia da aula, dentro da janela de aviso, usando o
-  // fuso horário do usuário (o mesmo já usado no .ics, settings.timezone).
-  const classMinutesBefore = Number(prefs.classMinutesBefore ?? 15);
-  const tz = data?.settings?.timezone || 'America/Sao_Paulo';
-  const nowParts = nowPartsInTimezone(now, tz);
-  (data.classSchedule || []).forEach(a => {
-    if (a.dia === null || a.dia === undefined || !a.inicio) return;
-    if (Number(a.dia) !== nowParts.weekday) return;
-    const [hh, mm] = String(a.inicio).split(':').map(Number);
-    const classMinutes = (hh || 0) * 60 + (mm || 0);
-    const triggerMinutes = classMinutes - classMinutesBefore;
-    if (nowParts.minutesOfDay < triggerMinutes || nowParts.minutesOfDay >= classMinutes) return;
-    // Chave inclui a data do dia (no fuso do usuário) pra não deduplicar
-    // pra sempre — na semana que vem é uma ocorrência nova, precisa avisar
-    // de novo. sentReminders é uma lista limitada (DEDUPE_LIMIT), então
-    // chaves de semanas antigas somem sozinhas com o tempo.
-    const key = `class:${a.id}:${nowParts.dateStr}`;
-    if (already.has(key)) return;
-    due.push({ key, title: '🎓 Aula já já', body: `${a.materia}${a.sala ? ` — ${a.sala}` : ''}` });
   });
 
   return due;
