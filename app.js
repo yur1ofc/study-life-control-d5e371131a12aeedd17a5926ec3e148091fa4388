@@ -713,7 +713,9 @@ class StudyLifeControl {
                 this.data.user.horasMaximas = parseInt(document.getElementById('config-horas')?.value, 10) || 4;
                 this.data.user.tipoRotina = document.getElementById('config-tipo-rotina')?.value || 'so-estuda';
                 this.data.user.tempoDeslocamento = parseInt(document.getElementById('config-deslocamento')?.value, 10) || 20;
-                this.data.user.horarioSono = document.getElementById('config-sono')?.value?.trim() || '';
+                const sonoInicio = document.getElementById('config-sono-inicio')?.value || '';
+                const sonoFim = document.getElementById('config-sono-fim')?.value || '';
+                this.data.user.horarioSono = (sonoInicio && sonoFim) ? `${sonoInicio} - ${sonoFim}` : (sonoInicio || sonoFim || '');
                 await dbService.saveData('user', this.data.user);
                 window.AIAssistant?.prototype && this.aiAssistant?.updateContext?.(this.data);
                 window.showToast?.('Rotina atualizada! O Mentor IA já vai usar os novos dados.', 'success');

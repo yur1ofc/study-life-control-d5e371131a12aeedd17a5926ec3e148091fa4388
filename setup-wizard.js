@@ -37,6 +37,17 @@
 
   function q(sel) { return document.querySelector(sel); }
 
+  // Converte "23:30 - 07:00" (formato salvo) em { inicio, fim } pros dois
+  // campos type="time" do formulário, e o caminho inverso pra salvar.
+  function parseTimeRange(str) {
+    const m = String(str || '').match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
+    return m ? { inicio: m[1], fim: m[2] } : { inicio: '', fim: '' };
+  }
+  function formatTimeRange(inicio, fim) {
+    if (!inicio && !fim) return '';
+    if (inicio && fim) return `${inicio} - ${fim}`;
+    return inicio || fim; // só um dos dois preenchido — salva o que tiver
+
   function injectStyles() {
     if (document.getElementById('wizard-styles')) return;
     const s = document.createElement('style');
@@ -739,7 +750,11 @@ Regras:
     </div>
     <div class="wiz-field">
       <label>Horário de sono (opcional)</label>
-      <input type="text" id="wiz-sono" placeholder="Ex: 00:00 - 07:00">
+      <div class="wiz-time-range">
+        <input type="time" id="wiz-sono-inicio" aria-label="Início do sono">
+        <span class="wiz-time-sep">até</span>
+        <input type="time" id="wiz-sono-fim" aria-label="Fim do sono">
+      </div>
     </div>
   </div>
 </div>`;
@@ -900,7 +915,11 @@ Regras:
       if (wizardState.horas)       { const el = q('#wiz-horas'); if(el) el.value = wizardState.horas; }
       if (wizardState.rotina)      { const el = q('#wiz-rotina'); if(el) el.value = wizardState.rotina; }
       if (wizardState.deslocamento) { const el = q('#wiz-deslocamento'); if(el) el.value = wizardState.deslocamento; }
-      if (wizardState.sono)        { const el = q('#wiz-sono'); if(el) el.value = wizardState.sono; }
+      if (wizardState.sono) {
+        const { inicio, fim } = parseTimeRange(wizardState.sono);
+        const elInicio = q('#wiz-sono-inicio'); if (elInicio) elInicio.value = inicio;
+        const elFim = q('#wiz-sono-fim'); if (elFim) elFim.value = fim;
+      }
       if (wizardState.dias) {
         document.querySelectorAll('#wiz-days-group .wiz-day-btn').forEach(b => {
           b.classList.toggle('active', wizardState.dias.includes(b.dataset.val));
@@ -1261,7 +1280,7 @@ Regras:
       wizardState.horas        = parseInt(q('#wiz-horas')?.value || '4');
       wizardState.rotina       = q('#wiz-rotina')?.value || 'so-estuda';
       wizardState.deslocamento = parseInt(q('#wiz-deslocamento')?.value || '20');
-      wizardState.sono         = q('#wiz-sono')?.value?.trim() || '';
+      wizardState.sono         = formatTimeRange(q('#wiz-sono-inicio')?.value || '', q('#wiz-sono-fim')?.value || '');
       wizardState.dias         = Array.from(document.querySelectorAll('#wiz-days-group .wiz-day-btn.active'))
                                       .map(b => b.dataset.val);
     }

@@ -4880,6 +4880,21 @@ body.sidebar-open .mobile-nav-overlay {
 .wiz-field select:focus {
     border-color: var(--accent-primary);
 }
+.wiz-time-range {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.wiz-time-range input[type="time"] {
+    width: auto;
+    flex: 1;
+    min-width: 0;
+}
+.wiz-time-sep {
+    font-size: .82rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
 
 
 

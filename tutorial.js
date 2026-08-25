@@ -160,6 +160,7 @@
       document.querySelectorAll('.tutorial-target-active').forEach(node => node.classList.remove('tutorial-target-active'));
       window.removeEventListener('resize', this.handleViewportChange);
       window.removeEventListener('scroll', this.handleViewportChange, true);
+      if (document.body.classList.contains('sidebar-open')) window.SLCSidebar?.close();
       if (markDone) this.markCompleted();
     },
 
@@ -331,8 +332,34 @@
         return;
       }
 
+      // No celular a sidebar é uma gaveta escondida fora da tela (transform)
+      // até o usuário abrir com o ☰. Se o alvo do passo está dentro dela e a
+      // gaveta está fechada, precisamos abri-la primeiro — chamar
+      // scrollIntoView num elemento fora da tela (mesmo que "visível" pro
+      // DOM) é o que fazia a página inteira ser arrastada pra baixo sem
+      // necessidade, já que o navegador tenta trazer pra viewport um
+      // elemento fixed que só está invisível por causa do transform.
+      const isMobileDrawer = window.innerWidth <= 980;
+      const insideSidebar = !!target.closest('.sidebar');
+      if (insideSidebar && isMobileDrawer) {
+        if (window.SLCSidebar && !document.body.classList.contains('sidebar-open')) {
+          window.SLCSidebar.open();
+          await wait(300); // espera a transição de 0.25s da gaveta terminar
+        }
+      } else if (document.body.classList.contains('sidebar-open')) {
+        // Saindo de um passo da sidebar pra um passo fora dela: fecha a
+        // gaveta pra não ficar sobrepondo o resto da tela.
+        window.SLCSidebar?.close();
+        await wait(260);
+      }
+
       target.classList.add('tutorial-target-active');
-      target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      if (!insideSidebar) {
+        // Itens da sidebar já ficam com posição garantida (fixed / dentro da
+        // gaveta que acabamos de abrir) — não precisam de scroll, e tentar
+        // rolar até eles é o que causava o bug do "arrasta a tela toda".
+        target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      }
       await wait(280);
 
       this.updateSpotlight(target);

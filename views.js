@@ -1,5 +1,12 @@
 // views.js - Renderizador de visualizações COMPLETO, CORRIGIDO E COMPATÍVEL
 
+// Converte "23:30 - 07:00" (formato salvo em user.horarioSono) em
+// { inicio, fim } pros dois campos type="time" da tela de Configurações.
+function parseTimeRange(str) {
+    const m = String(str || '').match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
+    return m ? { inicio: m[1], fim: m[2] } : { inicio: '', fim: '' };
+}
+
 class ViewRenderer {
     constructor(app) {
         this.app = app;
@@ -1390,7 +1397,11 @@ class ViewRenderer {
                         <input type="number" id="config-deslocamento" min="0" max="240" value="${parseInt(user.tempoDeslocamento) || 20}">
                     </div>
                     <div class="wiz-field" style="flex:1;min-width:140px;"><label>Horário de sono (opcional)</label>
-                        <input type="text" id="config-sono" value="${this.esc(user.horarioSono || '')}" placeholder="Ex: 00:00 - 07:00">
+                        <div class="wiz-time-range">
+                            <input type="time" id="config-sono-inicio" value="${this.esc(parseTimeRange(user.horarioSono).inicio)}" aria-label="Início do sono">
+                            <span class="wiz-time-sep">até</span>
+                            <input type="time" id="config-sono-fim" value="${this.esc(parseTimeRange(user.horarioSono).fim)}" aria-label="Fim do sono">
+                        </div>
                     </div>
                 </div>
                 <button class="btn-primary" id="btn-salvar-rotina" style="margin-top:4px;">
