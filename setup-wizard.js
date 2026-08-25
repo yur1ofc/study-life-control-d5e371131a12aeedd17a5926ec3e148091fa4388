@@ -557,9 +557,10 @@ Regras:
   </div>
 
   <div class="wiz-row">
-    <div class="wiz-field">
+    <div class="wiz-field wiz-autocomplete-wrap">
       <label>Universidade</label>
-      <input type="text" id="wiz-universidade" placeholder="Ex: UFOB, USP, UFMG...">
+      <input type="text" id="wiz-universidade" placeholder="Digite para buscar: UFOB, USP, UFMG..." autocomplete="off">
+      <div class="wiz-autocomplete-list" id="wiz-universidade-list" role="listbox"></div>
     </div>
     <div class="wiz-field">
       <label>Curso</label>
@@ -944,6 +945,93 @@ Regras:
   }
 
   /* ─── Eventos de cada etapa ──────────────────────────────── */
+  /* ─── Autocomplete de universidade ───────────────────────── */
+  function setupUniversidadeAutocomplete() {
+    const input = q('#wiz-universidade');
+    const list  = q('#wiz-universidade-list');
+    if (!input || !list || !window.SLC_Universidades) return;
+
+    let items = [];
+    let activeIndex = -1;
+
+    function fechar() {
+      list.innerHTML = '';
+      list.classList.remove('open');
+      items = [];
+      activeIndex = -1;
+    }
+
+    function render(termo) {
+      items = window.SLC_Universidades.buscarInstituicoes(termo, 8);
+      if (!items.length) { fechar(); return; }
+
+      list.innerHTML = items.map((it, i) => `
+        <div class="wiz-ac-item" data-idx="${i}" role="option">
+          <span class="wiz-ac-nome">${escapeHtml(it.nome)}</span>
+          <span class="wiz-ac-meta">${escapeHtml(it.sigla || '')}${it.sigla ? ' · ' : ''}${escapeHtml(it.uf || '')}</span>
+        </div>
+      `).join('');
+      list.classList.add('open');
+      activeIndex = -1;
+
+      list.querySelectorAll('.wiz-ac-item').forEach(el => {
+        el.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          escolher(parseInt(el.dataset.idx, 10));
+        });
+      });
+    }
+
+    function escolher(idx) {
+      const item = items[idx];
+      if (!item) return;
+      input.value = item.nome;
+      wizardState.universidade = item.nome;
+      fechar();
+    }
+
+    function escapeHtml(s) {
+      return (s || '').replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]));
+    }
+
+    let debounceT;
+    input.addEventListener('input', () => {
+      clearTimeout(debounceT);
+      const val = input.value;
+      debounceT = setTimeout(() => render(val), 120);
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (!items.length) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        activeIndex = Math.min(activeIndex + 1, items.length - 1);
+        updateActive();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        activeIndex = Math.max(activeIndex - 1, 0);
+        updateActive();
+      } else if (e.key === 'Enter') {
+        if (activeIndex >= 0) { e.preventDefault(); escolher(activeIndex); }
+      } else if (e.key === 'Escape') {
+        fechar();
+      }
+    });
+
+    function updateActive() {
+      list.querySelectorAll('.wiz-ac-item').forEach((el, i) => {
+        el.classList.toggle('active', i === activeIndex);
+      });
+      const activeEl = list.querySelector('.wiz-ac-item.active');
+      if (activeEl) activeEl.scrollIntoView({ block: 'nearest' });
+    }
+
+    input.addEventListener('blur', () => setTimeout(fechar, 100));
+    input.addEventListener('focus', () => { if (input.value.trim().length >= 2) render(input.value); });
+  }
+
   function attachEvents(step) {
     // Radio cards genérico
     document.querySelectorAll('.wiz-radio-group').forEach(group => {
@@ -967,6 +1055,9 @@ Regras:
     document.querySelectorAll('#wiz-days-group .wiz-day-btn').forEach(btn => {
       btn.addEventListener('click', () => btn.classList.toggle('active'));
     });
+
+    // Autocomplete de universidade (passo 1)
+    if (step === 1) setupUniversidadeAutocomplete();
 
     // Navegação
     q('#wiz-btn-next')?.addEventListener('click', () => goNext());
