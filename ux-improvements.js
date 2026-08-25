@@ -27,6 +27,18 @@
     if (!shouldShow && menu) menu.hidden = true;
   }
 
+  function syncFeedbackVisibility() {
+    const btn = document.getElementById('slc-feedback-btn');
+    if (!btn) {
+      if (isDashboardVisible()) window.SLCFeedback?.injectFeedbackButton();
+      return;
+    }
+    const shouldShow = isDashboardVisible();
+    btn.style.display = shouldShow ? 'flex' : 'none';
+    if (shouldShow) setTimeout(() => window.SLCFeedback?.talvezMostrarNudge(), 4000);
+    else document.getElementById('slc-feedback-nudge')?.remove();
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // 1. CONFIRMAÇÃO DE DELETE BONITA (substitui window.confirm feio)
   // ═══════════════════════════════════════════════════════════════
@@ -465,7 +477,6 @@
       { icon: 'fa-tasks',        label: 'Tarefa',  action: () => goTo('tarefas'),  color: 'var(--accent-warning)' },
       { icon: 'fa-graduation-cap', label: 'Prova', action: () => goTo('provas'),   color: '#ef4444' },
       { icon: 'fa-calendar-week', label: 'Aula',   action: () => goTo('grade-horaria'), color: 'var(--accent-primary)' },
-      { icon: 'fa-comment-dots', label: 'Feedback', action: () => window.openFeedbackModal?.(), color: '#4f46e5' },
     ];
 
     items.forEach(item => {
@@ -627,6 +638,8 @@
         .main-content { padding-bottom: 72px !important; }
         #slc-quick-add-btn { bottom: 90px !important; }
         #slc-quick-menu { bottom: 154px !important; }
+        #slc-feedback-btn { bottom: 90px !important; }
+        #slc-feedback-nudge { bottom: 140px !important; }
       }
     `;
     document.head.appendChild(style);
@@ -667,6 +680,7 @@
       // injectMeuDiaNav();
       injectQuickAdd();
       enableOfflinePersistence();
+      window.SLCFeedback?.injectFeedbackButton();
 
       // Briefing: injeta no dashboard quando carregado
       const origLoadView = app._origLoadViewForBriefing || app.loadView;
@@ -710,6 +724,7 @@
       tryInit();
       onDashboardReady();
       syncQuickAddVisibility();
+      syncFeedbackVisibility();
       if ((window.app && window.ViewRenderer && window.StudyLifeControl) || ++attempts > 20) {
         clearInterval(interval);
       }
@@ -718,12 +733,12 @@
     // Observa as 3 telas e liga/desliga o botão + junto com elas
     ['login-screen', 'setup-screen', 'main-dashboard'].forEach(id => {
       const node = document.getElementById(id);
-      if (node) new MutationObserver(syncQuickAddVisibility).observe(node, { attributes: true, attributeFilter: ['style', 'class'] });
+      if (node) new MutationObserver(() => { syncQuickAddVisibility(); syncFeedbackVisibility(); }).observe(node, { attributes: true, attributeFilter: ['style', 'class'] });
     });
   });
 
   // Reexecuta quando app emite eventos
-  document.addEventListener('app-ready', () => { tryInit(); onDashboardReady(); syncQuickAddVisibility(); });
+  document.addEventListener('app-ready', () => { tryInit(); onDashboardReady(); syncQuickAddVisibility(); syncFeedbackVisibility(); });
   document.addEventListener('view-loaded', () => {
     if (window.app?.currentView === 'dashboard') setTimeout(injectBriefingCard, 200);
     if (window.innerWidth <= 768 && !document.getElementById('slc-bottom-nav')) injectBottomNav();
