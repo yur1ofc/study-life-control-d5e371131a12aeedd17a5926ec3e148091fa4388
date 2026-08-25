@@ -47,6 +47,7 @@
     if (!inicio && !fim) return '';
     if (inicio && fim) return `${inicio} - ${fim}`;
     return inicio || fim; // só um dos dois preenchido — salva o que tiver
+  }
 
   function injectStyles() {
     if (document.getElementById('wizard-styles')) return;
