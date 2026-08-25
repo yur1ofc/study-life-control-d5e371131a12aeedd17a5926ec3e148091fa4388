@@ -20,7 +20,7 @@
 // 503 ("model is overloaded"/"high demand"). Antes disso derrubava a importação
 // direto — agora, se o primeiro modelo estiver sobrecarregado, tentamos o próximo
 // da lista antes de desistir e mostrar erro pro usuário.
-const GEMINI_MODELS = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+const GEMINI_MODELS = ['gemini-flash-latest', 'gemini-3.6-flash', 'gemini-2.5-flash'];
 const DAILY_LIMIT = 8; // importações de grade por usuário por dia
 
 function isOverloadError(status, data) {
