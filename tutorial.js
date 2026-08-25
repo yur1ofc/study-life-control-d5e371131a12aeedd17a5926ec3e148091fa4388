@@ -75,7 +75,7 @@
   }
 
   function renderHelpPage() {
-    const suggestions = ['o que estudar hoje?', 'quais matérias estão em risco?', 'organiza meu dia agora', 'como estou em física?', 'o que está atrasado?', 'me dá um raio-x completo'];
+    const suggestions = ['o que estudar hoje?', 'quais matérias estão em risco?', 'organiza meu dia agora', 'como estou em física?', 'o que está atrasado?', 'me dá um raio-x completo', 'qual minha rotina?'];
     return `
       <div class="view-header">
         <h2><i class="fas fa-question-circle"></i> Central de Ajuda</h2>
@@ -128,7 +128,12 @@
     reset() { localStorage.removeItem('slc_tutorial_completed'); },
 
     maybeStart() {
-      if (this.running || this.hasCompleted() || !window.app || !document.getElementById('app-screen') || document.getElementById('app-screen').classList.contains('hidden')) return;
+      // Bug antigo: procurava #app-screen, um id que nunca existiu no HTML
+      // (a tela principal é #main-dashboard) — por isso o tutorial nunca
+      // disparava sozinho depois do onboarding. Corrigido para checar o id certo.
+      const mainScreen = document.getElementById('main-dashboard');
+      const visible = mainScreen && mainScreen.style.display !== 'none' && !mainScreen.classList.contains('hidden');
+      if (this.running || this.hasCompleted() || !window.app || !visible) return;
       if (this.pendingAutostart) return;
       this.pendingAutostart = true;
       setTimeout(() => {
@@ -374,5 +379,13 @@
   document.addEventListener('DOMContentLoaded', () => {
     assignTutorialTargets();
     setTimeout(() => SiteTutorial.maybeStart(), 1200);
+  });
+
+  // Principal gatilho: dispara logo que o app termina de montar a tela
+  // principal — seja porque o usuário acabou de concluir o wizard de
+  // configuração ("Iniciar Jornada"), seja num login normal de quem ainda
+  // não viu o tutorial. app.js dispara 'app-ready' em ambos os casos.
+  document.addEventListener('app-ready', () => {
+    setTimeout(() => SiteTutorial.maybeStart(), 500);
   });
 })();

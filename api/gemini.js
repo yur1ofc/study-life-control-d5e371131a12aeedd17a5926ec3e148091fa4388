@@ -15,8 +15,53 @@
 // Também é preciso liberar a coleção "ai_usage" no firestore.rules — veja o
 // bloco novo em firestore.rules incluído nesta atualização.
 
-const GEMINI_MODEL = 'gemini-flash-latest';
+// Lista de modelos tentados em ordem. "gemini-flash-latest" é o mais rápido/barato,
+// mas de vez em quando fica sobrecarregado nos horários de pico do Google e devolve
+// 503 ("model is overloaded"/"high demand"). Antes disso derrubava a importação
+// direto — agora, se o primeiro modelo estiver sobrecarregado, tentamos o próximo
+// da lista antes de desistir e mostrar erro pro usuário.
+const GEMINI_MODELS = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'];
 const DAILY_LIMIT = 8; // importações de grade por usuário por dia
+
+function isOverloadError(status, data) {
+  if (status === 503) return true;
+  const msg = (data?.error?.message || '').toLowerCase();
+  return msg.includes('overload') || msg.includes('high demand') || msg.includes('unavailable');
+}
+
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+async function callGeminiWithFallback(geminiKey, contents) {
+  let lastError = null;
+  for (let i = 0; i < GEMINI_MODELS.length; i += 1) {
+    const model = GEMINI_MODELS[i];
+    // Uma pequena espera + nova tentativa no MESMO modelo antes de trocar de
+    // modelo — picos de demanda costumam durar poucos segundos.
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
+      const geminiRes = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents,
+          generationConfig: { temperature: 0.1, responseMimeType: 'application/json' }
+        })
+      });
+      const data = await geminiRes.json().catch(() => ({}));
+
+      if (geminiRes.ok) return { ok: true, data, modelUsed: model };
+
+      lastError = { status: geminiRes.status, data };
+      if (isOverloadError(geminiRes.status, data)) {
+        if (attempt === 0) { await sleep(900); continue; } // tenta de novo no mesmo modelo
+        break; // desiste desse modelo, tenta o próximo da lista
+      }
+      // Erro que não é de sobrecarga (ex: chave inválida, request malformado) — não adianta trocar de modelo
+      return { ok: false, status: geminiRes.status, data };
+    }
+  }
+  return { ok: false, status: lastError?.status || 503, data: lastError?.data || {} };
+}
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
@@ -118,25 +163,17 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ error: 'Requisição inválida: falta "contents".' });
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`;
+    const result = await callGeminiWithFallback(geminiKey, body.contents);
 
-    const geminiRes = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: body.contents,
-        generationConfig: { temperature: 0.1, responseMimeType: 'application/json' }
-      })
-    });
-
-    const data = await geminiRes.json();
-
-    if (!geminiRes.ok) {
-      const msg = data?.error?.message || `Erro HTTP ${geminiRes.status} do Gemini`;
-      return res.status(geminiRes.status).json({ error: msg });
+    if (!result.ok) {
+      const overloaded = isOverloadError(result.status, result.data);
+      const msg = overloaded
+        ? 'A IA está sobrecarregada no momento (todos os modelos tentados falharam). Isso costuma ser temporário — tente novamente em alguns segundos.'
+        : (result.data?.error?.message || `Erro HTTP ${result.status} do Gemini`);
+      return res.status(result.status || 503).json({ error: msg });
     }
 
-    return res.status(200).json(data);
+    return res.status(200).json(result.data);
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Erro interno no proxy do Gemini' });
   }

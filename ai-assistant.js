@@ -341,9 +341,20 @@
         return 'Cadastre mais dados para eu montar um plano de hoje mais certeiro.';
       }
 
-      const horasMaximas = Math.max(2, Math.min(6, Number(this.context.user?.horasMaximas) || 4));
+      const user = this.context.user || {};
+      const horasMaximas = Math.max(2, Math.min(6, Number(user.horasMaximas) || 4));
+      const deslocamento = Math.max(0, Number(user.tempoDeslocamento) || 0);
+      // O tempo de deslocamento cadastrado na rotina consome parte das horas
+      // disponíveis do dia — sem isso o plano prometia mais estudo do que a
+      // pessoa realmente teria tempo de fazer.
+      let minutosDisponiveis = Math.max(25, (horasMaximas * 60) - deslocamento);
+
+      const diasMap = { 0: 'dom', 1: 'seg', 2: 'ter', 3: 'qua', 4: 'qui', 5: 'sex', 6: 'sab' };
+      const diaHoje = diasMap[new Date().getDay()];
+      const diasPreferidos = Array.isArray(user.diasPreferidos) && user.diasPreferidos.length ? user.diasPreferidos : null;
+      const foraDaRotina = diasPreferidos && !diasPreferidos.includes(diaHoje);
+
       const blocos = [];
-      let minutosDisponiveis = horasMaximas * 60;
 
       prioridades.slice(0, 4).forEach((item, index) => {
         if (minutosDisponiveis < 25) return;
@@ -361,12 +372,20 @@
       this.lastPlans = blocos;
       this.lastReasoningSnapshot = prioridades.map(item => `${item.nome}: ${item.justificativaCurta}`).join(' | ');
 
+      const cabecalho = ['Plano de estudo para hoje:'];
+      if (foraDaRotina) {
+        cabecalho.push(`(Hoje não é um dos dias que você marcou como rotina de estudo na sua Rotina — se puder, deixe algo mais leve.)`);
+      }
+
       return [
-        'Plano de estudo para hoje:',
+        ...cabecalho,
         ...blocos.map((bloco, index) =>
           `- ${bloco.materia} — ${this._labelForStudyType(bloco.tipo)} (${bloco.duracao} min). Motivo: ${bloco.motivo}.`
         ),
         '',
+        deslocamento > 0
+          ? `Considerei ${deslocamento} min de deslocamento (da sua Rotina) e ${horasMaximas}h de disponibilidade máxima por dia.`
+          : `Considerei ${horasMaximas}h de disponibilidade máxima por dia (configurado na sua Rotina).`,
         'Ordem sugerida: comece pela maior urgência, faça uma pausa curta entre blocos e termine revisando erros/anotações.'
       ].join('\n');
     }
@@ -1088,6 +1107,26 @@ ${report.monthly}`;
     return `Gamificação: nível ${level}, ${xp} XP total, streak de ${streak} dia(s) e ${unlocked} conquista(s) desbloqueada(s).`;
   };
 
+  proto._getRotinaSummary = function () {
+    const user = this.context.user || {};
+    if (!user.turnoPrincipal && !user.diasPreferidos) {
+      return 'Você ainda não preencheu sua rotina (turno, dias de estudo, horas por dia). Pode ajustar em Configurações → Perfil → Sua rotina — isso melhora bastante minhas sugestões de horário.';
+    }
+    const turnoLabel = { manha: 'manhã', tarde: 'tarde', noite: 'noite', madrugada: 'madrugada' }[user.turnoPrincipal] || user.turnoPrincipal || 'não definido';
+    const diasLabel = { seg: 'seg', ter: 'ter', qua: 'qua', qui: 'qui', sex: 'sex', sab: 'sáb', dom: 'dom' };
+    const dias = Array.isArray(user.diasPreferidos) && user.diasPreferidos.length
+      ? user.diasPreferidos.map(d => diasLabel[d] || d).join(', ')
+      : 'seg a sex (padrão)';
+    const rotinaLabel = { 'so-estuda': 'só estudo', 'estuda-trabalha': 'estudo + trabalho', 'estuda-estagio': 'estudo + estágio', 'rotina-pesada': 'rotina muito pesada' }[user.tipoRotina] || 'não definida';
+    const partes = [
+      `Sua rotina: estuda melhor à ${turnoLabel}, nos dias ${dias}, até ${Number(user.horasMaximas) || 4}h por dia.`,
+      `Tipo de rotina: ${rotinaLabel}.`
+    ];
+    if (Number(user.tempoDeslocamento) > 0) partes.push(`Deslocamento: ${Number(user.tempoDeslocamento)} min — já desconto isso do tempo de estudo disponível quando monto seu plano.`);
+    if (user.horarioSono) partes.push(`Sono: ${user.horarioSono}.`);
+    return partes.join(' ');
+  };
+
   proto._getSiteSnapshot = function () {
     const subjects = this.context.subjects || [];
     const sessions = (this.context.sessions || []).filter(s => s?.concluida || s?.status === 'concluida');
@@ -1102,6 +1141,7 @@ ${report.monthly}`;
     const extraCourses = (this.context.extraCourses || []).length;
     return [
       `Resumo geral do seu site: ${subjects.length} matéria(s), ${fmtHours(totalHours)} estudadas, ${pendingTasks} tarefa(s) pendente(s), ${overdueTasks} atrasada(s), ${exams.length} prova(s)/trabalho(s) nos próximos 30 dias, ${reviews.length} revisão(ões) pendente(s), ${materials} material(is), ${grades} nota(s), ${curriculum} item(ns) de currículo e ${extraCourses} curso(s) extra(s).`,
+      this._getRotinaSummary(),
       this._getGamificationSummary()
     ].join(' ');
   };
@@ -1109,6 +1149,7 @@ ${report.monthly}`;
   proto._getWhatIsMissing = function () {
     const missing = [];
     if (!(this.context.subjects || []).length) missing.push('matérias');
+    if (!this.context.user?.turnoPrincipal) missing.push('rotina (turno, dias e horas de estudo)');
     if (!(this.context.classSchedule || []).length) missing.push('grade horária');
     if (!(this.context.sessions || []).some(s => s?.concluida || s?.status === 'concluida')) missing.push('sessões de estudo concluídas');
     if (!(this.context.tasks || []).length) missing.push('tarefas');
@@ -1134,6 +1175,7 @@ ${report.monthly}`;
       '- notas, média, presença e faltas',
       '- próxima aula, grade horária e diário de aula',
       '- materiais, currículo/fluxograma e cursos extras',
+      '- sua rotina (turno, dias, horas por dia, deslocamento) para dar horários realistas',
       '- metas, relatórios, gamificação e visão geral do perfil',
       '',
       'Perguntas que chamam atenção e funcionam bem:',
@@ -1185,6 +1227,10 @@ ${report.monthly}`;
 
     if (p.includes('raio x') || p.includes('raiox') || p.includes('resumo geral') || p.includes('visao geral') || p.includes('visão geral') || p.includes('me da um resumo') || p.includes('me da um raio x') || p.includes('resuma meu site')) {
       return this._getSiteSnapshot();
+    }
+
+    if (p.includes('minha rotina') || p.includes('meu turno') || p.includes('quando eu estudo') || p.includes('quando estudo melhor') || (p.includes('quantas horas') && p.includes('dia'))) {
+      return this._getRotinaSummary();
     }
 
     if (p.includes('o que falta cadastrar') || p.includes('faltando cadastrar') || p.includes('o que ta faltando') || p.includes('oque ta faltando')) {
@@ -1294,7 +1340,8 @@ ${report.monthly}`;
     if (p.includes('me conhece') || p.includes('o que voce sabe de mim') || p.includes('o que vc sabe de mim')) {
       const user = this.context.user || {};
       return [
-        `Eu sei o que está no teu site: nome ${user.nome || 'não cadastrado'}, curso ${user.curso || 'não cadastrado'}, universidade ${user.universidade || 'não cadastrada'}, semestre ${user.semestre || 'não cadastrado'}, turno principal ${user.turnoPrincipal || 'não definido'}.`,
+        `Eu sei o que está no teu site: nome ${user.nome || 'não cadastrado'}, curso ${user.curso || 'não cadastrado'}, universidade ${user.universidade || 'não cadastrada'}, semestre ${user.semestre || 'não cadastrado'}.`,
+        this._getRotinaSummary(),
         this._getSiteSnapshot()
       ].join(' ');
     }

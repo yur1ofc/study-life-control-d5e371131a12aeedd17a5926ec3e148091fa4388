@@ -566,139 +566,30 @@ Regras:
   }
 
   function renderStep2() {
-    const faculdade = q('#wiz-universidade')?.value?.trim() || '';
-    const curso = q('#wiz-curso')?.value?.trim() || '';
-    const prompt = buildAIPrompt(faculdade, curso);
     const hasCurriculum = wizardState.importedCurriculum.length > 0;
 
     return `
 <div class="wiz-card" id="wiz-step-2">
   <div class="wiz-card-title">📚 Grade Curricular</div>
+  <div class="wiz-card-sub">Importe todas as disciplinas do seu curso de uma vez, direto do PDF ou de uma foto do fluxograma.</div>
 
   <button id="wiz-auto-ia-import" type="button" style="
     width:100%;display:flex;align-items:center;justify-content:center;gap:10px;
-    padding:14px 16px;border-radius:var(--radius-md);border:none;
+    padding:16px;border-radius:var(--radius-md);border:none;
     background:linear-gradient(135deg,#1a73e8,#4f46e5);color:#fff;cursor:pointer;
-    font-size:13.5px;font-weight:600;font-family:inherit;margin-bottom:10px;
+    font-size:14.5px;font-weight:600;font-family:inherit;margin:16px 0 8px;
     box-shadow:0 4px 14px rgba(79,70,229,.28);
   ">
     <i class="fas fa-wand-magic-sparkles"></i> Importar PDF ou foto com IA (automático, grátis)
   </button>
-  <p style="text-align:center;font-size:11px;color:var(--text-tertiary);margin:0 0 16px;">A IA lê o arquivo e preenche a grade sozinha — sem precisar colar em outro site</p>
-
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
-    <div style="flex:1;height:1px;background:var(--border);"></div>
-    <span style="font-size:11px;color:var(--text-tertiary);">ou use um método manual abaixo</span>
-    <div style="flex:1;height:1px;background:var(--border);"></div>
-  </div>
-  <div class="wiz-card-sub">Importe todas as disciplinas do seu curso de uma vez. Você pode pular e fazer depois.</div>
-
-  <div class="wiz-import-tabs">
-    <button class="wiz-tab active" data-tab="ia">📋 Prompt manual (ChatGPT/Claude)</button>
-    <button class="wiz-tab" data-tab="texto">📋 Colar Texto</button>
-    <button class="wiz-tab" data-tab="manual">✏️ Manual</button>
-  </div>
-
-  <!-- Tab: IA (PDF/Foto) -->
-  <div class="wiz-tab-panel active" id="wiz-tab-ia">
-    <div class="wiz-ai-box">
-      <h4>🤖 Alternativa: use ChatGPT ou Claude você mesmo</h4>
-      <p>Se preferir não usar o botão automático acima, dá pra fazer manualmente com uma IA gratuita em 3 passos simples:</p>
-      <div class="wiz-ai-steps">
-        <div class="wiz-ai-step">
-          <div class="wiz-ai-step-num">1</div>
-          <div class="wiz-ai-step-text">
-            <strong>Copie o prompt abaixo</strong> — ele instrui a IA a gerar o JSON no formato certo
-          </div>
-        </div>
-        <div class="wiz-ai-step">
-          <div class="wiz-ai-step-num">2</div>
-          <div class="wiz-ai-step-text">
-            <strong>Abra o ChatGPT ou Claude</strong>, cole o prompt e <strong>anexe o PDF ou a foto</strong> da grade curricular da sua faculdade
-          </div>
-        </div>
-        <div class="wiz-ai-step">
-          <div class="wiz-ai-step-num">3</div>
-          <div class="wiz-ai-step-text">
-            <strong>Copie o JSON</strong> que a IA gerou e cole no campo abaixo
-          </div>
-        </div>
-      </div>
-
-      <button class="wiz-copy-prompt-btn" id="wiz-copy-prompt-btn">
-        <i class="fas fa-copy"></i> Copiar Prompt
-      </button>
-
-      <span class="wiz-prompt-toggle" id="wiz-prompt-toggle">▼ Ver prompt completo</span>
-      <pre class="wiz-prompt-preview" id="wiz-prompt-preview">${esc(prompt)}</pre>
-
-      <div class="wiz-open-ai-btns">
-        <a class="wiz-open-ai-btn" href="https://chat.openai.com" target="_blank" rel="noopener">
-          <i class="fas fa-external-link-alt"></i> Abrir ChatGPT
-        </a>
-        <a class="wiz-open-ai-btn" href="https://claude.ai" target="_blank" rel="noopener">
-          <i class="fas fa-external-link-alt"></i> Abrir Claude
-        </a>
-      </div>
-    </div>
-
-    <label style="display:block;font-size:.88rem;font-weight:600;color:var(--text-secondary);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em;">
-      Cole o JSON aqui
-    </label>
-    <textarea class="wiz-json-area" id="wiz-json-input" placeholder='{"faculdade":"...","disciplinas":[...]}'></textarea>
-    <div style="display:flex;gap:8px;align-items:center;">
-      <button class="wiz-import-json-btn" id="wiz-import-json-btn">
-        <i class="fas fa-file-import"></i> Importar Grade
-      </button>
-      <span class="wiz-feedback" id="wiz-json-feedback"></span>
-    </div>
-  </div>
-
-  <!-- Tab: Texto -->
-  <div class="wiz-tab-panel" id="wiz-tab-texto">
-    <div class="wiz-ai-box">
-      <h4>📋 Cole o texto do site da faculdade</h4>
-      <p>Abra o site da sua faculdade, copie o texto da página de grade curricular (Ctrl+A → Ctrl+C) e cole aqui. A IA irá extrair as disciplinas.</p>
-      <div class="wiz-ai-steps">
-        <div class="wiz-ai-step">
-          <div class="wiz-ai-step-num">1</div>
-          <div class="wiz-ai-step-text"><strong>Acesse a página da grade</strong> no site da sua faculdade</div>
-        </div>
-        <div class="wiz-ai-step">
-          <div class="wiz-ai-step-num">2</div>
-          <div class="wiz-ai-step-text"><strong>Selecione tudo (Ctrl+A)</strong> e copie (Ctrl+C)</div>
-        </div>
-        <div class="wiz-ai-step">
-          <div class="wiz-ai-step-num">3</div>
-          <div class="wiz-ai-step-text"><strong>Cole abaixo</strong> — o sistema vai tentar identificar as disciplinas automaticamente</div>
-        </div>
-      </div>
-    </div>
-    <label style="display:block;font-size:.88rem;font-weight:600;color:var(--text-secondary);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em;">
-      Texto copiado do site
-    </label>
-    <textarea class="wiz-json-area" id="wiz-text-input" placeholder="Cole aqui o texto do site da faculdade..." style="min-height:160px;font-family:inherit;font-size:.88rem;"></textarea>
-    <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
-      <button class="wiz-import-json-btn" id="wiz-import-text-btn" style="background:var(--accent-secondary);">
-        <i class="fas fa-magic"></i> Extrair Disciplinas do Texto
-      </button>
-    </div>
-    <span class="wiz-feedback" id="wiz-text-feedback" style="display:none;margin-top:8px;"></span>
-  </div>
-
-  <!-- Tab: Manual -->
-  <div class="wiz-tab-panel" id="wiz-tab-manual">
-    <p style="font-size:.9rem;color:var(--text-secondary);margin-bottom:16px;">
-      Adicione as disciplinas uma a uma. Você pode completar ou editar a lista depois em <strong>Grade Curricular</strong>.
-    </p>
-    <div id="wiz-manual-items"></div>
-    <button class="wiz-add-subject-btn" id="wiz-add-manual-btn">
-      <i class="fas fa-plus"></i> Adicionar Disciplina
-    </button>
-  </div>
+  <p style="text-align:center;font-size:11.5px;color:var(--text-tertiary);margin:0 0 20px;">A IA lê o arquivo e preenche a grade sozinha, em segundos — não precisa digitar nada</p>
 
   <!-- Preview do que foi importado -->
   ${hasCurriculum ? renderCurriculumPreview() : '<div id="wiz-curr-preview-slot"></div>'}
+
+  <p style="text-align:center;font-size:11.5px;color:var(--text-tertiary);margin:18px 0 0;">
+    Não tem o PDF em mãos agora? Sem problema — clique em <strong>Pular esta etapa</strong> abaixo e importe depois em <strong>Grade Curricular</strong>.
+  </p>
 </div>`;
   }
 
@@ -727,7 +618,7 @@ Regras:
   // app.pendingSetupImportedCurriculum, que o módulo já preenche sozinho.
   let _autoImportPoll = null;
 
-  function openAutoGradeImport() {
+  function openAutoGradeImport(forCurrentSubjects) {
     if (!window.GradeIAImport || typeof window.GradeIAImport.openModal !== 'function') {
       if (window.showToast) window.showToast('Importação automática indisponível agora. Use uma das opções manuais abaixo.', 'error');
       return;
@@ -764,9 +655,28 @@ Regras:
         const existingNames = new Set(wizardState.importedCurriculum.map(d => (d.nome || '').toLowerCase().trim()));
         const novos = pending.filter(d => !existingNames.has((d.nome || '').toLowerCase().trim()));
         wizardState.importedCurriculum = [...wizardState.importedCurriculum, ...novos];
+        wizardState.touched = wizardState.touched || {};
+        wizardState.touched[2] = true;
 
-        saveDraft();
-        if (wizardState.step === 2) renderWizard();
+        if (forCurrentSubjects) {
+          // Chamado da etapa 4 ("cadastrar matérias por print/PDF"): filtra pelo
+          // semestre atual e injeta direto na lista de matérias do semestre,
+          // sem esperar a pessoa voltar pra etapa 2.
+          const semestre = wizardState.semestre || q('#wiz-semestre')?.value || '';
+          const existingSubjNames = new Set((wizardState.subjects || []).map(s => (s.nome || '').toLowerCase().trim()));
+          const toAdd = wizardState.importedCurriculum.filter(d => String(d.semestre) === String(semestre))
+            .filter(d => !existingSubjNames.has((d.nome || '').toLowerCase().trim()))
+            .map(d => ({ nome: d.nome, dificuldade: 3, peso: d.tipo === 'optativa' ? 3 : 4, notaDesejada: 7 }));
+          if (toAdd.length) {
+            wizardState.subjects = [...(wizardState.subjects || []).filter(s => s.nome), ...toAdd];
+            wizardState.touched[4] = true;
+          }
+          saveDraft();
+          if (wizardState.step === 4) renderWizard();
+        } else {
+          saveDraft();
+          if (wizardState.step === 2) renderWizard();
+        }
         if (window.showToast) window.showToast(`${novos.length} disciplina(s) importada(s) com IA!`, 'success');
       } else if (attempts > 300) {
         // ~2 minutos sem resultado (modal cancelado ou fechado) — para de esperar
@@ -861,12 +771,24 @@ Regras:
     ${autoSubjects.length ? `— <span style="color:var(--accent-success)">${autoSubjects.length} pré-preenchidas da grade importada ✓</span>` : '— adicione as que você está cursando agora'}
   </div>
 
+  <button id="wiz-step4-ia-import" type="button" style="
+    width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
+    padding:10px 14px;border-radius:var(--radius-md);border:1px dashed var(--accent-primary);
+    background:transparent;color:var(--accent-primary);cursor:pointer;
+    font-size:12.5px;font-weight:600;font-family:inherit;margin-bottom:14px;
+  ">
+    <i class="fas fa-wand-magic-sparkles"></i> Cadastrar matérias por print ou PDF com IA
+  </button>
+
   <div id="wiz-subjects-list">
     ${subjects.map((s, i) => renderSubjectRow(s, i)).join('')}
   </div>
   <button class="wiz-add-subject-btn" id="wiz-add-subject-btn" type="button">
     <i class="fas fa-plus"></i> Adicionar Matéria
   </button>
+  <p style="font-size:11px;color:var(--text-tertiary);margin:10px 0 0;">
+    <i class="fas fa-circle-info"></i> Você não precisa definir a dificuldade de cada matéria — o site calcula isso sozinho com base nas tarefas, notas e frequência que você for registrando, e ajusta automaticamente ao longo do semestre.
+  </p>
 
   <div style="margin-top: 28px;">
     <div class="wiz-field">
@@ -898,10 +820,7 @@ Regras:
     return `
 <div class="wiz-subject-item" data-idx="${index}">
   <input type="text" class="wiz-subject-nome" placeholder="Nome da matéria" value="${esc(subject.nome || '')}">
-  <select class="wiz-subject-diff" title="Dificuldade (1=fácil, 5=muito difícil)">
-    ${[1,2,3,4,5].map(n => `<option value="${n}" ${n===(subject.dificuldade||3)?'selected':''}>Dif ${n}</option>`).join('')}
-  </select>
-  <select class="wiz-subject-peso" title="Peso na grade">
+  <select class="wiz-subject-peso" title="Peso/importância dessa matéria pra você">
     ${[1,2,3,4,5].map(n => `<option value="${n}" ${n===(subject.peso||3)?'selected':''}>Peso ${n}</option>`).join('')}
   </select>
   <button class="btn-remove" type="button" title="Remover"><i class="fas fa-times"></i></button>
@@ -1033,76 +952,18 @@ Regras:
     q('#wiz-btn-next')?.addEventListener('click', () => goNext());
     q('#wiz-btn-finish')?.addEventListener('click', () => finishSetup());
     q('#wiz-btn-back')?.addEventListener('click', () => goBack());
-    q('#wiz-skip-step')?.addEventListener('click', () => { wizardState.step++; saveDraft(); renderWizard(); });
+    q('#wiz-skip-step')?.addEventListener('click', async () => {
+      const { title, body } = confirmationContentFor(wizardState.step);
+      const proceed = await confirmProceed(title, body, 'Pular mesmo assim');
+      if (!proceed) return;
+      wizardState.step++;
+      saveDraft();
+      renderWizard();
+    });
 
-    // Etapa 2: tabs
+    // Etapa 2: importação automática por IA
     if (step === 2) {
       q('#wiz-auto-ia-import')?.addEventListener('click', () => openAutoGradeImport());
-
-      document.querySelectorAll('.wiz-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-          document.querySelectorAll('.wiz-tab').forEach(t => t.classList.remove('active'));
-          document.querySelectorAll('.wiz-tab-panel').forEach(p => p.classList.remove('active'));
-          tab.classList.add('active');
-          const panel = document.getElementById(`wiz-tab-${tab.dataset.tab}`);
-          if (panel) panel.classList.add('active');
-        });
-      });
-
-      // Copiar prompt
-      q('#wiz-copy-prompt-btn')?.addEventListener('click', () => {
-        const faculdade = wizardState.universidade || '';
-        const curso = wizardState.curso || '';
-        const prompt = buildAIPrompt(faculdade, curso);
-        navigator.clipboard.writeText(prompt).then(() => {
-          const btn = q('#wiz-copy-prompt-btn');
-          if (btn) { btn.innerHTML = '<i class="fas fa-check"></i> Copiado!'; setTimeout(() => { btn.innerHTML = '<i class="fas fa-copy"></i> Copiar Prompt'; }, 2500); }
-        });
-      });
-
-      // Toggle prompt preview
-      q('#wiz-prompt-toggle')?.addEventListener('click', () => {
-        const preview = q('#wiz-prompt-preview');
-        if (!preview) return;
-        const visible = preview.style.display !== 'none' && preview.style.display !== '';
-        preview.style.display = visible ? 'none' : 'block';
-        q('#wiz-prompt-toggle').textContent = visible ? '▼ Ver prompt completo' : '▲ Ocultar prompt';
-      });
-
-      // Importar JSON
-      q('#wiz-import-json-btn')?.addEventListener('click', () => {
-        const raw = q('#wiz-json-input')?.value?.trim();
-        const feedback = q('#wiz-json-feedback');
-        if (!raw) { showFeedback(feedback, 'error', 'Cole o JSON no campo acima primeiro.'); return; }
-        try {
-          const parsed = parseGradeJSON(raw);
-          if (!parsed.length) throw new Error('Nenhuma disciplina encontrada no JSON.');
-          wizardState.importedCurriculum = parsed;
-          showFeedback(feedback, 'success', `✓ ${parsed.length} disciplinas importadas com sucesso!`);
-          updateCurriculumPreview();
-        } catch (e) {
-          showFeedback(feedback, 'error', 'JSON inválido ou formato inesperado. Verifique se a IA retornou corretamente.');
-        }
-      });
-
-      // Importar Texto
-      q('#wiz-import-text-btn')?.addEventListener('click', () => {
-        const text = q('#wiz-text-input')?.value?.trim();
-        const feedback = q('#wiz-text-feedback');
-        if (!text) { showFeedback(feedback, 'error', 'Cole o texto acima primeiro.'); return; }
-        const parsed = parseGradeText(text);
-        if (!parsed.length) {
-          showFeedback(feedback, 'error', 'Não consegui identificar disciplinas. Tente o método via IA (PDF/foto) que funciona melhor.');
-          return;
-        }
-        wizardState.importedCurriculum = [...wizardState.importedCurriculum, ...parsed];
-        showFeedback(feedback, 'success', `✓ ${parsed.length} disciplinas identificadas! Para melhor resultado, use o método via IA com o PDF.`);
-        updateCurriculumPreview();
-      });
-
-      // Manual add
-      q('#wiz-add-manual-btn')?.addEventListener('click', () => addManualItem());
-      attachManualEvents();
     }
 
     // Etapa 4: subjects
@@ -1111,7 +972,22 @@ Regras:
         wizardState.subjects.push({ nome: '', dificuldade: 3, peso: 3, notaDesejada: 7 });
         refreshSubjectsList();
       });
+      q('#wiz-step4-ia-import')?.addEventListener('click', () => openAutoGradeImport(true));
       attachSubjectEvents();
+    }
+
+    // Marca a etapa como "mexida" em qualquer interação real dentro do corpo
+    // do wizard (exceto os próprios botões de navegação) — usado para saber
+    // se dá pra avançar direto ou se vale mostrar o aviso de "tem certeza?".
+    const body = document.querySelector('.wiz-body');
+    if (body && !body.dataset.touchListenerBound) {
+      body.dataset.touchListenerBound = '1';
+      ['input', 'change', 'click'].forEach(evt => {
+        body.addEventListener(evt, () => {
+          wizardState.touched = wizardState.touched || {};
+          wizardState.touched[wizardState.step] = true;
+        }, true);
+      });
     }
   }
 
@@ -1249,10 +1125,86 @@ Regras:
     try { localStorage.removeItem(DRAFT_KEY); } catch (_) {}
   }
 
+  /* ─── Aviso de "tem certeza que quer pular?" ─────────────────
+     Em vez de simplesmente bloquear o avanço (o que irrita quem realmente
+     quer pular e completar depois), mostramos uma caixa explicando o que
+     fica pior/faltando no site se essa etapa não for preenchida agora —
+     e deixa a pessoa decidir: voltar e preencher, ou seguir mesmo assim. */
+  function confirmProceed(title, bodyHtml, confirmLabel) {
+    return new Promise(resolve => {
+      document.getElementById('wiz-confirm-modal')?.remove();
+      const wrap = document.createElement('div');
+      wrap.id = 'wiz-confirm-modal';
+      wrap.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:1rem;';
+      wrap.innerHTML = `
+        <div style="background:var(--bg-secondary,#fff);color:var(--text-primary,#1e293b);border-radius:16px;width:100%;max-width:440px;box-shadow:0 8px 40px rgba(0,0,0,.3);overflow:hidden;">
+          <div style="padding:1.1rem 1.3rem;background:linear-gradient(135deg,#f59e0b,#ea580c);color:#fff;display:flex;align-items:center;gap:.6rem;">
+            <i class="fas fa-triangle-exclamation" style="font-size:1.1rem;"></i>
+            <h3 style="margin:0;font-size:.98rem;">${esc(title)}</h3>
+          </div>
+          <div style="padding:1.2rem 1.3rem;font-size:.85rem;line-height:1.55;color:var(--text-secondary,#475569);">${bodyHtml}</div>
+          <div style="padding:0 1.3rem 1.2rem;display:flex;gap:.6rem;justify-content:flex-end;">
+            <button id="wiz-confirm-back" style="padding:.55rem 1rem;border-radius:8px;border:1px solid var(--border,#e2e8f0);background:transparent;color:inherit;cursor:pointer;font-size:.83rem;">Voltar e preencher</button>
+            <button id="wiz-confirm-go" style="padding:.55rem 1.1rem;border-radius:8px;border:none;background:#ea580c;color:#fff;cursor:pointer;font-size:.83rem;font-weight:600;">${esc(confirmLabel || 'Continuar mesmo assim')}</button>
+          </div>
+        </div>`;
+      document.body.appendChild(wrap);
+      wrap.querySelector('#wiz-confirm-back').addEventListener('click', () => { wrap.remove(); resolve(false); });
+      wrap.querySelector('#wiz-confirm-go').addEventListener('click', () => { wrap.remove(); resolve(true); });
+    });
+  }
+
+  function stepNeedsConfirmation(step) {
+    if (step === 2) {
+      return !wizardState.importedCurriculum.length;
+    }
+    if (step === 3) {
+      return !(wizardState.touched && wizardState.touched[3]);
+    }
+    if (step === 4) {
+      const hasSubjects = document.querySelectorAll('#wiz-subjects-list .wiz-subject-item .wiz-subject-nome')
+        && Array.from(document.querySelectorAll('#wiz-subjects-list .wiz-subject-nome')).some(i => i.value.trim());
+      return !hasSubjects;
+    }
+    return false;
+  }
+
+  function confirmationContentFor(step) {
+    if (step === 2) {
+      return {
+        title: 'Seguir sem importar a grade?',
+        body: `<p>Sem a grade curricular, o site não sabe quais matérias você ainda vai cursar nem os pré-requisitos delas.</p>
+               <p>Isso deixa mais fraco: o planejamento de semestres futuros, o mapa de progresso do curso e os alertas de pré-requisito. Você pode importar a qualquer momento depois em <strong>Grade Curricular</strong>.</p>`
+      };
+    }
+    if (step === 3) {
+      return {
+        title: 'Seguir com a rotina padrão?',
+        body: `<p>Você não ajustou nada nesta etapa — o site vai usar valores padrão (turno tarde, dias de seg a sex, 4h por dia) em vez da sua rotina real.</p>
+               <p>Isso afeta diretamente o <strong>Mentor IA</strong> e o plano de estudos: os horários sugeridos podem não bater com quando você realmente pode estudar. Vale a pena ajustar agora — leva menos de 1 minuto.</p>`
+      };
+    }
+    if (step === 4) {
+      return {
+        title: 'Iniciar sem cadastrar nenhuma matéria?',
+        body: `<p>Sem matérias cadastradas, o Dashboard, o Mentor IA e o plano de estudos ficam praticamente vazios — não há o que planejar ainda.</p>
+               <p>Você pode adicionar manualmente, uma a uma, ou importar por print/PDF com IA agora mesmo.</p>`
+      };
+    }
+    return { title: '', body: '' };
+  }
+
   /* ─── Navegação ──────────────────────────────────────────── */
-  function goNext() {
+  async function goNext() {
     if (wizardState.step === 1 && !validateStep1()) return;
     saveCurrentStep();
+
+    if (stepNeedsConfirmation(wizardState.step)) {
+      const { title, body } = confirmationContentFor(wizardState.step);
+      const proceed = await confirmProceed(title, body);
+      if (!proceed) return;
+    }
+
     wizardState.step++;
     saveDraft();
     renderWizard();
@@ -1323,7 +1275,10 @@ Regras:
         if (!nome) return;
         wizardState.subjects.push({
           nome,
-          dificuldade: parseInt(row.querySelector('.wiz-subject-diff')?.value || '3'),
+          // Dificuldade não é mais escolhida manualmente aqui — começa em um valor
+          // neutro e o subject-difficulty.js recalcula automaticamente depois,
+          // com base em tarefas, notas e frequência reais da matéria.
+          dificuldade: 3,
           peso:        parseInt(row.querySelector('.wiz-subject-peso')?.value || '3'),
           notaDesejada: 7
         });
@@ -1333,6 +1288,12 @@ Regras:
 
   /* ─── Finalizar setup ─────────────────────────────────────── */
   async function finishSetup() {
+    if (stepNeedsConfirmation(4)) {
+      const { title, body } = confirmationContentFor(4);
+      const proceed = await confirmProceed(title, body, 'Iniciar mesmo assim');
+      if (!proceed) return;
+    }
+
     saveCurrentStep();
 
     const btn = q('#wiz-btn-finish');

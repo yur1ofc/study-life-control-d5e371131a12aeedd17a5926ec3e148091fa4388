@@ -62,9 +62,9 @@ Regras:
 
   // ─── Chamada ao Gemini ─────────────────────────────────────────────────────
 
-  async function callGemini(parts) {
-    // Só usuários logados no app podem chamar o proxy — evita que gente de fora
-    // (ou scripts) descubra a URL e fique consumindo sua cota diária do Gemini.
+  function wait(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+  async function callGeminiOnce(parts) {
     const user = window.auth?.currentUser;
     if (!user) throw new Error('Você precisa estar logado para usar a importação com IA.');
     const idToken = await user.getIdToken();
@@ -79,7 +79,9 @@ Regras:
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
       const msg = (typeof err?.error === 'string' ? err.error : err?.error?.message) || `Erro HTTP ${response.status}`;
-      throw new Error(msg);
+      const e = new Error(msg);
+      e.status = response.status;
+      throw e;
     }
 
     const data = await response.json();
@@ -89,8 +91,36 @@ Regras:
     try {
       return JSON.parse(clean);
     } catch {
-      throw new Error('A IA retornou um formato inesperado. Tente novamente — geralmente funciona na segunda tentativa.');
+      const e = new Error('A IA retornou um formato inesperado. Tente novamente — geralmente funciona na segunda tentativa.');
+      e.status = 'bad-json';
+      throw e;
     }
+  }
+
+  function isOverloadMsg(msg) {
+    const m = String(msg || '').toLowerCase();
+    return m.includes('overload') || m.includes('sobrecarr') || m.includes('high demand') || m.includes('demanda');
+  }
+
+  // O proxy (api/gemini.js) já tenta modelos alternativos sozinho, mas em
+  // picos de tráfego às vezes até isso falha na primeira tentativa. Aqui a
+  // gente dá mais 2 tentativas do lado do cliente, com pequena espera entre
+  // elas, antes de mostrar o erro pro usuário — evita que a pessoa precise
+  // clicar "Tentar novamente" manualmente para algo que se resolve sozinho.
+  async function callGemini(parts, onRetryStatus) {
+    let lastErr = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await callGeminiOnce(parts);
+      } catch (err) {
+        lastErr = err;
+        const overloaded = err.status === 503 || isOverloadMsg(err.message);
+        if (!overloaded || attempt === 2) throw err;
+        if (typeof onRetryStatus === 'function') onRetryStatus(attempt + 1);
+        await wait(1500 * (attempt + 1));
+      }
+    }
+    throw lastErr;
   }
 
   // ─── Normalização ───────────────────────────────────────────────────────────
@@ -449,7 +479,9 @@ Regras:
           parts = [{ text: GRADE_PROMPT + '\n\nConteúdo da grade:\n\n' + text }];
         }
 
-        const result = await callGemini(parts);
+        const result = await callGemini(parts, (tentativa) => {
+          setStatus(`<i class="fas fa-spinner fa-spin"></i> A IA está com alta demanda, tentando de novo automaticamente (${tentativa}/2)...`, 'loading');
+        });
         const disciplinas = result?.disciplinas || [];
         if (!disciplinas.length) throw new Error('Nenhuma disciplina encontrada no arquivo.');
 

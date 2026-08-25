@@ -700,6 +700,25 @@ class StudyLifeControl {
                 window.showToast?.('Perfil atualizado!', 'success');
             });
 
+            // Aba Perfil — Rotina (toggle dos dias)
+            document.querySelectorAll('#config-dias-group .wiz-day-btn').forEach(btn => {
+                btn.addEventListener('click', () => btn.classList.toggle('active'));
+            });
+
+            document.getElementById('btn-salvar-rotina')?.addEventListener('click', async () => {
+                const dias = Array.from(document.querySelectorAll('#config-dias-group .wiz-day-btn.active')).map(b => b.dataset.val);
+                this.data.user = this.data.user || {};
+                this.data.user.turnoPrincipal = document.getElementById('config-turno')?.value || 'tarde';
+                this.data.user.diasPreferidos = dias.length ? dias : ['seg','ter','qua','qui','sex'];
+                this.data.user.horasMaximas = parseInt(document.getElementById('config-horas')?.value, 10) || 4;
+                this.data.user.tipoRotina = document.getElementById('config-tipo-rotina')?.value || 'so-estuda';
+                this.data.user.tempoDeslocamento = parseInt(document.getElementById('config-deslocamento')?.value, 10) || 20;
+                this.data.user.horarioSono = document.getElementById('config-sono')?.value?.trim() || '';
+                await dbService.saveData('user', this.data.user);
+                window.AIAssistant?.prototype && this.aiAssistant?.updateContext?.(this.data);
+                window.showToast?.('Rotina atualizada! O Mentor IA já vai usar os novos dados.', 'success');
+            });
+
             // Aba Tema
             document.querySelectorAll('.config-tema-btn').forEach(btn => {
                 btn.addEventListener('click', () => {

@@ -1346,6 +1346,58 @@ class ViewRenderer {
                     <i class="fas fa-save"></i> Salvar alterações
                 </button>
             </div>
+
+            <div class="config-section-title" style="margin-top:28px;">⏰ Sua rotina</div>
+            <p style="font-size:.82rem;color:var(--text-tertiary);margin:-6px 0 12px;">
+                Preenchida no cadastro inicial. O Mentor IA e o plano de estudos usam esses dados
+                para sugerir horários que fazem sentido pra você — mantenha atualizado se sua rotina mudar.
+            </p>
+            <div class="config-item" style="flex-direction:column;align-items:flex-start;gap:10px;">
+                <div class="wiz-field" style="width:100%"><label>Quando você estuda melhor?</label>
+                    <select id="config-turno">
+                        <option value="manha" ${user.turnoPrincipal === 'manha' ? 'selected' : ''}>☀️ Manhã</option>
+                        <option value="tarde" ${(!user.turnoPrincipal || user.turnoPrincipal === 'tarde') ? 'selected' : ''}>🌤 Tarde</option>
+                        <option value="noite" ${user.turnoPrincipal === 'noite' ? 'selected' : ''}>🌙 Noite</option>
+                        <option value="madrugada" ${user.turnoPrincipal === 'madrugada' ? 'selected' : ''}>🌑 Madrugada</option>
+                    </select>
+                </div>
+                <div class="wiz-field" style="width:100%"><label>Dias que você costuma estudar</label>
+                    <div class="wiz-days" id="config-dias-group">
+                        ${['seg','ter','qua','qui','sex','sab','dom'].map((v, i) => {
+                            const labels = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+                            const dias = Array.isArray(user.diasPreferidos) && user.diasPreferidos.length ? user.diasPreferidos : ['seg','ter','qua','qui','sex'];
+                            return `<button class="wiz-day-btn ${dias.includes(v) ? 'active' : ''}" data-val="${v}" type="button">${labels[i]}</button>`;
+                        }).join('')}
+                    </div>
+                </div>
+                <div style="display:flex;gap:10px;width:100%;flex-wrap:wrap;">
+                    <div class="wiz-field" style="flex:1;min-width:140px;"><label>Horas máximas por dia</label>
+                        <select id="config-horas">
+                            ${[1,2,3,4,5,6,7,8,9,10,12].map(h => `<option value="${h}" ${h === (parseInt(user.horasMaximas) || 4) ? 'selected' : ''}>${h}h</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="wiz-field" style="flex:1;min-width:140px;"><label>Tipo de rotina</label>
+                        <select id="config-tipo-rotina">
+                            <option value="so-estuda" ${(!user.tipoRotina || user.tipoRotina === 'so-estuda') ? 'selected' : ''}>Só estudo</option>
+                            <option value="estuda-trabalha" ${user.tipoRotina === 'estuda-trabalha' ? 'selected' : ''}>Estudo + Trabalho</option>
+                            <option value="estuda-estagio" ${user.tipoRotina === 'estuda-estagio' ? 'selected' : ''}>Estudo + Estágio</option>
+                            <option value="rotina-pesada" ${user.tipoRotina === 'rotina-pesada' ? 'selected' : ''}>Rotina muito pesada</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display:flex;gap:10px;width:100%;flex-wrap:wrap;">
+                    <div class="wiz-field" style="flex:1;min-width:140px;"><label>Tempo de deslocamento (min)</label>
+                        <input type="number" id="config-deslocamento" min="0" max="240" value="${parseInt(user.tempoDeslocamento) || 20}">
+                    </div>
+                    <div class="wiz-field" style="flex:1;min-width:140px;"><label>Horário de sono (opcional)</label>
+                        <input type="text" id="config-sono" value="${this.esc(user.horarioSono || '')}" placeholder="Ex: 00:00 - 07:00">
+                    </div>
+                </div>
+                <button class="btn-primary" id="btn-salvar-rotina" style="margin-top:4px;">
+                    <i class="fas fa-save"></i> Salvar rotina
+                </button>
+            </div>
+
             <div class="config-section-title" style="margin-top:28px;">🔐 Conta</div>
             <div class="config-item">
                 <div class="config-info"><h4>Conectado como</h4><p>${email}</p></div>
