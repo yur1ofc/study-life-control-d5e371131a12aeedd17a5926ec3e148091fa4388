@@ -69,17 +69,10 @@ function setupWebPush() {
 // Datas e horários salvos pelo app (exams.data, tasks.dataLimite,
 // sessions.data) não guardam fuso horário — vêm de campos <input
 // type="date"> / type="datetime-local">, que só têm os dígitos da hora
-// LOCAL do navegador de quem preencheu.
-//
-// Até aqui, este arquivo assumia esses valores como UTC (acrescentando
-// "Z"). Isso é um bug real, não só uma imprecisão: pra quem está no
-// Brasil (UTC-3), o servidor interpretava qualquer horário futuro
-// próximo como se já tivesse acontecido ~3h atrás — e como a janela de
-// aviso de sessão é de só 15 min, isso fazia a notificação NUNCA
-// disparar. Corrigido assumindo horário de Brasília (UTC-3) para todo
-// mundo, já que o Brasil não tem mais horário de verão desde 2019 (esse
-// offset é fixo o ano todo). Se algum dia o app passar a atender fora
-// do Brasil, isso precisa virar um fuso por usuário salvo no cadastro.
+// LOCAL do navegador de quem preencheu. Assumimos horário de Brasília
+// (UTC-3, fixo, já que o Brasil não tem mais horário de verão desde
+// 2019). Se algum dia o app atender fora do Brasil, isso precisa virar
+// um fuso por usuário salvo no cadastro.
 const FUSO_BRASIL = '-03:00';
 
 function dateOnlyToMs(yyyyMmDd) {
@@ -94,6 +87,33 @@ function localDateTimeToMs(isoLocal) {
   return Number.isNaN(t) ? null : t;
 }
 
+// Provas, tarefas e trabalhos (tratados como "exams") não usam mais um
+// único "X horas antes" configurável — mandam vários avisos fixos,
+// ficando mais frequentes perto da data. Cada checkpoint tem uma janela
+// de 24h pra disparar (dá folga pro cron não perder o horário certo) e
+// é marcado individualmente em sentReminders, então nunca repete.
+const CHECKPOINTS_DIAS = [7, 5, 3, 1, 0];
+const JANELA_CHECKPOINT_MS = 24 * 3600000;
+
+function labelDias(dias) {
+  if (dias === 0) return 'é hoje';
+  if (dias === 1) return 'é amanhã';
+  return `em ${dias} dias`;
+}
+
+function checkpointsDevidos(itemMs, prefixo, id, tipoLabel, corpo, now, already) {
+  const due = [];
+  for (const dias of CHECKPOINTS_DIAS) {
+    const key = `${prefixo}:${id}:${dias}d`;
+    if (already.has(key)) continue;
+    const triggerMs = itemMs - dias * 86400000;
+    if (now >= triggerMs && now < triggerMs + JANELA_CHECKPOINT_MS) {
+      due.push({ key, title: `${tipoLabel} ${labelDias(dias)}`, body: corpo });
+    }
+  }
+  return due;
+}
+
 // Descobre quais itens de um usuário "vencem" dentro da janela de aviso e
 // ainda não foram notificados.
 function findDueReminders(data, now) {
@@ -101,30 +121,20 @@ function findDueReminders(data, now) {
   const already = new Set(data.sentReminders || []);
   const due = [];
 
-  const examsHoursBefore = Number(prefs.examsHoursBefore ?? 24);
   (data.exams || []).forEach(e => {
     if (e.concluida) return;
-    const key = `exam:${e.id}`;
-    if (already.has(key)) return;
     const examMs = dateOnlyToMs(e.data);
     if (examMs == null) return;
-    const triggerMs = examMs - examsHoursBefore * 3600000;
-    if (now >= triggerMs && now < examMs) {
-      due.push({ key, title: '📝 Prova chegando', body: `${e.titulo}${e.materia ? ` — ${e.materia}` : ''}` });
-    }
+    const corpo = `${e.titulo}${e.materia ? ` — ${e.materia}` : ''}`;
+    due.push(...checkpointsDevidos(examMs, 'exam', e.id, '📝 Prova/trabalho', corpo, now, already));
   });
 
-  const tasksHoursBefore = Number(prefs.tasksHoursBefore ?? 24);
   (data.tasks || []).forEach(t => {
     if (t.concluida) return;
-    const key = `task:${t.id}`;
-    if (already.has(key)) return;
     const taskMs = dateOnlyToMs(t.dataLimite);
     if (taskMs == null) return;
-    const triggerMs = taskMs - tasksHoursBefore * 3600000;
-    if (now >= triggerMs && now < taskMs) {
-      due.push({ key, title: '✅ Tarefa vencendo', body: `${t.titulo}${t.materia ? ` — ${t.materia}` : ''}` });
-    }
+    const corpo = `${t.titulo}${t.materia ? ` — ${t.materia}` : ''}`;
+    due.push(...checkpointsDevidos(taskMs, 'task', t.id, '✅ Tarefa', corpo, now, already));
   });
 
   const sessionsMinutesBefore = Number(prefs.sessionsMinutesBefore ?? 15);

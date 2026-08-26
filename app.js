@@ -675,9 +675,9 @@ class StudyLifeControl {
                 }
             });
 
-            ['exams', 'tasks', 'sessions', 'reviews', 'class'].forEach(tipo => {
+            ['sessions', 'reviews', 'class'].forEach(tipo => {
                 const map = {
-                    exams: 'examsHoursBefore', tasks: 'tasksHoursBefore', sessions: 'sessionsMinutesBefore',
+                    sessions: 'sessionsMinutesBefore',
                     reviews: 'reviewsHoursBefore', class: 'classMinutesBefore'
                 };
                 document.getElementById(`config-reminder-${tipo}`)?.addEventListener('change', async e => {

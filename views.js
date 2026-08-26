@@ -1518,19 +1518,18 @@ class ViewRenderer {
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
+                <div style="margin-top:14px;">
+                    <label style="font-size:.85rem;font-weight:600;color:var(--text-secondary);">Prova, tarefa ou trabalho — quando avisar?</label>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
+                        ${['7 dias antes', '5 dias antes', '3 dias antes', '1 dia antes', 'No dia da entrega'].map(l => `
+                            <span style="padding:6px 12px;border-radius:999px;background:var(--bg-tertiary);border:1px solid var(--border);font-size:.78rem;color:var(--text-primary);">${l}</span>
+                        `).join('')}
+                    </div>
+                    <p style="font-size:.78rem;color:var(--text-tertiary);margin-top:8px;">
+                        Esses avisos são automáticos e fixos (não dá pra desligar um por um) — quanto mais perto da data, mais vezes você é lembrado.
+                    </p>
+                </div>
                 <div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:14px;">
-                    <div class="wiz-field">
-                        <label>Avisar prova com quantas horas de antecedência?</label>
-                        <select id="config-reminder-exams">
-                            ${[6, 12, 24, 48, 72].map(h => `<option value="${h}" ${Number(reminders.examsHoursBefore ?? 24) === h ? 'selected' : ''}>${h}h antes</option>`).join('')}
-                        </select>
-                    </div>
-                    <div class="wiz-field">
-                        <label>Avisar tarefa com quantas horas de antecedência?</label>
-                        <select id="config-reminder-tasks">
-                            ${[6, 12, 24, 48, 72].map(h => `<option value="${h}" ${Number(reminders.tasksHoursBefore ?? 24) === h ? 'selected' : ''}>${h}h antes</option>`).join('')}
-                        </select>
-                    </div>
                     <div class="wiz-field">
                         <label>Avisar sessão de estudo com quantos minutos de antecedência?</label>
                         <select id="config-reminder-sessions">
