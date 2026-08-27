@@ -132,11 +132,6 @@
         '--radius-sm':     '4px',
       }
     },
-            '--radius-lg':     '8px',
-        '--radius-md':     '6px',
-        '--radius-sm':     '4px',
-      }
-    },
     allblack: {
       label: 'All Black', icon: '⚫',
       vars: {
@@ -264,8 +259,6 @@
       }
     },
   };
-
-  
 
   // ── Carrega / salva config ─────────────────────────────────────────────────
   // Prioriza o tema salvo na CONTA (Firestore, carregado pelo app após o
