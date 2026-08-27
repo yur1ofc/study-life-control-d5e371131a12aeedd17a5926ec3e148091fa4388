@@ -5,7 +5,7 @@
 // adicione ele aqui também — senão ele só entra no cache dinâmico depois
 // do primeiro acesso online, e falha se o usuário abrir o app offline
 // (ou logo após instalar como PWA) antes disso acontecer.
-const CACHE_VERSION = 'slc-v15';
+const CACHE_VERSION = 'slc-v16';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 
@@ -33,6 +33,7 @@ const STATIC_ASSETS = [
   './diary-view.js',
   './review-system.js',
   './grade-calculator.js',
+  './subject-difficulty.js',
   './smart-dashboard.js',
   './ai-assistant.js',
   './schedule.js',
@@ -40,6 +41,8 @@ const STATIC_ASSETS = [
   './tutorial.js',
   './app.js',
   './semester-finish.js',
+  './semester-archive-viewer.js',
+  './universidades-brasil.js',
   './setup-wizard.js',
   './launch-ready.js',
   './script.js',
@@ -54,11 +57,15 @@ const STATIC_ASSETS = [
   './xp-widget.js',
   './calendar-feed.js',
   './push-notifications.js',
+  './auto-notification-prompt.js',
+  './exam-study-popup.js',
+  './quick-search.js',
   './export-data.js',
   './feedback-widget.js',
   './launch-polish.js',
   './improvements.js',
-  './ux-improvements.js'
+  './ux-improvements.js',
+  './reprovado-ecosystem.js'
 ];
 
 // Origens externas: busca sempre da rede, sem interceptar

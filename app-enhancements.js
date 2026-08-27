@@ -80,8 +80,34 @@
 
   function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
+
+    // Se já existia um SW controlando esta aba ANTES deste registro, então
+    // um "controllerchange" depois é uma atualização de verdade (nova
+    // versão assumiu). Se não existia, é só o primeiro registro do site
+    // neste dispositivo — nesse caso não precisa recarregar nada.
+    const hadControllerBefore = !!navigator.serviceWorker.controller;
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadControllerBefore || refreshing) return;
+      refreshing = true;
+      // A sessão do Firebase fica salva no IndexedDB (fora do Cache
+      // Storage que o service worker controla), então recarregar aqui
+      // não desconecta a conta do usuário — só busca os arquivos novos.
+      window.location.reload();
+    });
+
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('service-worker.js').catch((error) => {
+      navigator.serviceWorker.register('service-worker.js').then((reg) => {
+        // Checa por atualização assim que registra...
+        reg.update().catch(() => null);
+        // ...toda vez que o app volta a ficar visível (cobre o caso do
+        // usuário deixar a aba/PWA aberta em segundo plano por um tempo)...
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') reg.update().catch(() => null);
+        });
+        // ...e periodicamente, para quem fica com o app aberto por horas.
+        setInterval(() => reg.update().catch(() => null), 60 * 60 * 1000);
+      }).catch((error) => {
         console.error('Falha ao registrar service worker:', error);
       });
     });
