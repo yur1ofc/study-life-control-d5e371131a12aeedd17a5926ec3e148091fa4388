@@ -760,18 +760,9 @@ class StudyLifeControl {
                 window.showToast?.('Rotina atualizada! O Mentor IA já vai usar os novos dados.', 'success');
             });
 
-            // Aba Tema
-            document.querySelectorAll('.config-tema-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const tema = btn.dataset.tema;
-                    localStorage.setItem('slc-theme', tema);
-                    window.applyTheme?.(tema);
-                    document.querySelectorAll('.config-tema-btn').forEach(b => {
-                        b.style.borderColor = b.dataset.tema === tema ? 'var(--accent-primary)' : 'var(--border)';
-                    });
-                    window.showToast?.('Tema aplicado!', 'success');
-                });
-            });
+            // Aba Tema: painel completo (presets + personalização) é
+            // renderizado e controlado inteiramente pelo theme-engine.js —
+            // ver bindThemePanel() ali.
 
             // Aba Dados
             document.getElementById('exportar-dados')?.addEventListener('click', () => this.exportarDados());

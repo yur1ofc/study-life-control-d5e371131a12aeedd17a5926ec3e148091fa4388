@@ -1725,37 +1725,7 @@ class ViewRenderer {
         }
 
         if (aba === 'tema') {
-            const temaAtual = localStorage.getItem('slc-theme') || 'dark';
-            const temas = [
-                { id: 'dark',   nome: 'Escuro',        emoji: '🌑' },
-                { id: 'ocean',  nome: 'Ocean',         emoji: '🌊' },
-                { id: 'forest', nome: 'Floresta',      emoji: '🌲' },
-                { id: 'sunset', nome: 'Pôr do Sol',    emoji: '🌅' },
-                { id: 'light',  nome: 'Claro',         emoji: '☀️' },
-            ];
-            conteudo = `
-            <div class="config-section-title">🎨 Aparência</div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:24px;">
-                ${temas.map(t => `
-                <button class="config-tema-btn ${temaAtual === t.id ? 'active' : ''}" data-tema="${t.id}" style="
-                    padding:14px 10px;border-radius:12px;border:2px solid ${temaAtual === t.id ? 'var(--accent-primary)' : 'var(--border)'};
-                    background:var(--bg-tertiary);cursor:pointer;color:var(--text-primary);font-size:.88rem;font-weight:600;
-                    display:flex;flex-direction:column;align-items:center;gap:8px;transition:all .2s;">
-                    <span style="font-size:1.6rem">${t.emoji}</span>
-                    <span>${t.nome}</span>
-                    ${temaAtual === t.id ? '<span style="font-size:.75rem;color:var(--accent-primary)">✓ Ativo</span>' : ''}
-                </button>`).join('')}
-            </div>
-            <div class="config-section-title" style="margin-top:20px">🔠 Tamanho da fonte</div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;">
-                ${['small','normal','large'].map(sz => `
-                <button class="config-font-btn" data-size="${sz}" style="
-                    padding:10px 18px;border-radius:10px;border:1.5px solid var(--border);
-                    background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;
-                    font-size:${sz === 'small' ? '.82rem' : sz === 'large' ? '1.05rem' : '.9rem'};font-weight:600;">
-                    ${sz === 'small' ? 'Pequena' : sz === 'large' ? 'Grande' : 'Normal'}
-                </button>`).join('')}
-            </div>`;
+            conteudo = '';
         }
 
         if (aba === 'dados') {
