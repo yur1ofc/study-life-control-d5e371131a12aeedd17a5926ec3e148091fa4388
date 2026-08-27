@@ -1,303 +1,448 @@
-// reprovado-ecosystem.js — "Ecossistema de Repescagem"
-//
-// O que faz:
-// 1. Lê o histórico de tentativas de cada matéria (item.tentativas, gravado
-//    pelo semester-finish.js toda vez que uma matéria é marcada como
-//    aprovada ou reprovada) e identifica quais matérias "cursando" agora
-//    já foram reprovadas antes.
-// 2. Mostra essas matérias em destaque no Dashboard e na Previsão de Notas,
-//    comparando a nota da tentativa atual com a(s) tentativa(s) anterior(es).
-// 3. Faz o Mentor IA priorizar essas matérias automaticamente (aumenta a
-//    pontuação delas na fila de prioridade que já existia) e entende
-//    perguntas do tipo "estou repetindo alguma matéria?".
-//
-// Não duplica nada que já existe: usa o mesmo app.data.curriculum e o mesmo
-// sistema de arquivamento por semestre (semester-finish.js), só acrescenta
-// a camada de "isso já foi reprovado antes, preste atenção nisso".
-(function () {
-    'use strict';
+// schedule.js - Grade horária com modo dia/semana, edição e conflitos
 
-    function slug(value) {
-        return String(value || '')
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, ' ')
-            .trim();
+class ScheduleManager {
+    constructor() {
+        this.aulas = [];
+        this.HORARIO_INICIO = 7;
+        this.HORARIO_FIM = 22;
+        this.ALTURA_POR_HORA = 80;
+        this.initialized = false;
+        this.viewMode = 'day';
+        this.selectedDay = new Date().getDay();
     }
 
-    function esc(value) {
-        return String(value === undefined || value === null ? '' : value)
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    init() {
+        this.loadAulas();
+        this.initialized = true;
     }
 
-    // Lê app.data.curriculum e devolve as matérias que estão "cursando"
-    // agora e que já têm pelo menos uma tentativa reprovada no histórico.
-    function getRepescagemSubjects(data) {
-        const curriculum = Array.isArray(data?.curriculum) ? data.curriculum : [];
-        return curriculum
-            .filter(item => item.status === 'cursando' && Array.isArray(item.tentativas) && item.tentativas.some(t => t.resultado === 'reprovado'))
-            .map(item => {
-                const reprovadas = item.tentativas.filter(t => t.resultado === 'reprovado');
-                return {
-                    id: item.id,
-                    nome: item.nome,
-                    tentativas: item.tentativas.slice().sort((a, b) => new Date(a.data || 0) - new Date(b.data || 0)),
-                    vezesReprovada: reprovadas.length,
-                    ultimaTentativa: reprovadas[reprovadas.length - 1]
+    loadAulas() {
+        this.aulas = window.app?.data?.classSchedule || [];
+        return this.aulas;
+    }
+
+    async addAula(aula) {
+        if (!aula.id) aula.id = generateId();
+
+        const conflitos = this.verificarConflitos(aula);
+        if (conflitos.length) {
+            showToast(`Conflito com ${conflitos.map(c => c.materia).join(', ')}`, 'warning');
+            return false;
+        }
+
+        const success = await dbService.addItem('classSchedule', aula);
+        if (success) this.loadAulas();
+        return success;
+    }
+
+    async editAula(id, updates) {
+        this.loadAulas();
+
+        const aulaExistente = this.aulas.find(a => a.id === id);
+        if (!aulaExistente) return false;
+
+        const aulaAtualizada = { ...aulaExistente, ...updates };
+        const conflitos = this.verificarConflitos(aulaAtualizada, id);
+
+        if (conflitos.length) {
+            showToast(`Conflito com ${conflitos.map(c => c.materia).join(', ')}`, 'warning');
+            return false;
+        }
+
+        const success = await dbService.updateItem('classSchedule', id, aulaAtualizada);
+        if (success) this.loadAulas();
+        return success;
+    }
+
+    async removeAula(id) {
+        const success = await dbService.removeItem('classSchedule', id);
+        if (success) this.loadAulas();
+        return success;
+    }
+
+    getAulasPorDia(diaSemana) {
+        this.loadAulas();
+        return this.aulas
+            .filter(a => parseInt(a.dia, 10) === diaSemana)
+            .sort((a, b) => a.inicio.localeCompare(b.inicio));
+    }
+
+    verificarConflitos(novaAula, ignorarId = null) {
+        const aulasDia = this.getAulasPorDia(parseInt(novaAula.dia, 10));
+
+        return aulasDia.filter(a => {
+            if (ignorarId && a.id === ignorarId) return false;
+
+            const inicioExistente = calcularDuracaoMinutos('00:00', a.inicio);
+            const fimExistente = calcularDuracaoMinutos('00:00', a.fim);
+            const inicioNovo = calcularDuracaoMinutos('00:00', novaAula.inicio);
+            const fimNovo = calcularDuracaoMinutos('00:00', novaAula.fim);
+
+            return inicioNovo < fimExistente && fimNovo > inicioExistente;
+        });
+    }
+
+    calcularPosicaoTop(horario) {
+        const [horas, minutos] = horario.split(':').map(Number);
+        const minutosDesdeInicio = (horas - this.HORARIO_INICIO) * 60 + minutos;
+        return Math.max(0, (minutosDesdeInicio / 60) * this.ALTURA_POR_HORA);
+    }
+
+    calcularAltura(inicio, fim) {
+        const duracaoMinutos = calcularDuracaoMinutos(inicio, fim);
+        return Math.max(20, (duracaoMinutos / 60) * this.ALTURA_POR_HORA);
+    }
+
+    renderGrade() {
+        if (this.viewMode === 'week') {
+            this.renderGradeSemanal('schedule-vertical-container');
+        } else {
+            this.renderGradeDia(this.selectedDay, 'schedule-vertical-container');
+        }
+    }
+
+    renderGradeDia(diaSemana, containerId) {
+        this.loadAulas();
+
+        const aulas = this.getAulasPorDia(diaSemana);
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        container.classList.remove('has-week-grid');
+        container.innerHTML = '';
+
+        if (!aulas.length) {
+            container.innerHTML = `
+                <div class="no-classes-message">
+                    <i class="fas fa-calendar-times"></i>
+                    <p>Nenhuma aula neste dia</p>
+                </div>
+            `;
+            return;
+        }
+
+        const totalHoras = this.HORARIO_FIM - this.HORARIO_INICIO + 1;
+        const alturaTotal = totalHoras * this.ALTURA_POR_HORA;
+
+        const scheduleDiv = document.createElement('div');
+        scheduleDiv.className = 'schedule-vertical';
+        scheduleDiv.style.height = `${alturaTotal}px`;
+
+        for (let hora = this.HORARIO_INICIO; hora <= this.HORARIO_FIM; hora++) {
+            const horaFormatada = `${hora.toString().padStart(2, '0')}:00`;
+            const hourRow = document.createElement('div');
+            hourRow.className = 'schedule-hour-row';
+            hourRow.innerHTML = `
+                <div class="hour-label">${horaFormatada}</div>
+                <div class="hour-line"></div>
+            `;
+            scheduleDiv.appendChild(hourRow);
+        }
+
+        const eventsContainer = document.createElement('div');
+        eventsContainer.className = 'schedule-events';
+        eventsContainer.style.height = `${alturaTotal}px`;
+
+        aulas.forEach(aula => {
+            const top = this.calcularPosicaoTop(aula.inicio);
+            const altura = this.calcularAltura(aula.inicio, aula.fim);
+            const cor = aula.cor || '#3b82f6';
+
+            const eventBlock = document.createElement('div');
+            eventBlock.className = 'schedule-event-block';
+            eventBlock.style.top = `${top}px`;
+            eventBlock.style.height = `${altura}px`;
+            eventBlock.style.backgroundColor = `${cor}20`;
+            eventBlock.style.borderLeft = `4px solid ${cor}`;
+            eventBlock.dataset.aulaId = aula.id;
+
+            eventBlock.innerHTML = `
+                <div class="event-content">
+                    <strong>${escapeHtml(aula.materia)}</strong>
+                    <div class="event-time">${escapeHtml(aula.inicio)} - ${escapeHtml(aula.fim)}</div>
+                    ${aula.sala ? `<div class="event-room">📍 ${escapeHtml(aula.sala)}</div>` : ''}
+                    ${aula.professor ? `<div class="event-prof">👤 ${escapeHtml(aula.professor)}</div>` : ''}
+                </div>
+            `;
+
+            eventBlock.onclick = () => {
+                if (window.app) window.app.openAulaModal(aula.id);
+            };
+
+            eventsContainer.appendChild(eventBlock);
+        });
+
+        scheduleDiv.appendChild(eventsContainer);
+        container.appendChild(scheduleDiv);
+    }
+
+    renderGradeSemanal(containerId) {
+        this.loadAulas();
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        const dias = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+        const weeklyGrid = document.createElement('div');
+        weeklyGrid.className = 'weekly-schedule-grid';
+
+        for (let dia = 0; dia < 7; dia++) {
+            const aulasDia = this.getAulasPorDia(dia);
+
+            const column = document.createElement('div');
+            column.className = 'weekly-day-column';
+            column.innerHTML = `
+                <div class="weekly-day-header ${dia === new Date().getDay() ? 'today' : ''}">
+                    <h4>${dias[dia]}</h4>
+                    <small>${this.getTotalHorasDia(aulasDia)}h</small>
+                </div>
+                <div class="weekly-events">
+                    ${
+                        aulasDia.length
+                            ? aulasDia.map(aula => `
+                                <div class="weekly-event" data-aula-id="${aula.id}" style="border-left-color:${aula.cor || '#3b82f6'}">
+                                    <div class="weekly-event-time">${escapeHtml(aula.inicio)} - ${escapeHtml(aula.fim)}</div>
+                                    <div class="weekly-event-title">${escapeHtml(aula.materia)}</div>
+                                    ${aula.sala ? `<div class="weekly-event-detail">📍 ${escapeHtml(aula.sala)}</div>` : ''}
+                                    ${aula.professor ? `<div class="weekly-event-detail">👤 ${escapeHtml(aula.professor)}</div>` : ''}
+                                </div>
+                            `).join('')
+                            : `<p class="no-classes">Sem aulas</p>`
+                    }
+                </div>
+            `;
+            weeklyGrid.appendChild(column);
+        }
+
+        container.appendChild(weeklyGrid);
+
+        container.querySelectorAll('.weekly-event').forEach(el => {
+            el.addEventListener('click', e => {
+                const aulaId = e.currentTarget.dataset.aulaId;
+                if (window.app) window.app.openAulaModal(aulaId);
+            });
+        });
+    }
+
+    // ── Calendário semanal com eixo de horas real ──────────────────────────
+    // Colunas = dias da semana, cada aula posicionada no ponto exato da
+    // hora/duração dela (igual um Google Calendar). A altura de cada hora
+    // se ajusta ao espaço disponível na tela para que a semana toda caiba
+    // sem precisar rolar (em telas muito pequenas, pode rolar só um pouco).
+    renderGradeSemanalGrid(containerId) {
+        this.loadAulas();
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.classList.add('has-week-grid');
+
+        const dias = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+        const hoje = new Date().getDay();
+
+        if (!this.aulas.length) {
+            container.innerHTML = `
+                <div class="no-classes-message">
+                    <i class="fas fa-calendar-times"></i>
+                    <p>Nenhuma aula cadastrada</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Faixa de horário: só o intervalo onde realmente há aulas (+1h de
+        // folga de cada lado), pra não desperdiçar espaço com horas vazias.
+        const horarios = this.aulas.map(a => [a.inicio, a.fim]).flat().filter(Boolean)
+            .map(v => String(v).split(':').map(Number)).filter(p => p.length === 2 && p.every(Number.isFinite));
+        const earliest = Math.max(0, Math.min(...horarios.map(([h]) => h)) - 1);
+        const latest = Math.min(23, Math.max(...horarios.map(([h]) => h)) + 1);
+        const totalHoras = Math.max(6, latest - earliest + 1);
+
+        // Altura de hora dinâmica: cabe tudo na tela disponível sem rolar.
+        const headerChrome = container.closest('.card')?.previousElementSibling ? 260 : 240;
+        const available = Math.max(360, window.innerHeight - headerChrome);
+        const alturaHora = Math.max(28, Math.min(64, Math.floor(available / totalHoras)));
+        const alturaTotal = totalHoras * alturaHora;
+
+        const top = (horario) => {
+            const [h, m] = String(horario).split(':').map(Number);
+            return Math.max(0, ((h - earliest) * 60 + (m || 0)) / 60 * alturaHora);
+        };
+        const altura = (inicio, fim) => Math.max(20, calcularDuracaoMinutos(inicio, fim) / 60 * alturaHora);
+
+        let horasHtml = '';
+        for (let h = earliest; h <= latest; h++) {
+            horasHtml += `<div class="wgrid-hour-label" style="height:${alturaHora}px">${String(h).padStart(2, '0')}:00</div>`;
+        }
+
+        let colsHtml = '';
+        for (let dia = 0; dia < 7; dia++) {
+            const aulasDia = this.getAulasPorDia(dia);
+            let linesHtml = '';
+            for (let h = earliest; h <= latest; h++) {
+                linesHtml += `<div class="wgrid-hline" style="top:${(h - earliest) * alturaHora}px"></div>`;
+            }
+            const eventsHtml = aulasDia.map(aula => {
+                const cor = aula.cor || '#3b82f6';
+                return `
+                    <div class="wgrid-event" data-aula-id="${aula.id}" title="${escapeHtml(aula.materia)} • ${escapeHtml(aula.inicio)}-${escapeHtml(aula.fim)}"
+                         style="top:${top(aula.inicio)}px;height:${altura(aula.inicio, aula.fim)}px;background:${cor}22;border-left-color:${cor};">
+                        <strong>${escapeHtml(aula.materia)}</strong>
+                        <span>${escapeHtml(aula.inicio)}–${escapeHtml(aula.fim)}${aula.sala ? ` • ${escapeHtml(aula.sala)}` : ''}</span>
+                    </div>`;
+            }).join('');
+
+            colsHtml += `
+                <div class="wgrid-day-col ${dia === hoje ? 'is-today' : ''}">
+                    <div class="wgrid-day-header">${dias[dia]}</div>
+                    <div class="wgrid-day-body" style="height:${alturaTotal}px">
+                        ${linesHtml}
+                        ${eventsHtml}
+                    </div>
+                </div>`;
+        }
+
+        container.innerHTML = `
+            <div class="wgrid-wrap">
+                <div class="wgrid-hours-col">
+                    <div class="wgrid-hour-corner"></div>
+                    ${horasHtml}
+                </div>
+                <div class="wgrid-days">${colsHtml}</div>
+            </div>`;
+
+        container.querySelectorAll('.wgrid-event').forEach(el => {
+            el.addEventListener('click', e => {
+                const aulaId = e.currentTarget.dataset.aulaId;
+                if (window.app) window.app.openAulaModal(aulaId);
+            });
+        });
+
+        // No celular a grade rola na horizontal (ver CSS) — já abre
+        // posicionada no dia de hoje em vez de sempre começar no Domingo.
+        if (window.innerWidth <= 640) {
+            const wrap = container.querySelector('.wgrid-wrap');
+            const todayCol = container.querySelector('.wgrid-day-col.is-today');
+            const hoursCol = container.querySelector('.wgrid-hours-col');
+            if (wrap && todayCol) {
+                const wrapRect = wrap.getBoundingClientRect();
+                const colRect = todayCol.getBoundingClientRect();
+                const hoursW = hoursCol ? hoursCol.offsetWidth : 0;
+                wrap.scrollLeft = Math.max(0, (colRect.left - wrapRect.left) - hoursW - 6);
+            }
+        }
+    }
+
+    getProximaAula() {
+        this.loadAulas();
+
+        const hoje = new Date();
+        const diaSemana = hoje.getDay();
+        const minutosAtuais = hoje.getHours() * 60 + hoje.getMinutes();
+
+        const aulasHoje = this.getAulasPorDia(diaSemana);
+        const proximaHoje = aulasHoje.find(a => calcularDuracaoMinutos('00:00', a.inicio) > minutosAtuais);
+        if (proximaHoje) return proximaHoje;
+
+        for (let i = 1; i <= 7; i++) {
+            const proximoDia = (diaSemana + i) % 7;
+            const aulas = this.getAulasPorDia(proximoDia);
+            if (aulas.length) return aulas[0];
+        }
+
+        return null;
+    }
+
+    getAulaAtual() {
+        this.loadAulas();
+
+        const hoje = new Date();
+        const diaSemana = hoje.getDay();
+        const minutosAtuais = hoje.getHours() * 60 + hoje.getMinutes();
+
+        return this.getAulasPorDia(diaSemana).find(a => {
+            const minutosInicio = calcularDuracaoMinutos('00:00', a.inicio);
+            const minutosFim = calcularDuracaoMinutos('00:00', a.fim);
+            return minutosAtuais >= minutosInicio && minutosAtuais <= minutosFim;
+        }) || null;
+    }
+
+    async marcarPresenca(aulaId, data, status) {
+        const key = `${aulaId}_${data}`;
+        const attendance = { ...(window.app?.data?.attendance || {}), [key]: status };
+        const success = await dbService.saveData('attendance', attendance);
+
+        if (success && window.app) {
+            window.app.data.attendance = attendance;
+        }
+
+        if (success && status === 'absent') {
+            const aula = this.aulas.find(a => a.id === aulaId);
+            if (aula) {
+                const tarefa = {
+                    id: generateId(),
+                    titulo: `Recuperar conteúdo da aula perdida - ${aula.materia}`,
+                    materia: aula.materia,
+                    prioridade: 'alta',
+                    dataLimite: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                    estimativa: 60,
+                    concluida: false,
+                    automatica: true
                 };
-            });
-    }
-
-    function mediaAtualDaMateria(nome) {
-        try {
-            const notas = (window.app?.data?.grades || []).filter(g => g.materia === nome);
-            if (typeof window.app?.calcularMedia === 'function') return window.app.calcularMedia(notas);
-        } catch (_) { /* segue sem média */ }
-        return 0;
-    }
-
-    // ======================================================================
-    // ESTILOS
-    // ======================================================================
-    function injectStyles() {
-        if (document.getElementById('repro-eco-styles')) return;
-        const style = document.createElement('style');
-        style.id = 'repro-eco-styles';
-        style.textContent = `
-            #repro-eco-card{background:linear-gradient(135deg,#7c2d12 0%,#9a3412 100%);border-radius:14px;padding:1.1rem 1.25rem;margin-bottom:1.25rem;color:#fff;position:relative;overflow:hidden;}
-            #repro-eco-card .repro-label{font-size:.72rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.7);margin-bottom:.4rem;}
-            #repro-eco-card .repro-title{font-size:1.02rem;font-weight:700;margin-bottom:.5rem;line-height:1.35;}
-            #repro-eco-card .repro-list{display:flex;flex-direction:column;gap:.45rem;margin-bottom:.9rem;}
-            #repro-eco-card .repro-item{display:flex;align-items:center;justify-content:space-between;gap:.6rem;background:rgba(255,255,255,.1);border-radius:10px;padding:.5rem .7rem;font-size:.85rem;}
-            #repro-eco-card .repro-item b{font-weight:700;}
-            #repro-eco-card .repro-delta{font-weight:700;white-space:nowrap;}
-            #repro-eco-card .repro-delta.up{color:#86efac;}
-            #repro-eco-card .repro-delta.down{color:#fca5a5;}
-            #repro-eco-card .repro-delta.same{color:#fde68a;}
-            #repro-eco-card .repro-btn{padding:.45rem 1rem;border-radius:8px;border:none;font-size:.82rem;font-weight:600;cursor:pointer;background:#fff;color:#7c2d12;}
-            .repro-badge{display:inline-flex;align-items:center;gap:4px;font-size:.7rem;font-weight:700;padding:2px 9px;border-radius:999px;background:rgba(249,115,22,.16);color:#fb923c;margin-left:8px;vertical-align:middle;}
-            .repro-history{margin-top:14px;border-top:1px dashed var(--border,#2d3a4f);padding-top:12px;}
-            .repro-history h4{margin:0 0 8px;font-size:.85rem;color:#fb923c;}
-            .repro-history ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;}
-            .repro-history li{display:flex;justify-content:space-between;gap:8px;font-size:.82rem;color:var(--text-secondary,#94a3b8);background:var(--bg-tertiary,#1e2b3a);border-radius:8px;padding:6px 10px;}
-            .repro-history li strong{color:var(--text-primary,#f8fafc);}
-            .repro-compare{margin-top:6px;font-size:.82rem;font-weight:600;}
-            .repro-compare.up{color:#22c55e;}
-            .repro-compare.down{color:#ef4444;}
-            .repro-compare.same{color:#eab308;}
-        `;
-        document.head.appendChild(style);
-    }
-
-    // ======================================================================
-    // DASHBOARD: card de destaque
-    // ======================================================================
-    function renderDashboardCard() {
-        const existing = document.getElementById('repro-eco-card');
-        if (existing) existing.remove();
-
-        const repescagem = getRepescagemSubjects(window.app?.data);
-        if (!repescagem.length) return;
-
-        const card = document.createElement('div');
-        card.id = 'repro-eco-card';
-        card.innerHTML = `
-            <div class="repro-label">🔁 Repescagem</div>
-            <div class="repro-title">${repescagem.length > 1 ? `Você está repetindo ${repescagem.length} matérias` : `Você está repetindo ${esc(repescagem[0].nome)}`} — o mentor IA já está priorizando ${repescagem.length > 1 ? 'elas' : 'ela'}.</div>
-            <div class="repro-list">
-                ${repescagem.map(item => {
-                    const atual = mediaAtualDaMateria(item.nome);
-                    const antiga = Number(item.ultimaTentativa?.nota) || 0;
-                    const delta = atual - antiga;
-                    const cls = !atual ? 'same' : delta > 0.05 ? 'up' : delta < -0.05 ? 'down' : 'same';
-                    const deltaTxt = !atual ? 'ainda sem notas nessa nova tentativa' : `${delta > 0 ? '+' : ''}${delta.toFixed(1)} vs. tentativa anterior`;
-                    return `
-                        <div class="repro-item">
-                            <span><b>${esc(item.nome)}</b> • reprovada ${item.vezesReprovada}x (última: ${esc(item.ultimaTentativa?.nota ?? '—')})</span>
-                            <span class="repro-delta ${cls}">${deltaTxt}</span>
-                        </div>
-                    `;
-                }).join('')}
-            </div>
-            <button class="repro-btn" id="repro-eco-btn">Ver comparação de notas</button>
-        `;
-
-        const content = document.getElementById('content-area');
-        const header = content?.querySelector('.dashboard-header');
-        const priorityCard = document.getElementById('slc-priority-card');
-        if (priorityCard) priorityCard.insertAdjacentElement('afterend', card);
-        else if (header) header.insertAdjacentElement('afterend', card);
-        else content?.prepend(card);
-
-        document.getElementById('repro-eco-btn')?.addEventListener('click', () => {
-            window.app?.loadView?.('previsao-notas');
-        });
-    }
-
-    // ======================================================================
-    // PREVISÃO DE NOTAS: badge + histórico de tentativas em cada card
-    // ======================================================================
-    function injectPrevisaoNotasHistory() {
-        const repescagem = getRepescagemSubjects(window.app?.data);
-        if (!repescagem.length) return;
-        const byName = new Map(repescagem.map(item => [slug(item.nome), item]));
-
-        document.querySelectorAll('#content-area .subject-grade-card').forEach(card => {
-            const h3 = card.querySelector('.card-header h3');
-            if (!h3) return;
-            const item = byName.get(slug(h3.textContent));
-            if (!item) return;
-
-            if (!card.querySelector('.repro-badge')) {
-                const badge = document.createElement('span');
-                badge.className = 'repro-badge';
-                badge.innerHTML = `🔁 Repescagem (${item.vezesReprovada}ª reprovação)`;
-                h3.insertAdjacentElement('afterend', badge);
+                await dbService.addItem('tasks', tarefa);
+                showToast('Tarefa de recuperação criada automaticamente!');
             }
-
-            if (!card.querySelector('.repro-history')) {
-                const atual = mediaAtualDaMateria(item.nome);
-                const antiga = Number(item.ultimaTentativa?.nota) || 0;
-                const delta = atual - antiga;
-                const cls = !atual ? 'same' : delta > 0.05 ? 'up' : delta < -0.05 ? 'down' : 'same';
-                const compareTxt = !atual
-                    ? 'Ainda sem notas registradas nesta nova tentativa.'
-                    : delta > 0.05 ? `📈 Melhorou ${delta.toFixed(1)} ponto(s) em relação à última tentativa.`
-                    : delta < -0.05 ? `📉 Está ${Math.abs(delta).toFixed(1)} ponto(s) abaixo da última tentativa.`
-                    : '➡️ Praticamente igual à última tentativa.';
-
-                const block = document.createElement('div');
-                block.className = 'repro-history';
-                block.innerHTML = `
-                    <h4>Histórico de tentativas</h4>
-                    <ul>
-                        ${item.tentativas.map(t => `
-                            <li>
-                                <span>${t.semestre ? `${esc(t.semestre)}º semestre` : 'Semestre anterior'}</span>
-                                <strong>${t.resultado === 'aprovado' ? '✅' : '❌'} Nota ${esc(t.nota ?? '—')}</strong>
-                            </li>
-                        `).join('')}
-                    </ul>
-                    <div class="repro-compare ${cls}">${compareTxt}</div>
-                `;
-                const body = card.querySelector('.card-body');
-                body?.appendChild(block);
-            }
-        });
-    }
-
-    // ======================================================================
-    // GANCHO NAS TROCAS DE VIEW
-    // ======================================================================
-    function patchApp() {
-        const app = window.app;
-        if (!app || app.__reproEcoPatched) return;
-        app.__reproEcoPatched = true;
-
-        const orig = app.loadView?.bind(app);
-        if (!orig) return;
-
-        window.app.loadView = function (view) {
-            const result = orig(view);
-            if (view === 'dashboard') setTimeout(renderDashboardCard, 250);
-            if (view === 'previsao-notas') setTimeout(injectPrevisaoNotasHistory, 200);
-            return result;
-        };
-    }
-
-    // ======================================================================
-    // MENTOR IA: prioriza repescagem, entende contexto e novas perguntas
-    // ======================================================================
-    function patchAI() {
-        if (!window.AIAssistant || !window.AIAssistant.prototype._getMatterPriorityList) return;
-        const proto = window.AIAssistant.prototype;
-        if (proto.__reproEcoPatched) return;
-        proto.__reproEcoPatched = true;
-
-        // Contexto: acrescenta curriculum + a lista de repescagem, sem
-        // remover nada do que updateContext já monta.
-        if (window.aiAssistant && !window.aiAssistant.__reproEcoCtxPatched) {
-            window.aiAssistant.__reproEcoCtxPatched = true;
-            const origUpdateContext = window.aiAssistant.updateContext.bind(window.aiAssistant);
-            window.aiAssistant.updateContext = function (data) {
-                origUpdateContext(data);
-                this.context.curriculum = Array.isArray(data?.curriculum) ? data.curriculum : [];
-                this.context.repescagem = getRepescagemSubjects(data);
-            };
         }
 
-        // Prioridade: matéria em repescagem ganha peso extra na fila que já
-        // existe (a mesma usada em plano do dia, plano semanal, "o que
-        // estudar agora" e análise de risco).
-        const origPriorityList = proto._getMatterPriorityList;
-        proto._getMatterPriorityList = function () {
-            const list = origPriorityList.call(this);
-            const repescagemMap = new Map((this.context.repescagem || []).map(r => [r.nome, r]));
-            if (!repescagemMap.size) return list;
-
-            list.forEach(item => {
-                const info = repescagemMap.get(item.nome);
-                if (!info) return;
-                item.score += 30;
-                item.emRepescagem = true;
-                item.vezesReprovada = info.vezesReprovada;
-                const prefixo = `você já foi reprovado nessa matéria ${info.vezesReprovada}x antes`;
-                item.justificativaCurta = item.justificativaCurta
-                    ? `${prefixo}, ${item.justificativaCurta.charAt(0).toLowerCase()}${item.justificativaCurta.slice(1)}`
-                    : prefixo.charAt(0).toUpperCase() + prefixo.slice(1);
-            });
-
-            return list.sort((a, b) => b.score - a.score);
-        };
-
-        // Diagnóstico completo: acrescenta uma seção de repescagem, no
-        // mesmo formato usado pelas outras extensões desse arquivo.
-        if (typeof proto._buildSmartDiagnosis === 'function') {
-            const origDiag = proto._buildSmartDiagnosis;
-            proto._buildSmartDiagnosis = function () {
-                const base = origDiag.call(this);
-                const repescagem = this.context.repescagem || [];
-                if (!repescagem.length) return base;
-                const linhas = repescagem.map(item => `${item.nome} (${item.vezesReprovada}x reprovada, última nota ${item.ultimaTentativa?.nota ?? '—'})`);
-                return `${base}\n\n🔁 **Em repescagem:** ${linhas.join(' • ')}. Essas matérias estão recebendo prioridade extra no seu plano.`;
-            };
-        }
-
-        // Nova pergunta: "estou repetindo alguma matéria?"
-        const origAsk = proto.ask;
-        proto.ask = async function (pergunta) {
-            const p = String(pergunta || '').toLowerCase();
-            if (p.match(/repescagem|repetindo.*materia|materia.*repetindo|ja.*reprovei|reprovei.*antes|de novo.*materia|cursando.*de novo/)) {
-                const repescagem = this.context.repescagem || [];
-                if (!repescagem.length) return 'Você não está cursando nenhuma matéria em repescagem agora — nenhuma das que você está fazendo foi reprovada antes.';
-                const linhas = repescagem.map(item => {
-                    const atual = mediaAtualDaMateria(item.nome);
-                    const antiga = Number(item.ultimaTentativa?.nota) || 0;
-                    const cmp = !atual ? 'ainda sem notas nesta tentativa' : atual > antiga ? `melhor que da última vez (${antiga.toFixed(1)})` : atual < antiga ? `pior que da última vez (${antiga.toFixed(1)})` : 'igual à última vez';
-                    return `- ${item.nome}: reprovada ${item.vezesReprovada}x, nota atual ${atual.toFixed(1)} (${cmp}).`;
-                });
-                return [`Você está em repescagem em ${repescagem.length} matéria(s):`, ...linhas, '\nEstou priorizando essas matérias no seu plano automaticamente.'].join('\n');
-            }
-            return origAsk.call(this, pergunta);
-        };
+        return success;
     }
 
-    // ======================================================================
-    // INIT
-    // ======================================================================
-    injectStyles();
+    getGradeStats() {
+        const stats = {
+            totalAulas: this.aulas.length,
+            horasSemanais: 0,
+            aulasPorMateria: {},
+            diasMaisCheios: []
+        };
 
-    document.addEventListener('app-ready', () => {
-        setTimeout(patchApp, 500);
-        setTimeout(patchAI, 500);
-    });
-    if (window.app?.initialized) {
-        setTimeout(patchApp, 100);
-        setTimeout(patchAI, 100);
+        const horasPorDia = new Array(7).fill(0);
+        const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+        this.aulas.forEach(aula => {
+            const dia = parseInt(aula.dia, 10);
+            const duracao = calcularDuracaoMinutos(aula.inicio, aula.fim) / 60;
+
+            horasPorDia[dia] += duracao;
+            stats.horasSemanais += duracao;
+            stats.aulasPorMateria[aula.materia] = (stats.aulasPorMateria[aula.materia] || 0) + 1;
+        });
+
+        stats.diasMaisCheios = horasPorDia
+            .map((horas, index) => ({ dia: diasSemana[index], horas }))
+            .filter(d => d.horas > 0)
+            .sort((a, b) => b.horas - a.horas);
+
+        return stats;
     }
-    // Reforço: o AIAssistant e o app podem inicializar em momentos meio
-    // diferentes dependendo da conexão — tenta de novo em alguns segundos
-    // caso a primeira tentativa tenha sido cedo demais.
-    setTimeout(() => { patchApp(); patchAI(); }, 2500);
-})();
+
+    getTotalHorasDia(aulas) {
+        const totalMinutos = aulas.reduce((acc, a) => acc + calcularDuracaoMinutos(a.inicio, a.fim), 0);
+        return (totalMinutos / 60).toFixed(1);
+    }
+
+    atualizarERenderizar() {
+        this.loadAulas();
+        this.renderGrade();
+    }
+}
+
+window.scheduleManager = new ScheduleManager();
+
+document.addEventListener('app-ready', () => {
+    window.scheduleManager.init();
+});
+
+document.addEventListener('aulas-atualizadas', () => {
+    if (window.scheduleManager) {
+        window.scheduleManager.atualizarERenderizar();
+    }
+});

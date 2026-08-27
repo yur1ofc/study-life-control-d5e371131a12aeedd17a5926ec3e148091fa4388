@@ -1,289 +1,294 @@
-// api/send-reminders.js — Vercel Function, feita pra rodar de tempos em
-// tempos (cron) e não sob demanda de um usuário.
+// api/calendar/feed.js — Vercel Function (feed .ics assinável)
 //
-// O que faz, a cada execução:
-//   1) Busca todo usuário com settings.studyReminders.enabled == true.
-//   2) Pra cada um, olha provas/tarefas/sessões e calcula se alguma "vence"
-//      dentro da janela de aviso configurada (ex: 24h antes da prova).
-//   3) Manda um push de verdade (via web-push + VAPID) pros dispositivos
-//      salvos em pushSubscriptions.
-//   4) Marca o que já foi avisado em sentReminders, pra não repetir no
-//      próximo run.
+// IMPORTANTE: essa rota era originalmente api/calendar/[token].js (rota
+// dinâmica), mas a Vercel está com um bug de plataforma nesse período
+// (meados de 2026) onde rotas de função com segmento dinâmico ([token])
+// compilam certinho e aparecem em "Output"/"Invoke Function", mas devolvem
+// 404 da própria Vercel quando acessadas por HTTP público. Rotas "retas"
+// (sem colchetes), como esta e api/send-reminders.js, não têm esse
+// problema. Por isso migramos pra uma rota fixa que lê o token via
+// querystring (?token=...) em vez de via segmento de URL.
 //
-// Isso PRECISA de acesso de administrador ao Firestore (ler/atualizar o
-// documento de QUALQUER usuário, não só o de quem está logado) — por isso,
-// diferente de api/gemini.js e api/calendar/[token].js, aqui a gente usa o
-// firebase-admin com uma Service Account. Essa chave é secreta e só existe
-// como variável de ambiente no Vercel — nunca commitada (veja .gitignore).
+// Google Calendar / Apple Calendário / Outlook batem nessa URL sozinhos de
+// tempos em tempos (o app do usuário nem precisa estar aberto) e recebem de
+// volta um arquivo .ics com provas, tarefas, sessões de estudo, aulas e
+// revisões espaçadas —
+// sempre atualizado, porque calendar-feed.js (front) mantém o documento
+// calendar_feeds/{token} em dia a cada save.
 //
-// ── Variáveis de ambiente necessárias no Vercel ─────────────────────────────
-//   FIREBASE_SERVICE_ACCOUNT_KEY → JSON da service account, em base64.
-//     Como conseguir: Firebase Console → ⚙️ Configurações do projeto →
-//     Contas de serviço → "Gerar nova chave privada" (baixa um .json).
-//     Depois rode isso pra converter:
-//       base64 -w0 sua-chave.json          (Linux)
-//       base64 -i sua-chave.json           (macOS)
-//     e cole o resultado como valor da variável.
-//   VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT
-//     → gerados com scripts/generate-vapid-keys.js
-//   CRON_SECRET → qualquer string longa aleatória, escolhida por você.
-//     Precisa bater com o header "Authorization: Bearer <CRON_SECRET>" de
-//     quem chama essa rota (o cron do Vercel manda isso sozinho quando
-//     CRON_SECRET está configurada; um cron EXTERNO, tipo cron-job.org,
-//     precisa ser configurado manualmente pra mandar esse header).
+// Não precisa de service account/Admin SDK: o documento é público de
+// propósito (veja o comentário em firestore.rules), então basta uma
+// requisição REST simples e sem autenticação.
 //
-// ── Por que um cron externo, além do cron do Vercel? ────────────────────────
-// No plano Hobby da Vercel, cron job só roda 1x por dia — o suficiente pra
-// um lembrete "prova amanhã", mas fraco demais pra "sua sessão de estudo
-// começa em 15 minutos". Recomendado: cadastre esta URL de graça em
-// https://cron-job.org (ou similar) pra rodar a cada 10–15 minutos, mandando
-// o header Authorization acima. Mantenha também a entrada em vercel.json
-// como um fallback diário caso o cron externo falhe.
+// Variável de ambiente necessária no Vercel:
+//   FIREBASE_PROJECT_ID → a mesma já usada em api/gemini.js
 
-const DEDUPE_LIMIT = 500;
+const TOKEN_RE = /^[a-f0-9]{24,64}$/i;
 
-let firebaseAdminApp = null;
-function getDb() {
-  const admin = require('firebase-admin');
-  if (!firebaseAdminApp) {
-    const raw = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-    if (!raw) throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY não configurada no servidor.');
-    const serviceAccount = JSON.parse(Buffer.from(raw, 'base64').toString('utf8'));
-    firebaseAdminApp = admin.apps.length ? admin.app() : admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
+// ── Decodificador mínimo do formato "Value" do Firestore REST ──────────────
+function fsValue(v) {
+  if (v == null) return null;
+  if ('stringValue' in v) return v.stringValue;
+  if ('integerValue' in v) return parseInt(v.integerValue, 10);
+  if ('doubleValue' in v) return v.doubleValue;
+  if ('booleanValue' in v) return v.booleanValue;
+  if ('nullValue' in v) return null;
+  if ('arrayValue' in v) return (v.arrayValue.values || []).map(fsValue);
+  if ('mapValue' in v) return fsFields(v.mapValue.fields || {});
+  return null;
+}
+function fsFields(fields) {
+  const out = {};
+  Object.keys(fields || {}).forEach(k => { out[k] = fsValue(fields[k]); });
+  return out;
+}
+
+// ── Helpers de formatação ICS (RFC 5545) ────────────────────────────────────
+function icsEscape(text) {
+  return String(text ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\n/g, '\\n');
+}
+
+// Quebra linhas maiores que 75 octetos, como o padrão exige.
+function foldLine(line) {
+  if (line.length <= 75) return line;
+  let out = line.slice(0, 75);
+  let rest = line.slice(75);
+  while (rest.length > 0) {
+    out += '\r\n ' + rest.slice(0, 74);
+    rest = rest.slice(74);
   }
-  return admin.firestore();
+  return out;
 }
 
-function setupWebPush() {
-  const webpush = require('web-push');
-  const { VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT } = process.env;
-  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !VAPID_SUBJECT) {
-    throw new Error('VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT não configuradas no servidor.');
+function dateOnly(yyyyMmDd) {
+  return (yyyyMmDd || '').replace(/-/g, '');
+}
+
+function addDaysToDateOnly(yyyyMmDd, days) {
+  const [y, m, d] = yyyyMmDd.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return `${dt.getUTCFullYear()}${String(dt.getUTCMonth() + 1).padStart(2, '0')}${String(dt.getUTCDate()).padStart(2, '0')}`;
+}
+
+// Fuso horário usado nos eventos com hora (aulas e sessões de estudo).
+// Vem do feed do próprio usuário (settings.timezone, detectado no
+// navegador dele em calendar-feed.js — front). Isso é o que faz o
+// horário sair certo pra qualquer usuário, não só pra quem mora no
+// Brasil.
+//
+// DECISÃO DE DESIGN — por que TZID sem VTIMEZONE embutido:
+// A abordagem anterior tentou embutir um VTIMEZONE com as regras de
+// horário de verão do fuso. O problema é que essas regras mudam (o
+// Brasil, por exemplo, aboliu o horário de verão em 2019) e qualquer
+// tabela que a gente embuta no código fica desatualizada mais cedo ou
+// mais tarde — recriando o mesmo tipo de bug, só que sazonal. Referenciar
+// o TZID pelo nome IANA puro (ex: "America/Sao_Paulo", "Europe/Lisbon",
+// "America/New_York") e deixar o Google Calendar / Apple Calendário /
+// Outlook resolverem contra o banco de fusos deles (que eles mantêm
+// atualizado) é mais simples e correto pra sempre — inclusive pra
+// recorrência semanal das aulas atravessando trocas de horário de verão
+// em países que ainda têm.
+const DEFAULT_TZID = 'America/Sao_Paulo';
+
+// Confirma que o navegador/runtime reconhece o nome do fuso (formato
+// IANA válido) antes de colocar no .ics — string inválida ali quebraria
+// o arquivo inteiro para o app de calendário do usuário.
+function safeTzid(tz) {
+  const candidate = String(tz || '').trim();
+  if (!candidate) return DEFAULT_TZID;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: candidate });
+    return candidate;
+  } catch (_) {
+    return DEFAULT_TZID;
   }
-  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-  return webpush;
 }
 
-// Datas e horários salvos pelo app (exams.data, tasks.dataLimite,
-// reviews.data, sessions.data) não guardam fuso horário — vêm de campos
-// <input type="date"> / type="datetime-local">, que só têm os dígitos da
-// hora LOCAL do navegador de quem preencheu. Assumimos horário de
-// Brasília (UTC-3, fixo, já que o Brasil não tem mais horário de verão
-// desde 2019). Se algum dia o app atender fora do Brasil, isso precisa
-// virar um fuso por usuário salvo no cadastro.
-const FUSO_BRASIL = '-03:00';
-
-function dateOnlyToMs(yyyyMmDd) {
-  if (!yyyyMmDd) return null;
-  const t = Date.parse(`${yyyyMmDd}T00:00:00${FUSO_BRASIL}`);
-  return Number.isNaN(t) ? null : t;
+// datetime-local ("2026-08-20T14:00") -> "20260820T140000" (hora de
+// parede, sem conversão — o TZID declarado no DTSTART/DTEND é quem diz
+// ao calendário que isso é horário de Brasília).
+function wallClockDateTime(isoLocal, extraMinutes = 0) {
+  const m = String(isoLocal).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!m) return null;
+  const dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]));
+  dt.setMinutes(dt.getMinutes() + extraMinutes);
+  const p = n => String(n).padStart(2, '0');
+  return `${dt.getFullYear()}${p(dt.getMonth() + 1)}${p(dt.getDate())}T${p(dt.getHours())}${p(dt.getMinutes())}00`;
 }
 
-// "Agora" já deslocado -3h, pra poder ler getUTCHours()/toISOString() e
-// obter a hora e a data de calendário corretas em Brasília sem depender
-// do fuso do servidor (Vercel roda em UTC).
-function agoraBrasilia(now) {
-  return new Date(now - 3 * 3600000);
+// DTSTAMP tem que ser sempre UTC de verdade (com Z), diferente do
+// DTSTART/DTEND dos eventos. feed.updatedAt já vem em ISO UTC
+// (new Date().toISOString(), gerado no calendar-feed.js), então só
+// formatamos sem reinterpretar os números como se fossem hora local.
+function utcStamp(isoUtc) {
+  const dt = isoUtc ? new Date(isoUtc) : new Date();
+  const valid = !isNaN(dt.getTime()) ? dt : new Date();
+  const p = n => String(n).padStart(2, '0');
+  return `${valid.getUTCFullYear()}${p(valid.getUTCMonth() + 1)}${p(valid.getUTCDate())}T${p(valid.getUTCHours())}${p(valid.getUTCMinutes())}${p(valid.getUTCSeconds())}Z`;
 }
 
-function calcularStreakDiario(dailyLogs, hojeStr) {
-  const datasComLog = new Set((dailyLogs || []).map(l => l.data));
-  let streak = 0;
-  const cursor = new Date(`${hojeStr}T00:00:00Z`);
-  if (!datasComLog.has(hojeStr)) cursor.setUTCDate(cursor.getUTCDate() - 1);
-  while (datasComLog.has(cursor.toISOString().slice(0, 10))) {
-    streak++;
-    cursor.setUTCDate(cursor.getUTCDate() - 1);
-  }
-  return streak;
+const WEEKDAY_ICS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+// 2023-01-01 foi um domingo — usado só como âncora estável pro DTSTART das
+// aulas recorrentes (RRULE cuida do resto). Não representa a aula "de
+// verdade" ter começado nessa data.
+function anchoredWeeklyDateTime(diaSemana, hhmm) {
+  const dia = Number(diaSemana) || 0;
+  const [hh, mm] = String(hhmm || '00:00').split(':').map(Number);
+  const anchor = new Date(Date.UTC(2023, 0, 1 + dia, 0, 0));
+  const p = n => String(n).padStart(2, '0');
+  return `${anchor.getUTCFullYear()}${p(anchor.getUTCMonth() + 1)}${p(anchor.getUTCDate())}T${p(hh || 0)}${p(mm || 0)}00`;
 }
 
-function localDateTimeToMs(isoLocal) {
-  if (!isoLocal) return null;
-  const t = Date.parse(isoLocal.length === 16 ? `${isoLocal}:00${FUSO_BRASIL}` : isoLocal);
-  return Number.isNaN(t) ? null : t;
-}
+function buildIcs(feed) {
+  const tzid = safeTzid(feed.timezone);
+  const lines = [];
+  lines.push('BEGIN:VCALENDAR');
+  lines.push('VERSION:2.0');
+  lines.push('PRODID:-//SLCampus//Feed de Calendario//PT');
+  lines.push('CALSCALE:GREGORIAN');
+  lines.push('METHOD:PUBLISH');
+  lines.push('X-WR-CALNAME:SLCampus');
+  lines.push('X-WR-CALDESC:Provas, tarefas, sessões de estudo, aulas e revisões');
+  // Dica de intervalo de atualização pros clientes que respeitam (a maioria
+  // busca de qualquer forma a cada 12–24h, mas não custa declarar).
+  lines.push('REFRESH-INTERVAL;VALUE=DURATION:PT12H');
+  lines.push('X-PUBLISHED-TTL:PT12H');
+  lines.push(`X-WR-TIMEZONE:${tzid}`);
 
-// Provas, tarefas e trabalhos (tratados como "exams") não usam mais um
-// único "X horas antes" configurável — mandam vários avisos fixos,
-// ficando mais frequentes perto da data. Cada checkpoint tem uma janela
-// de 24h pra disparar (dá folga pro cron não perder o horário certo) e
-// é marcado individualmente em sentReminders, então nunca repete.
-const CHECKPOINTS_DIAS = [7, 5, 3, 1, 0];
-const JANELA_CHECKPOINT_MS = 24 * 3600000;
-
-function labelDias(dias) {
-  if (dias === 0) return 'é hoje';
-  if (dias === 1) return 'é amanhã';
-  return `em ${dias} dias`;
-}
-
-function checkpointsDevidos(itemMs, prefixo, id, tipoLabel, corpo, now, already) {
-  const due = [];
-  for (const dias of CHECKPOINTS_DIAS) {
-    const key = `${prefixo}:${id}:${dias}d`;
-    if (already.has(key)) continue;
-    const triggerMs = itemMs - dias * 86400000;
-    if (now >= triggerMs && now < triggerMs + JANELA_CHECKPOINT_MS) {
-      due.push({ key, title: `${tipoLabel} ${labelDias(dias)}`, body: corpo });
-    }
-  }
-  return due;
-}
-
-// Descobre quais itens de um usuário "vencem" dentro da janela de aviso e
-// ainda não foram notificados.
-function findDueReminders(data, now) {
-  const prefs = data?.settings?.studyReminders || {};
-  const already = new Set(data.sentReminders || []);
-  const due = [];
-
-  (data.exams || []).forEach(e => {
-    if (e.concluida) return;
-    const examMs = dateOnlyToMs(e.data);
-    if (examMs == null) return;
-    const corpo = `${e.titulo}${e.materia ? ` — ${e.materia}` : ''}`;
-    due.push(...checkpointsDevidos(examMs, 'exam', e.id, '📝 Prova/trabalho', corpo, now, already));
+  (feed.exams || []).forEach(e => {
+    if (!e.data) return;
+    lines.push('BEGIN:VEVENT');
+    lines.push(`UID:exam-${e.id}@study-life-control`);
+    lines.push(`DTSTAMP:${utcStamp(feed.updatedAt)}`);
+    lines.push(`DTSTART;VALUE=DATE:${dateOnly(e.data)}`);
+    lines.push(`DTEND;VALUE=DATE:${addDaysToDateOnly(e.data, 1)}`);
+    lines.push(foldLine(`SUMMARY:${icsEscape(`📝 Prova: ${e.titulo}${e.materia ? ` (${e.materia})` : ''}`)}`));
+    const desc = [e.tipo && `Tipo: ${e.tipo}`, e.peso && `Peso: ${e.peso}`, e.importancia && `Importância: ${e.importancia}`].filter(Boolean).join(' · ');
+    if (desc) lines.push(foldLine(`DESCRIPTION:${icsEscape(desc)}`));
+    lines.push('BEGIN:VALARM');
+    lines.push('ACTION:DISPLAY');
+    lines.push(foldLine(`DESCRIPTION:${icsEscape(`Prova amanhã: ${e.titulo}`)}`));
+    lines.push('TRIGGER:-P1D');
+    lines.push('END:VALARM');
+    lines.push('END:VEVENT');
   });
 
-  (data.tasks || []).forEach(t => {
-    if (t.concluida) return;
-    const taskMs = dateOnlyToMs(t.dataLimite);
-    if (taskMs == null) return;
-    const corpo = `${t.titulo}${t.materia ? ` — ${t.materia}` : ''}`;
-    due.push(...checkpointsDevidos(taskMs, 'task', t.id, '✅ Tarefa', corpo, now, already));
+  (feed.tasks || []).forEach(t => {
+    if (!t.dataLimite) return;
+    lines.push('BEGIN:VEVENT');
+    lines.push(`UID:task-${t.id}@study-life-control`);
+    lines.push(`DTSTAMP:${utcStamp(feed.updatedAt)}`);
+    lines.push(`DTSTART;VALUE=DATE:${dateOnly(t.dataLimite)}`);
+    lines.push(`DTEND;VALUE=DATE:${addDaysToDateOnly(t.dataLimite, 1)}`);
+    lines.push(foldLine(`SUMMARY:${icsEscape(`✅ Tarefa: ${t.titulo}${t.materia ? ` (${t.materia})` : ''}`)}`));
+    const desc = [t.prioridade && `Prioridade: ${t.prioridade}`, t.estimativa && `Estimativa: ${t.estimativa} min`].filter(Boolean).join(' · ');
+    if (desc) lines.push(foldLine(`DESCRIPTION:${icsEscape(desc)}`));
+    lines.push('BEGIN:VALARM');
+    lines.push('ACTION:DISPLAY');
+    lines.push(foldLine(`DESCRIPTION:${icsEscape(`Tarefa vence: ${t.titulo}`)}`));
+    lines.push('TRIGGER:-P1D');
+    lines.push('END:VALARM');
+    lines.push('END:VEVENT');
   });
 
-  // Revisão espaçada: essa preferência (reviewsHoursBefore) já existia na
-  // tela de Configurações e era salva, mas nunca tinha sido lida aqui —
-  // por isso a notificação nunca disparava, em nenhuma hipótese. Segue o
-  // mesmo padrão de "X horas antes" que sessão/aula já usam.
-  const reviewsHoursBefore = Number(prefs.reviewsHoursBefore ?? 24);
-  (data.reviews || []).forEach(r => {
-    if (r.concluida) return;
-    const key = `review:${r.id}`;
-    if (already.has(key)) return;
-    const reviewMs = dateOnlyToMs(r.data);
-    if (reviewMs == null) return;
-    const triggerMs = reviewMs - reviewsHoursBefore * 3600000;
-    // janela vai até 24h depois do dia da revisão, não só até o instante
-    // exato — como reviewMs é meia-noite do dia, sem essa folga o aviso
-    // teria que disparar exatamente à 00h pra não perder a janela.
-    if (now >= triggerMs && now < reviewMs + JANELA_CHECKPOINT_MS) {
-      due.push({ key, title: '🔁 Revisão espaçada', body: `${r.materia}${r.topico ? ` — ${r.topico}` : ''}` });
-    }
+  (feed.sessions || []).forEach(s => {
+    const start = wallClockDateTime(s.data);
+    if (!start) return;
+    const end = wallClockDateTime(s.data, s.duracao || 60);
+    lines.push('BEGIN:VEVENT');
+    lines.push(`UID:session-${s.id}@study-life-control`);
+    lines.push(`DTSTAMP:${utcStamp(feed.updatedAt)}`);
+    lines.push(`DTSTART;TZID=${tzid}:${start}`);
+    lines.push(`DTEND;TZID=${tzid}:${end}`);
+    lines.push(foldLine(`SUMMARY:${icsEscape(`📚 Estudo: ${s.materia}${s.topico ? ` — ${s.topico}` : ''}`)}`));
+    if (s.tipo) lines.push(foldLine(`DESCRIPTION:${icsEscape(`Tipo: ${s.tipo}`)}`));
+    lines.push('BEGIN:VALARM');
+    lines.push('ACTION:DISPLAY');
+    lines.push(foldLine(`DESCRIPTION:${icsEscape(`Sessão de estudo: ${s.materia}`)}`));
+    lines.push('TRIGGER:-PT15M');
+    lines.push('END:VALARM');
+    lines.push('END:VEVENT');
   });
 
-  const sessionsMinutesBefore = Number(prefs.sessionsMinutesBefore ?? 15);
-  (data.sessions || []).forEach(s => {
-    if (s.concluida) return;
-    const key = `session:${s.id}`;
-    if (already.has(key)) return;
-    const sessionMs = localDateTimeToMs(s.data);
-    if (sessionMs == null) return;
-    const triggerMs = sessionMs - sessionsMinutesBefore * 60000;
-    if (now >= triggerMs && now < sessionMs) {
-      due.push({ key, title: '📚 Sessão de estudo já já', body: `${s.materia}${s.topico ? ` — ${s.topico}` : ''}` });
-    }
+  (feed.reviews || []).forEach(r => {
+    if (!r.data) return;
+    lines.push('BEGIN:VEVENT');
+    lines.push(`UID:review-${r.id}@study-life-control`);
+    lines.push(`DTSTAMP:${utcStamp(feed.updatedAt)}`);
+    lines.push(`DTSTART;VALUE=DATE:${dateOnly(r.data)}`);
+    lines.push(`DTEND;VALUE=DATE:${addDaysToDateOnly(r.data, 1)}`);
+    lines.push(foldLine(`SUMMARY:${icsEscape(`🔁 Revisão: ${r.materia}${r.topico ? ` — ${r.topico}` : ''}`)}`));
+    if (r.tipo) lines.push(foldLine(`DESCRIPTION:${icsEscape(`Tipo: ${r.tipo}`)}`));
+    lines.push('BEGIN:VALARM');
+    lines.push('ACTION:DISPLAY');
+    lines.push(foldLine(`DESCRIPTION:${icsEscape(`Revisão: ${r.materia}`)}`));
+    lines.push('TRIGGER:-P1D');
+    lines.push('END:VALARM');
+    lines.push('END:VEVENT');
   });
 
-  // Diário: se a hora configurada já passou (fuso Brasília) e o usuário
-  // ainda não registrou nada hoje (nem "Meu dia" nem diário de aula),
-  // manda 1 aviso — dedupe por dia (`diario:AAAA-MM-DD`), então mesmo o
-  // cron rodando várias vezes só dispara uma vez por dia, e some sozinho
-  // no dia seguinte por não bater mais a condição de horário.
-  const diarioHora = Number(prefs.diaryReminderHour ?? 20);
-  const bAgora = agoraBrasilia(now);
-  const hojeBr = bAgora.toISOString().slice(0, 10);
-  const diarioKey = `diario:${hojeBr}`;
-  if (!already.has(diarioKey) && bAgora.getUTCHours() >= diarioHora) {
-    const jaRegistrouHoje =
-      (data.dailyLogs || []).some(l => l.data === hojeBr) ||
-      (data.classDiaries || []).some(d => d.data === hojeBr);
-    if (!jaRegistrouHoje) {
-      const streak = calcularStreakDiario(data.dailyLogs, hojeBr);
-      due.push({
-        key: diarioKey,
-        title: streak > 0 ? `🔥 ${streak} dia${streak === 1 ? '' : 's'} seguido${streak === 1 ? '' : 's'} — não perca hoje!` : '📖 Registre seu dia',
-        body: 'Você ainda não preencheu o Diário hoje. Leva menos de 1 minuto no modo rápido.'
-      });
-    }
-  }
+  (feed.classSchedule || []).forEach(a => {
+    if (!a.inicio || !a.fim || a.dia === null || a.dia === undefined) return;
+    const start = anchoredWeeklyDateTime(a.dia, a.inicio);
+    const end = anchoredWeeklyDateTime(a.dia, a.fim);
+    lines.push('BEGIN:VEVENT');
+    lines.push(`UID:class-${a.id}@study-life-control`);
+    lines.push(`DTSTAMP:${utcStamp(feed.updatedAt)}`);
+    lines.push(`DTSTART;TZID=${tzid}:${start}`);
+    lines.push(`DTEND;TZID=${tzid}:${end}`);
+    lines.push(`RRULE:FREQ=WEEKLY;BYDAY=${WEEKDAY_ICS[Number(a.dia) % 7]}`);
+    lines.push(foldLine(`SUMMARY:${icsEscape(`🎓 Aula: ${a.materia}`)}`));
+    lines.push('BEGIN:VALARM');
+    lines.push('ACTION:DISPLAY');
+    lines.push(foldLine(`DESCRIPTION:${icsEscape(`Aula: ${a.materia}`)}`));
+    lines.push('TRIGGER:-PT15M');
+    lines.push('END:VALARM');
+    lines.push('END:VEVENT');
+  });
 
-  return due;
+  lines.push('END:VCALENDAR');
+  return lines.join('\r\n');
 }
 
 module.exports = async function handler(req, res) {
-  const expected = process.env.CRON_SECRET;
-  const authHeader = req.headers.authorization || '';
-  if (!expected || authHeader !== `Bearer ${expected}`) {
-    return res.status(401).json({ error: 'Não autorizado.' });
+  const token = String(req.query?.token || '').trim();
+
+  if (!TOKEN_RE.test(token)) {
+    return res.status(400).send('Token de calendário inválido.');
   }
 
-  let db, webpush;
-  try {
-    db = getDb();
-    webpush = setupWebPush();
-  } catch (err) {
-    return res.status(503).json({ error: err.message });
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  if (!projectId) {
+    return res.status(503).send('FIREBASE_PROJECT_ID não configurada no servidor.');
   }
 
-  const now = Date.now();
-  const summary = { usersChecked: 0, notificationsSent: 0, subscriptionsRemoved: 0, errors: [] };
-
   try {
-    const snapshot = await db.collection('users')
-      .where('settings.studyReminders.enabled', '==', true)
-      .get();
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/calendar_feeds/${token}`;
+    const resp = await fetch(url);
 
-    for (const doc of snapshot.docs) {
-      summary.usersChecked++;
-      const data = doc.data();
-      const subscriptions = Array.isArray(data.pushSubscriptions) ? data.pushSubscriptions : [];
-      if (!subscriptions.length) continue;
-
-      const due = findDueReminders(data, now);
-      if (!due.length) continue;
-
-      const stillValidSubs = [];
-      const sentKeys = [];
-
-      for (const subscription of subscriptions) {
-        let subOk = true;
-        for (const item of due) {
-          try {
-            await webpush.sendNotification(subscription, JSON.stringify({
-              title: item.title,
-              body: item.body,
-              url: './',
-              tag: item.key
-            }));
-            summary.notificationsSent++;
-          } catch (err) {
-            if (err.statusCode === 404 || err.statusCode === 410) {
-              subOk = false; // assinatura expirada/revogada — descarta
-            } else {
-              summary.errors.push(`push ${doc.id}: ${err.message}`);
-            }
-          }
-        }
-        if (subOk) stillValidSubs.push(subscription);
-        else summary.subscriptionsRemoved++;
-      }
-
-      due.forEach(item => sentKeys.push(item.key));
-      const mergedSent = [...(data.sentReminders || []), ...sentKeys].slice(-DEDUPE_LIMIT);
-
-      await doc.ref.update({
-        sentReminders: mergedSent,
-        pushSubscriptions: stillValidSubs
-      });
+    if (resp.status === 404) {
+      return res.status(404).send('Esse link de calendário não existe (ou foi revogado). Gere um novo em Configurações → Calendário.');
+    }
+    if (!resp.ok) {
+      return res.status(502).send('Não foi possível buscar o calendário agora. Tente novamente mais tarde.');
     }
 
-    return res.status(200).json(summary);
+    const doc = await resp.json();
+    const feed = fsFields(doc.fields || {});
+    const ics = buildIcs(feed);
+
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', 'inline; filename="study-life-control.ics"');
+    // Cache curto: os apps de calendário já espaçam as buscas sozinhos, isso
+    // aqui é só pra não gerar o arquivo do zero em toda requisição repetida.
+    res.setHeader('Cache-Control', 'public, max-age=900');
+    return res.status(200).send(ics);
   } catch (err) {
-    return res.status(500).json({ error: err.message, ...summary });
+    return res.status(500).send(`Erro interno ao gerar o calendário: ${err.message}`);
   }
 };

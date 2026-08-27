@@ -1,15 +1,146 @@
-# Este arquivo existe para que o Vercel PARE de usar o .gitignore
-# como filtro do que enviar no deploy (comportamento padrão do
-# Vercel CLI quando não há .vercelignore).
-#
-# Sem este arquivo, o env-config.js (gerado durante o build por
-# inject-env.js) era descartado no deploy porque está listado no
-# .gitignore — mesmo tendo sido criado com sucesso no build.
-#
-# NÃO adicione env-config.js aqui.
+// auth.js - autenticação e roteamento inicial
+let currentUser = null;
 
-node_modules/
-.git/
-.vercel/
-*.log
-.DS_Store
+function getEl(id) {
+  return document.getElementById(id);
+}
+
+function setDisplay(id, value) {
+  const el = getEl(id);
+  if (el) el.style.display = value;
+}
+
+async function handleSignedInUser(user) {
+  currentUser = user;
+  setDisplay('login-screen', 'none');
+
+  if (!window.app) {
+    console.error('window.app ainda não existe');
+    window.showToast?.('App ainda não inicializado. Recarregue a página.', 'error');
+    return;
+  }
+
+  const data = await window.dbService.loadUserData(user.uid);
+  const hasUserProfile = !!(data && data.user && (data.user.nome || data.user.curso || data.user.universidade));
+
+  if (!hasUserProfile) {
+    setDisplay('setup-screen', 'flex');
+    setDisplay('main-dashboard', 'none');
+
+    if (typeof window.app.renderSetupForm === 'function') {
+      window.app.renderSetupForm();
+    }
+    document.dispatchEvent(new Event('app-ready'));
+    return;
+  }
+
+  setDisplay('setup-screen', 'none');
+  setDisplay('main-dashboard', 'block');
+  await window.app.init();
+}
+
+function handleSignedOutUser() {
+  currentUser = null;
+  setDisplay('login-screen', 'flex');
+  setDisplay('setup-screen', 'none');
+  setDisplay('main-dashboard', 'none');
+}
+
+auth.onAuthStateChanged(async (user) => {
+  try {
+    window.showLoading?.();
+
+    if (user) {
+      await handleSignedInUser(user);
+    } else {
+      handleSignedOutUser();
+    }
+  } catch (error) {
+    console.error('Erro na autenticação/inicialização:', error);
+    window.showToast?.('Erro ao inicializar aplicação. Recarregue a página.', 'error');
+  } finally {
+    window.hideLoading?.();
+  }
+});
+
+async function loginWithGoogle() {
+  const btn = getEl('login-google');
+  const errorEl = getEl('login-error-msg');
+
+  // Estado: carregando
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Entrando...';
+  }
+  if (errorEl) errorEl.style.display = 'none';
+
+  try {
+    await auth.signInWithPopup(googleProvider);
+  } catch (error) {
+    console.error('Erro no login:', error);
+    const code = error?.code || '';
+
+    // Popup fechado pelo usuário — não é erro real, só reseta o botão
+    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fab fa-google"></i> Entrar com Google';
+      }
+      return;
+    }
+
+    // Popup bloqueado pelo navegador — tenta redirect
+    if (code === 'auth/popup-blocked') {
+      try {
+        window.showToast?.('Popup bloqueado. Abrindo em tela cheia...', 'warning');
+        await auth.signInWithRedirect(googleProvider);
+        return;
+      } catch (redirectError) {
+        console.error('Erro no redirect:', redirectError);
+      }
+    }
+
+    // Erro real — mostrar na tela
+    const msgs = {
+      'auth/network-request-failed': 'Sem conexão com a internet. Verifique sua rede.',
+      'auth/too-many-requests': 'Muitas tentativas. Aguarde alguns minutos.',
+      'auth/user-disabled': 'Esta conta foi desativada.',
+    };
+    const friendlyMsg = msgs[code] || 'Não foi possível entrar. Tente novamente.';
+
+    if (errorEl) {
+      errorEl.textContent = friendlyMsg;
+      errorEl.style.display = 'block';
+    } else {
+      window.showToast?.(friendlyMsg, 'error');
+    }
+  } finally {
+    // Resetar botão se ainda na tela de login
+    if (btn && getEl('login-screen')?.style.display !== 'none') {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fab fa-google"></i> Entrar com Google';
+    }
+  }
+}
+
+async function logout() {
+  try {
+    await auth.signOut();
+    window.showToast?.('Desconectado com sucesso', 'success');
+  } catch (error) {
+    console.error('Erro no logout:', error);
+    const message = error && error.message ? error.message : 'Falha ao sair';
+    window.showToast?.('Erro ao sair: ' + message, 'error');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  getEl('login-google')?.addEventListener('click', loginWithGoogle);
+  getEl('logout-btn')?.addEventListener('click', logout);
+});
+
+window.authService = {
+  getCurrentUser: () => currentUser,
+  loginWithGoogle,
+  logout
+};

@@ -1,45 +1,90 @@
-// scripts/generate-vapid-keys.js
+// auto-notification-prompt.js
+// Pede permissão de notificação automaticamente na primeira vez que o site
+// abre em um aparelho/navegador que ainda não decidiu nada (Notification.permission
+// === 'default'). Em vez de chamar Notification.requestPermission() direto no
+// load (o que vários navegadores ignoram/bloqueiam sem gesto do usuário e é uma
+// péssima primeira impressão), mostra uma faixa leve pedindo um clique — esse
+// clique já conta como o gesto que o navegador exige, e a permissão nativa some
+// junto.
 //
-// Gera um par de chaves VAPID (usadas pra assinar as notificações push dos
-// alarmes de estudo) usando SÓ o módulo nativo "crypto" do Node — não
-// precisa instalar nada pra rodar isso.
-//
-// Rode UMA VEZ, no seu computador (nunca em produção):
-//   node scripts/generate-vapid-keys.js
-//
-// Depois copie as 3 linhas impressas pra Vercel → Settings → Environment
-// Variables:
-//   VAPID_PUBLIC_KEY   → vai pro front (pode ficar pública, é só isso mesmo)
-//   VAPID_PRIVATE_KEY  → NUNCA exponha no front, fica só no servidor
-//   VAPID_SUBJECT       → um "mailto:seuemail@..." (Google exige isso)
-//
-// Guarde a chave privada em lugar seguro — se perder, precisa gerar um
-// par novo e todo mundo que já tinha ativado os alarmes vai precisar
-// reativar (a assinatura antiga do navegador some).
+// Reaparece em qualquer navegador/dispositivo novo onde ainda não foi decidido
+// (permitido ou negado). Se a pessoa clicar em "Agora não", não repete no mesmo
+// dia nesse aparelho, mas volta a perguntar no dia seguinte até que ela decida.
 
-const crypto = require('crypto');
+(function () {
+  'use strict';
 
-function base64url(buffer) {
-  return buffer.toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-}
+  const DISMISS_KEY_PREFIX = 'slc-notif-prompt-dismissed-';
 
-const ecdh = crypto.createECDH('prime256v1');
-ecdh.generateKeys();
+  function todayKey() {
+    const d = new Date();
+    return `${DISMISS_KEY_PREFIX}${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+  }
 
-let privateKey = ecdh.getPrivateKey();
-if (privateKey.length < 32) {
-  // getPrivateKey() às vezes devolve menos de 32 bytes quando o número
-  // começa com zero — preenche à esquerda pra manter o tamanho fixo.
-  privateKey = Buffer.concat([Buffer.alloc(32 - privateKey.length), privateKey]);
-}
-const publicKey = ecdh.getPublicKey(); // 65 bytes, ponto não-comprimido
+  function wasDismissedToday() {
+    try { return localStorage.getItem(todayKey()) === '1'; } catch (_) { return false; }
+  }
 
-console.log('\n✅ Par de chaves VAPID gerado!\n');
-console.log('Copie estas 3 variáveis para Vercel → Settings → Environment Variables:\n');
-console.log(`VAPID_PUBLIC_KEY=${base64url(publicKey)}`);
-console.log(`VAPID_PRIVATE_KEY=${base64url(privateKey)}`);
-console.log('VAPID_SUBJECT=mailto:seuemail@exemplo.com   ← troque pelo seu e-mail\n');
-console.log('Depois de configurar, redeploy o projeto pro build injetar a chave pública no front.\n');
+  function dismissForToday() {
+    try { localStorage.setItem(todayKey(), '1'); } catch (_) { /* ignore */ }
+  }
+
+  function buildBanner() {
+    const banner = document.createElement('div');
+    banner.id = 'auto-notif-banner';
+    banner.className = 'auto-notif-banner';
+    banner.innerHTML = `
+      <div class="auto-notif-banner-icon"><i class="fas fa-bell"></i></div>
+      <div class="auto-notif-banner-text">
+        <strong>Ativar alarmes de provas e lembretes?</strong>
+        <span>Avisamos antes de provas, trabalhos, sessões, revisões e aulas — mesmo com o app fechado.</span>
+      </div>
+      <div class="auto-notif-banner-actions">
+        <button type="button" class="auto-notif-btn secondary" id="auto-notif-dismiss">Agora não</button>
+        <button type="button" class="auto-notif-btn primary" id="auto-notif-accept">Ativar</button>
+      </div>
+    `;
+    return banner;
+  }
+
+  function removeBanner(banner) {
+    banner?.classList.remove('is-visible');
+    setTimeout(() => banner?.remove(), 200);
+  }
+
+  async function showPrompt() {
+    if (document.getElementById('auto-notif-banner')) return;
+    const banner = buildBanner();
+    document.body.appendChild(banner);
+    requestAnimationFrame(() => banner.classList.add('is-visible'));
+
+    document.getElementById('auto-notif-dismiss')?.addEventListener('click', () => {
+      dismissForToday();
+      removeBanner(banner);
+    });
+
+    document.getElementById('auto-notif-accept')?.addEventListener('click', async () => {
+      const btn = document.getElementById('auto-notif-accept');
+      if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
+      try {
+        await window.pushNotifications.enable();
+        window.showToast?.('Notificações ativadas! Você vai receber os alarmes de estudo.', 'success');
+      } catch (error) {
+        // Se a permissão foi negada, não adianta insistir hoje.
+        dismissForToday();
+        window.showToast?.(error?.message || 'Não foi possível ativar as notificações.', 'error');
+      } finally {
+        removeBanner(banner);
+      }
+    });
+  }
+
+  function maybePrompt() {
+    if (!window.pushNotifications?.isSupported?.()) return;
+    if (window.pushNotifications.permissionStatus() !== 'default') return;
+    if (wasDismissedToday()) return;
+    setTimeout(showPrompt, 1500);
+  }
+
+  document.addEventListener('app-ready', maybePrompt);
+})();

@@ -1,73 +1,38 @@
-// inject-env.js — Roda durante o build do Vercel.
-// Lê as variáveis de ambiente e gera o env-config.js com window.__ENV.
-// Versão com diagnóstico: nunca falha em silêncio.
+# O que aconteceu com os arquivos
 
-const fs = require('fs');
-const path = require('path');
+Quase **todo** o projeto estava com o conteúdo trocado de arquivo — não só o `improvements.js`
+que foi parar no lugar do `inject-env.js`. No zip que você mandou, dezenas de arquivos tinham por
+dentro o código de outro arquivo (cada um geralmente com o comentário `// nome-do-arquivo-certo.js`
+bem no topo, o que ajudou a rastrear tudo).
 
-console.log('[inject-env] ===== INÍCIO =====');
-console.log('[inject-env] __dirname:', __dirname);
-console.log('[inject-env] process.cwd():', process.cwd());
-console.log('[inject-env] Node version:', process.version);
+Eu abri cada arquivo, li o cabeçalho/conteúdo real, e recoloquei cada código no arquivo com o nome
+certo. Resultado: **53 de 56 arquivos foram recuperados corretamente** (validei todos os `.json` e
+`.xml/.svg`, e rodei `node --check` em todos os `.js` — nenhum erro de sintaxe).
 
-try {
-  const keys = [
-    'FIREBASE_API_KEY',
-    'FIREBASE_AUTH_DOMAIN',
-    'FIREBASE_PROJECT_ID',
-    'FIREBASE_STORAGE_BUCKET',
-    'FIREBASE_MESSAGING_SENDER_ID',
-    'FIREBASE_APP_ID'
-  ];
+## Os 3 arquivos que eu NÃO consegui recuperar
 
-  const missing = keys.filter(k => !process.env[k]);
+O conteúdo original de:
+- `app-enhancements.js`
+- `onboarding-simplificado.js`
+- `tutorial.js`
 
-  if (missing.length) {
-    console.error('[inject-env] ERRO: variáveis faltando:', missing.join(', '));
-    console.error('[inject-env] Configure em: Vercel → Settings → Environment Variables');
-    process.exitCode = 1;
-  } else {
-    const envObj = {};
-    keys.forEach(k => { envObj[k] = process.env[k]; });
+**não estava em nenhum lugar do zip** — parece que foi perdido de vez (sobrescrito) durante a
+bagunça, não só movido de lugar. Deixei esses 3 arquivos com um comentário de aviso no lugar do
+conteúdo, pra você não usar sem perceber.
 
-    if (process.env.VAPID_PUBLIC_KEY) {
-      envObj.VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
-    }
+Como recuperar esses 3:
+- Se você usa Git/GitHub para esse projeto: `git log` / `git checkout` numa versão anterior desses
+  3 arquivos específicos.
+- Se não usa Git: procure um backup local mais antigo, ou no histórico de "Versões" do Vercel
+  (Deployments antigos) — dá pra baixar o código-fonte de um deploy anterior que estava funcionando.
 
-    const content = `// Gerado automaticamente no build — NÃO EDITE e NÃO COMMITE este arquivo\nwindow.__ENV = ${JSON.stringify(envObj, null, 2)};\n`;
+## Bônus
 
-    // Escreve tanto em __dirname quanto em process.cwd(), caso sejam diferentes
-    const targets = new Set([
-      path.join(__dirname, 'env-config.js'),
-      path.join(process.cwd(), 'env-config.js')
-    ]);
+Achei um pedacinho de documentação (instruções de uso do `curriculum-catalog.js`) que não pertencia
+a nenhum arquivo do projeto — salvei separado como `CURRICULUM-CATALOG-USO.md`, caso seja útil.
 
-    targets.forEach(targetPath => {
-      fs.writeFileSync(targetPath, content, 'utf8');
-      const exists = fs.existsSync(targetPath);
-      const size = exists ? fs.statSync(targetPath).size : 0;
-      console.log(`[inject-env] Escrito em: ${targetPath} | existe depois: ${exists} | tamanho: ${size} bytes`);
-    });
+## Recomendação
 
-    console.log('[inject-env] env-config.js gerado com sucesso!');
-    keys.forEach(k => console.log(`  ${k}: ${process.env[k].slice(0, 8)}...`));
-
-    if (!process.env.VAPID_PUBLIC_KEY) {
-      console.warn('[inject-env] VAPID_PUBLIC_KEY não configurada — alarmes por push ficarão desativados (calendário .ics continua funcionando normalmente).');
-    }
-  }
-} catch (err) {
-  console.error('[inject-env] ERRO INESPERADO:', err.message);
-  console.error(err.stack);
-  process.exitCode = 1;
-}
-
-// Lista o diretório de saída pra conferência visual no log
-try {
-  const files = fs.readdirSync(__dirname).filter(f => !f.startsWith('.') && f !== 'node_modules');
-  console.log('[inject-env] Arquivos em __dirname após execução:', files.join(', '));
-} catch (e) {
-  console.error('[inject-env] Não consegui listar __dirname:', e.message);
-}
-
-console.log('[inject-env] ===== FIM (exitCode:', process.exitCode || 0, ') =====');
+Depois de conferir, eu apagaria os arquivos `download`, `download (1)` e o
+`study-life-control-atualizacao-grade-ia.zip` da raiz do projeto — são sobras/duplicatas que não
+fazem parte do site.

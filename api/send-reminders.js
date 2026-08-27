@@ -66,24 +66,23 @@ function setupWebPush() {
   return webpush;
 }
 
-// Datas "só dia" (exams.data / tasks.dataLimite) são tratadas como meia-noite
-// UTC — uma simplificação (o app não guarda fuso horário do usuário), então
-// o aviso pode chegar algumas horas mais cedo/tarde dependendo do fuso de
-// quem está usando. Documentado em CALENDARIO-E-LEMBRETES.md.
+// Datas e horários salvos pelo app (exams.data, tasks.dataLimite,
+// reviews.data, sessions.data) não guardam fuso horário — vêm de campos
+// <input type="date"> / type="datetime-local">, que só têm os dígitos da
+// hora LOCAL do navegador de quem preencheu. Assumimos horário de
+// Brasília (UTC-3, fixo, já que o Brasil não tem mais horário de verão
+// desde 2019). Se algum dia o app atender fora do Brasil, isso precisa
+// virar um fuso por usuário salvo no cadastro.
+const FUSO_BRASIL = '-03:00';
+
 function dateOnlyToMs(yyyyMmDd) {
   if (!yyyyMmDd) return null;
-  const t = Date.parse(`${yyyyMmDd}T00:00:00Z`);
-  return Number.isNaN(t) ? null : t;
-}
-
-function localDateTimeToMs(isoLocal) {
-  if (!isoLocal) return null;
-  const t = Date.parse(isoLocal.length === 16 ? `${isoLocal}:00Z` : isoLocal);
+  const t = Date.parse(`${yyyyMmDd}T00:00:00${FUSO_BRASIL}`);
   return Number.isNaN(t) ? null : t;
 }
 
 // "Agora" já deslocado -3h, pra poder ler getUTCHours()/toISOString() e
-// obter a hora e a data de calendário corretas em Brasília, independente
+// obter a hora e a data de calendário corretas em Brasília sem depender
 // do fuso do servidor (Vercel roda em UTC).
 function agoraBrasilia(now) {
   return new Date(now - 3 * 3600000);
@@ -101,6 +100,39 @@ function calcularStreakDiario(dailyLogs, hojeStr) {
   return streak;
 }
 
+function localDateTimeToMs(isoLocal) {
+  if (!isoLocal) return null;
+  const t = Date.parse(isoLocal.length === 16 ? `${isoLocal}:00${FUSO_BRASIL}` : isoLocal);
+  return Number.isNaN(t) ? null : t;
+}
+
+// Provas, tarefas e trabalhos (tratados como "exams") não usam mais um
+// único "X horas antes" configurável — mandam vários avisos fixos,
+// ficando mais frequentes perto da data. Cada checkpoint tem uma janela
+// de 24h pra disparar (dá folga pro cron não perder o horário certo) e
+// é marcado individualmente em sentReminders, então nunca repete.
+const CHECKPOINTS_DIAS = [7, 5, 3, 1, 0];
+const JANELA_CHECKPOINT_MS = 24 * 3600000;
+
+function labelDias(dias) {
+  if (dias === 0) return 'é hoje';
+  if (dias === 1) return 'é amanhã';
+  return `em ${dias} dias`;
+}
+
+function checkpointsDevidos(itemMs, prefixo, id, tipoLabel, corpo, now, already) {
+  const due = [];
+  for (const dias of CHECKPOINTS_DIAS) {
+    const key = `${prefixo}:${id}:${dias}d`;
+    if (already.has(key)) continue;
+    const triggerMs = itemMs - dias * 86400000;
+    if (now >= triggerMs && now < triggerMs + JANELA_CHECKPOINT_MS) {
+      due.push({ key, title: `${tipoLabel} ${labelDias(dias)}`, body: corpo });
+    }
+  }
+  return due;
+}
+
 // Descobre quais itens de um usuário "vencem" dentro da janela de aviso e
 // ainda não foram notificados.
 function findDueReminders(data, now) {
@@ -108,29 +140,39 @@ function findDueReminders(data, now) {
   const already = new Set(data.sentReminders || []);
   const due = [];
 
-  const examsHoursBefore = Number(prefs.examsHoursBefore ?? 24);
   (data.exams || []).forEach(e => {
     if (e.concluida) return;
-    const key = `exam:${e.id}`;
-    if (already.has(key)) return;
     const examMs = dateOnlyToMs(e.data);
     if (examMs == null) return;
-    const triggerMs = examMs - examsHoursBefore * 3600000;
-    if (now >= triggerMs && now < examMs) {
-      due.push({ key, title: '📝 Prova chegando', body: `${e.titulo}${e.materia ? ` — ${e.materia}` : ''}` });
-    }
+    const corpo = `${e.titulo}${e.materia ? ` — ${e.materia}` : ''}`;
+    due.push(...checkpointsDevidos(examMs, 'exam', e.id, '📝 Prova/trabalho', corpo, now, already));
   });
 
-  const tasksHoursBefore = Number(prefs.tasksHoursBefore ?? 24);
   (data.tasks || []).forEach(t => {
     if (t.concluida) return;
-    const key = `task:${t.id}`;
-    if (already.has(key)) return;
     const taskMs = dateOnlyToMs(t.dataLimite);
     if (taskMs == null) return;
-    const triggerMs = taskMs - tasksHoursBefore * 3600000;
-    if (now >= triggerMs && now < taskMs) {
-      due.push({ key, title: '✅ Tarefa vencendo', body: `${t.titulo}${t.materia ? ` — ${t.materia}` : ''}` });
+    const corpo = `${t.titulo}${t.materia ? ` — ${t.materia}` : ''}`;
+    due.push(...checkpointsDevidos(taskMs, 'task', t.id, '✅ Tarefa', corpo, now, already));
+  });
+
+  // Revisão espaçada: essa preferência (reviewsHoursBefore) já existia na
+  // tela de Configurações e era salva, mas nunca tinha sido lida aqui —
+  // por isso a notificação nunca disparava, em nenhuma hipótese. Segue o
+  // mesmo padrão de "X horas antes" que sessão/aula já usam.
+  const reviewsHoursBefore = Number(prefs.reviewsHoursBefore ?? 24);
+  (data.reviews || []).forEach(r => {
+    if (r.concluida) return;
+    const key = `review:${r.id}`;
+    if (already.has(key)) return;
+    const reviewMs = dateOnlyToMs(r.data);
+    if (reviewMs == null) return;
+    const triggerMs = reviewMs - reviewsHoursBefore * 3600000;
+    // janela vai até 24h depois do dia da revisão, não só até o instante
+    // exato — como reviewMs é meia-noite do dia, sem essa folga o aviso
+    // teria que disparar exatamente à 00h pra não perder a janela.
+    if (now >= triggerMs && now < reviewMs + JANELA_CHECKPOINT_MS) {
+      due.push({ key, title: '🔁 Revisão espaçada', body: `${r.materia}${r.topico ? ` — ${r.topico}` : ''}` });
     }
   });
 
@@ -150,7 +192,8 @@ function findDueReminders(data, now) {
   // Diário: se a hora configurada já passou (fuso Brasília) e o usuário
   // ainda não registrou nada hoje (nem "Meu dia" nem diário de aula),
   // manda 1 aviso — dedupe por dia (`diario:AAAA-MM-DD`), então mesmo o
-  // cron rodando várias vezes só dispara uma vez por dia.
+  // cron rodando várias vezes só dispara uma vez por dia, e some sozinho
+  // no dia seguinte por não bater mais a condição de horário.
   const diarioHora = Number(prefs.diaryReminderHour ?? 20);
   const bAgora = agoraBrasilia(now);
   const hojeBr = bAgora.toISOString().slice(0, 10);

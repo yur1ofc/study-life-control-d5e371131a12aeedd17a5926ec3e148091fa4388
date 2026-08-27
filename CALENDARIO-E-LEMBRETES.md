@@ -1,194 +1,92 @@
-(function () {
-  let deferredInstallPrompt = null;
-  let networkBannerTimer = null;
-  let networkWasOffline = !navigator.onLine;
+# Calendário automático e alarmes de estudo
 
-  function el(id) {
-    return document.getElementById(id);
-  }
+Duas features novas, pensadas pra não exigir nenhuma exportação manual do
+usuário depois da configuração inicial.
 
-  function setLoadingMessage(text) {
-    const target = el('loading-text');
-    if (target) target.textContent = text;
-  }
+## 1) Calendário assinável (.ics / webcal)
 
-  function updateNetworkBanner(forceState = null) {
-    const banner = el('network-banner');
-    const text = el('network-banner-text');
-    if (!banner || !text) return;
+**O que o usuário vê:** em Configurações → Calendário, clica em "Gerar meu
+link de calendário", copia a URL (ou clica em "Abrir no app de calendário")
+e assina isso UMA VEZ no Google Agenda / Calendário da Apple / Outlook. A
+partir daí, toda prova, tarefa, sessão de estudo e aula que ele cadastrar no
+site aparece sozinha lá.
 
-    const isOnline = forceState == null ? navigator.onLine : forceState === 'online';
+**Como funciona por baixo dos panos:**
+- `calendar-feed.js` gera um token aleatório (fica em `settings.calendarToken`)
+  e, a cada save (`slc-data-saved`), publica uma cópia enxuta e pública dos
+  dados relevantes em `calendar_feeds/{token}` no Firestore.
+- `api/calendar/[token].js` (Vercel Function) lê esse documento e devolve um
+  `.ics` de verdade sempre que o app de calendário do usuário buscar a URL.
 
-    if (networkBannerTimer) {
-      clearTimeout(networkBannerTimer);
-      networkBannerTimer = null;
-    }
+**Setup necessário:** nenhum além do que o projeto já tem. Só publique
+`firestore.rules` de novo (tem uma coleção nova, `calendar_feeds`).
 
-    if (!isOnline) {
-      networkWasOffline = true;
-      text.textContent = 'Você está offline. O app continua funcionando com dados locais quando possível.';
-      banner.hidden = false;
-      return;
-    }
+**Limitação conhecida:** os apps de calendário normalmente só buscam
+atualizações a cada 12–24h — não é instantâneo. Isso é do protocolo
+`webcal`/iCalendar, não dá pra forçar.
 
-    if (networkWasOffline) {
-      text.textContent = 'Conexão restabelecida. Tudo pronto para sincronizar.';
-      banner.hidden = false;
-      networkBannerTimer = setTimeout(() => {
-        if (navigator.onLine) banner.hidden = true;
-      }, 2200);
-      networkWasOffline = false;
-      return;
-    }
+## 2) Alarmes de estudo por notificação push
 
-    banner.hidden = true;
-  }
+**O que o usuário vê:** na mesma aba, ativa "Alarmes de estudo" e escolhe com
+quanto tempo de antecedência quer ser avisado (provas, tarefas, sessões).
+Recebe uma notificação real do sistema operacional, mesmo com o site
+fechado.
 
-  function setupInstallPrompt() {
-    const card = el('pwa-install-card');
-    const installBtn = el('pwa-install-btn');
-    const closeBtn = el('pwa-install-close');
-    if (!card || !installBtn || !closeBtn) return;
+**Como funciona por baixo dos panos:**
+- `push-notifications.js` pede permissão e assina o navegador no Push API
+  (guardado em `pushSubscriptions`, dentro do documento do usuário).
+- `api/send-reminders.js` roda periodicamente (cron), varre todo mundo com
+  alarme ativo, calcula o que vence dentro da janela configurada e manda o
+  push via `web-push` + VAPID.
+- `service-worker.js` recebe o push e mostra a notificação.
 
-    window.addEventListener('beforeinstallprompt', (event) => {
-      event.preventDefault();
-      deferredInstallPrompt = event;
-      card.hidden = false;
-    });
+### Setup necessário (variáveis de ambiente no Vercel)
 
-    installBtn.addEventListener('click', async () => {
-      if (!deferredInstallPrompt) return;
-      deferredInstallPrompt.prompt();
-      const choice = await deferredInstallPrompt.userChoice.catch(() => null);
-      if (choice?.outcome === 'accepted') {
-        window.showToast?.('App instalado com sucesso!', 'success');
-      }
-      deferredInstallPrompt = null;
-      card.hidden = true;
-    });
+1. **Chaves VAPID** — rode localmente:
+   ```
+   node scripts/generate-vapid-keys.js
+   ```
+   Copie o resultado para `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` e
+   `VAPID_SUBJECT` (um `mailto:seu@email.com`).
 
-    closeBtn.addEventListener('click', () => {
-      card.hidden = true;
-    });
+2. **Service Account do Firebase** (necessária porque o cron precisa ler/
+   atualizar o documento de TODOS os usuários, não só de quem está logado):
+   - Firebase Console → ⚙️ Configurações do projeto → Contas de serviço →
+     "Gerar nova chave privada" (baixa um `.json`).
+   - Converta pra base64: `base64 -w0 sua-chave.json` (Linux) ou
+     `base64 -i sua-chave.json` (macOS).
+   - Cole o resultado em `FIREBASE_SERVICE_ACCOUNT_KEY`.
+   - **Nunca** commite esse `.json` — o `.gitignore` já bloqueia os padrões
+     comuns dele, mas confira antes de dar push.
 
-    window.addEventListener('appinstalled', () => {
-      card.hidden = true;
-      deferredInstallPrompt = null;
-      window.showToast?.('SLCampus instalado no dispositivo!', 'success');
-    });
-  }
+3. **CRON_SECRET** — escolha qualquer string longa aleatória e salve como
+   variável de ambiente. É o que impede qualquer pessoa de chamar
+   `/api/send-reminders` na sua conta.
 
-  function registerServiceWorker() {
-    if (!('serviceWorker' in navigator)) return;
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('service-worker.js').catch((error) => {
-        console.error('Falha ao registrar service worker:', error);
-      });
-    });
-  }
+4. **Cron externo (recomendado)** — o plano Hobby da Vercel só roda cron 1x
+   por dia (já configurado em `vercel.json` como fallback, às 09:00 UTC).
+   Pra lembretes chegarem perto da hora certa (ex: "sua sessão começa em 15
+   min"), cadastre gratuitamente em algo como
+   [cron-job.org](https://cron-job.org) uma chamada `GET` a cada 10–15
+   minutos para:
+   ```
+   https://seu-dominio.vercel.app/api/send-reminders
+   ```
+   com o header:
+   ```
+   Authorization: Bearer <o mesmo valor de CRON_SECRET>
+   ```
 
-  function setupGlobalErrorHandling() {
-    window.addEventListener('error', (event) => {
-      console.error('Erro global capturado:', event.error || event.message);
-      window.showToast?.('Ocorreu um erro inesperado. Tente atualizar a página.', 'error');
-    });
+### Limitações conhecidas
 
-    window.addEventListener('unhandledrejection', (event) => {
-      console.error('Promise rejeitada sem tratamento:', event.reason);
-      window.showToast?.('Falha ao processar uma ação. Revise sua conexão e tente de novo.', 'error');
-    });
-  }
-
-  let scrollLockY = 0;
-
-  function closeSidebar() {
-    document.body.classList.remove('sidebar-open');
-    const overlay = el('mobile-nav-overlay');
-    if (overlay) overlay.hidden = true;
-
-    // Destrava o scroll do fundo (ver openSidebar)
-    document.body.style.position = '';
-    document.body.style.top = '';
-    document.body.style.left = '';
-    document.body.style.right = '';
-    document.body.style.width = '';
-    window.scrollTo(0, scrollLockY);
-  }
-
-  function openSidebar() {
-    // Trava o scroll do fundo enquanto o menu está aberto — sem isso, arrastar
-    // o dedo dentro do menu também rola a página por trás dele. Usa a técnica
-    // de "position:fixed" em vez de só overflow:hidden porque é a única forma
-    // confiável de bloquear o bounce/scroll em iOS Safari, e funciona igual em
-    // Android e desktop também (independe de marca/modelo de aparelho).
-    scrollLockY = window.scrollY || window.pageYOffset || 0;
-    document.body.style.position = 'fixed';
-    document.body.style.top = `-${scrollLockY}px`;
-    document.body.style.left = '0';
-    document.body.style.right = '0';
-    document.body.style.width = '100%';
-
-    document.body.classList.add('sidebar-open');
-    const overlay = el('mobile-nav-overlay');
-    if (overlay) overlay.hidden = false;
-  }
-
-  window.SLCSidebar = { open: openSidebar, close: closeSidebar };
-
-  function setupMobileSidebar() {
-    const toggle = el('mobile-nav-toggle');
-    const overlay = el('mobile-nav-overlay');
-    if (!toggle || !overlay) return;
-
-    toggle.addEventListener('click', () => {
-      if (document.body.classList.contains('sidebar-open')) {
-        closeSidebar();
-      } else {
-        openSidebar();
-      }
-    });
-
-    overlay.addEventListener('click', closeSidebar);
-
-    document.addEventListener('click', (event) => {
-      const item = event.target.closest('.nav-item');
-      if (item && window.innerWidth <= 980) {
-        setTimeout(closeSidebar, 120);
-      }
-    });
-
-    window.addEventListener('resize', () => {
-      if (window.innerWidth > 980) closeSidebar();
-    });
-  }
-
-  function setupOfflineEvents() {
-    updateNetworkBanner(navigator.onLine ? 'online' : 'offline');
-    window.addEventListener('online', () => updateNetworkBanner('online'));
-    window.addEventListener('offline', () => updateNetworkBanner('offline'));
-  }
-
-  function improveRefreshButton() {
-    const refresh = el('refresh-data');
-    if (!refresh || refresh.dataset.enhanced) return;
-    refresh.dataset.enhanced = '1';
-    refresh.addEventListener('click', () => {
-      setLoadingMessage('Sincronizando seus dados...');
-      setTimeout(() => setLoadingMessage('Carregando seu painel acadêmico...'), 1200);
-    });
-  }
-
-  document.addEventListener('DOMContentLoaded', () => {
-    setLoadingMessage('Carregando seu painel acadêmico...');
-    registerServiceWorker();
-    setupInstallPrompt();
-    setupGlobalErrorHandling();
-    setupMobileSidebar();
-    setupOfflineEvents();
-    improveRefreshButton();
-  });
-
-  document.addEventListener('app-ready', () => {
-    improveRefreshButton();
-  });
-})();
+- **iPhone/iPad:** push só funciona depois de instalar o site na Tela de
+  Início (Compartilhar → Adicionar à Tela de Início) — Safari em aba comum
+  não recebe push do iOS.
+- **Fuso horário:** o app não guarda o fuso horário do usuário, então os
+  horários de aviso de provas/tarefas (que só têm data, sem hora) são
+  calculados como meia-noite UTC. Na prática, o aviso pode chegar algumas
+  horas antes/depois do esperado dependendo de onde o usuário mora. Sessões
+  de estudo (que têm hora) são mais precisas.
+- **Plano Hobby da Vercel:** funções têm 10s de limite de execução. Com
+  poucos usuários isso não é problema; se o app crescer bastante, considere
+  paginar a varredura em `api/send-reminders.js` ou migrar pro plano Pro.

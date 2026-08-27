@@ -1,45 +1,194 @@
-// scripts/generate-vapid-keys.js
-//
-// Gera um par de chaves VAPID (usadas pra assinar as notificações push dos
-// alarmes de estudo) usando SÓ o módulo nativo "crypto" do Node — não
-// precisa instalar nada pra rodar isso.
-//
-// Rode UMA VEZ, no seu computador (nunca em produção):
-//   node scripts/generate-vapid-keys.js
-//
-// Depois copie as 3 linhas impressas pra Vercel → Settings → Environment
-// Variables:
-//   VAPID_PUBLIC_KEY   → vai pro front (pode ficar pública, é só isso mesmo)
-//   VAPID_PRIVATE_KEY  → NUNCA exponha no front, fica só no servidor
-//   VAPID_SUBJECT       → um "mailto:seuemail@..." (Google exige isso)
-//
-// Guarde a chave privada em lugar seguro — se perder, precisa gerar um
-// par novo e todo mundo que já tinha ativado os alarmes vai precisar
-// reativar (a assinatura antiga do navegador some).
+(function () {
+  let deferredInstallPrompt = null;
+  let networkBannerTimer = null;
+  let networkWasOffline = !navigator.onLine;
 
-const crypto = require('crypto');
+  function el(id) {
+    return document.getElementById(id);
+  }
 
-function base64url(buffer) {
-  return buffer.toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-}
+  function setLoadingMessage(text) {
+    const target = el('loading-text');
+    if (target) target.textContent = text;
+  }
 
-const ecdh = crypto.createECDH('prime256v1');
-ecdh.generateKeys();
+  function updateNetworkBanner(forceState = null) {
+    const banner = el('network-banner');
+    const text = el('network-banner-text');
+    if (!banner || !text) return;
 
-let privateKey = ecdh.getPrivateKey();
-if (privateKey.length < 32) {
-  // getPrivateKey() às vezes devolve menos de 32 bytes quando o número
-  // começa com zero — preenche à esquerda pra manter o tamanho fixo.
-  privateKey = Buffer.concat([Buffer.alloc(32 - privateKey.length), privateKey]);
-}
-const publicKey = ecdh.getPublicKey(); // 65 bytes, ponto não-comprimido
+    const isOnline = forceState == null ? navigator.onLine : forceState === 'online';
 
-console.log('\n✅ Par de chaves VAPID gerado!\n');
-console.log('Copie estas 3 variáveis para Vercel → Settings → Environment Variables:\n');
-console.log(`VAPID_PUBLIC_KEY=${base64url(publicKey)}`);
-console.log(`VAPID_PRIVATE_KEY=${base64url(privateKey)}`);
-console.log('VAPID_SUBJECT=mailto:seuemail@exemplo.com   ← troque pelo seu e-mail\n');
-console.log('Depois de configurar, redeploy o projeto pro build injetar a chave pública no front.\n');
+    if (networkBannerTimer) {
+      clearTimeout(networkBannerTimer);
+      networkBannerTimer = null;
+    }
+
+    if (!isOnline) {
+      networkWasOffline = true;
+      text.textContent = 'Você está offline. O app continua funcionando com dados locais quando possível.';
+      banner.hidden = false;
+      return;
+    }
+
+    if (networkWasOffline) {
+      text.textContent = 'Conexão restabelecida. Tudo pronto para sincronizar.';
+      banner.hidden = false;
+      networkBannerTimer = setTimeout(() => {
+        if (navigator.onLine) banner.hidden = true;
+      }, 2200);
+      networkWasOffline = false;
+      return;
+    }
+
+    banner.hidden = true;
+  }
+
+  function setupInstallPrompt() {
+    const card = el('pwa-install-card');
+    const installBtn = el('pwa-install-btn');
+    const closeBtn = el('pwa-install-close');
+    if (!card || !installBtn || !closeBtn) return;
+
+    window.addEventListener('beforeinstallprompt', (event) => {
+      event.preventDefault();
+      deferredInstallPrompt = event;
+      card.hidden = false;
+    });
+
+    installBtn.addEventListener('click', async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      const choice = await deferredInstallPrompt.userChoice.catch(() => null);
+      if (choice?.outcome === 'accepted') {
+        window.showToast?.('App instalado com sucesso!', 'success');
+      }
+      deferredInstallPrompt = null;
+      card.hidden = true;
+    });
+
+    closeBtn.addEventListener('click', () => {
+      card.hidden = true;
+    });
+
+    window.addEventListener('appinstalled', () => {
+      card.hidden = true;
+      deferredInstallPrompt = null;
+      window.showToast?.('SLCampus instalado no dispositivo!', 'success');
+    });
+  }
+
+  function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js').catch((error) => {
+        console.error('Falha ao registrar service worker:', error);
+      });
+    });
+  }
+
+  function setupGlobalErrorHandling() {
+    window.addEventListener('error', (event) => {
+      console.error('Erro global capturado:', event.error || event.message);
+      window.showToast?.('Ocorreu um erro inesperado. Tente atualizar a página.', 'error');
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+      console.error('Promise rejeitada sem tratamento:', event.reason);
+      window.showToast?.('Falha ao processar uma ação. Revise sua conexão e tente de novo.', 'error');
+    });
+  }
+
+  let scrollLockY = 0;
+
+  function closeSidebar() {
+    document.body.classList.remove('sidebar-open');
+    const overlay = el('mobile-nav-overlay');
+    if (overlay) overlay.hidden = true;
+
+    // Destrava o scroll do fundo (ver openSidebar)
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
+    document.body.style.width = '';
+    window.scrollTo(0, scrollLockY);
+  }
+
+  function openSidebar() {
+    // Trava o scroll do fundo enquanto o menu está aberto — sem isso, arrastar
+    // o dedo dentro do menu também rola a página por trás dele. Usa a técnica
+    // de "position:fixed" em vez de só overflow:hidden porque é a única forma
+    // confiável de bloquear o bounce/scroll em iOS Safari, e funciona igual em
+    // Android e desktop também (independe de marca/modelo de aparelho).
+    scrollLockY = window.scrollY || window.pageYOffset || 0;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollLockY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.width = '100%';
+
+    document.body.classList.add('sidebar-open');
+    const overlay = el('mobile-nav-overlay');
+    if (overlay) overlay.hidden = false;
+  }
+
+  window.SLCSidebar = { open: openSidebar, close: closeSidebar };
+
+  function setupMobileSidebar() {
+    const toggle = el('mobile-nav-toggle');
+    const overlay = el('mobile-nav-overlay');
+    if (!toggle || !overlay) return;
+
+    toggle.addEventListener('click', () => {
+      if (document.body.classList.contains('sidebar-open')) {
+        closeSidebar();
+      } else {
+        openSidebar();
+      }
+    });
+
+    overlay.addEventListener('click', closeSidebar);
+
+    document.addEventListener('click', (event) => {
+      const item = event.target.closest('.nav-item');
+      if (item && window.innerWidth <= 980) {
+        setTimeout(closeSidebar, 120);
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 980) closeSidebar();
+    });
+  }
+
+  function setupOfflineEvents() {
+    updateNetworkBanner(navigator.onLine ? 'online' : 'offline');
+    window.addEventListener('online', () => updateNetworkBanner('online'));
+    window.addEventListener('offline', () => updateNetworkBanner('offline'));
+  }
+
+  function improveRefreshButton() {
+    const refresh = el('refresh-data');
+    if (!refresh || refresh.dataset.enhanced) return;
+    refresh.dataset.enhanced = '1';
+    refresh.addEventListener('click', () => {
+      setLoadingMessage('Sincronizando seus dados...');
+      setTimeout(() => setLoadingMessage('Carregando seu painel acadêmico...'), 1200);
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    setLoadingMessage('Carregando seu painel acadêmico...');
+    registerServiceWorker();
+    setupInstallPrompt();
+    setupGlobalErrorHandling();
+    setupMobileSidebar();
+    setupOfflineEvents();
+    improveRefreshButton();
+  });
+
+  document.addEventListener('app-ready', () => {
+    improveRefreshButton();
+  });
+})();

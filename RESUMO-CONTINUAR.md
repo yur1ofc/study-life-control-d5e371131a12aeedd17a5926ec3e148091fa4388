@@ -1,199 +1,114 @@
-// quick-search.js
-// Busca rápida universal: pesquisa matérias, provas/trabalhos, sessões,
-// tópicos do mapa de aprendizado e materiais de estudo, tudo num lugar só.
-// Abre com o botão de lupa no topo ou com Ctrl/Cmd+K.
-// Resultado de matéria vem com ações rápidas (estudar, editar, +prova, +trabalho)
-// pra não precisar navegar até a tela certa antes de agir.
+# Resumo pra continuar em outro chat — Study Life Control
 
-(function () {
-  'use strict';
+Cole este arquivo (ou o conteúdo dele) no começo de um novo chat, junto com
+o ZIP mais recente do projeto, se o chat atual travar por limite de tokens.
 
-  function esc(str) {
-    return String(str || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  }
+## Contexto do projeto
+App de organização acadêmica (Firebase + Vercel, sem framework, JS puro).
+Deploy em: https://study-life-control.vercel.app
+Repo: github.com/yur1ofc/study-life-control-...
 
-  function norm(str) {
-    return String(str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  }
+## ✅ O que já foi RESOLVIDO nesta sessão
 
-  function buildOverlay() {
-    const overlay = document.createElement('div');
-    overlay.id = 'quick-search-overlay';
-    overlay.className = 'quick-search-overlay';
-    overlay.innerHTML = `
-      <div class="quick-search-box">
-        <div class="quick-search-input-row">
-          <i class="fas fa-search"></i>
-          <input type="text" id="quick-search-input" placeholder="Buscar matéria, prova, trabalho, sessão, tópico, material..." autocomplete="off">
-          <button type="button" class="btn-icon" id="quick-search-close" title="Fechar (Esc)"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="quick-search-results" id="quick-search-results">
-          <p class="quick-search-hint text-secondary">Digite pra buscar em tudo que você já cadastrou no app.</p>
-        </div>
-      </div>`;
-    return overlay;
-  }
+### 1. env-config.js não era gerado em produção (RESOLVIDO)
+- Causa: não era o código — era propagação de deploy/alias no Vercel.
+- `inject-env.js` foi reescrito com diagnóstico completo (imprime __dirname,
+  process.cwd(), confirma se o arquivo foi escrito e lista os arquivos do
+  diretório). Isso já está no repositório do usuário (ele já commitou).
+- Confirmado funcionando: `https://study-life-control.vercel.app/env-config.js`
+  responde certo, com as 6 chaves do Firebase + VAPID_PUBLIC_KEY.
+- **Não precisa mexer mais nisso.**
 
-  function coletarResultados(app, termoBruto) {
-    const termo = norm(termoBruto);
-    if (!termo) return { materias: [], provas: [], tarefas: [], sessoes: [], topicos: [], materiais: [] };
-    const data = app.data || {};
+### 2. Painel de tema aparecia em todas as abas de Configurações (RESOLVIDO,
+   sessão anterior) — corrigido em `theme-engine.js`, só aparece quando
+   aba === 'tema' agora.
 
-    const materias = (data.subjects || []).filter(s => norm(s.nome).includes(termo)).slice(0, 5);
-    const provas = (data.exams || []).filter(e => norm(e.titulo).includes(termo) || norm(e.materia).includes(termo)).slice(0, 5);
-    const tarefas = (data.tasks || []).filter(t => norm(t.titulo).includes(termo) || norm(t.materia).includes(termo)).slice(0, 5);
-    const sessoes = (data.sessions || []).filter(s => norm(s.materia).includes(termo) || norm(s.topico).includes(termo)).slice(0, 5);
-    const topicos = (data.learningMap || []).filter(t => norm(t.nome).includes(termo) || norm(t.materia).includes(termo)).slice(0, 5);
-    const materiais = (data.materials || []).filter(m => norm(m.titulo).includes(termo) || norm(m.materia).includes(termo)).slice(0, 5);
+### 3. Revisões espaçadas e aulas não apareciam no calendário/notificações
+   (RESOLVIDO NESTA SESSÃO — ver detalhes abaixo)
 
-    return { materias, provas, tarefas, sessoes, topicos, materiais };
-  }
+## 🔧 O que foi corrigido agora (revisões + aulas no calendário/push)
 
-  function renderGrupo(titulo, itens, renderItem) {
-    if (!itens.length) return '';
-    return `<div class="quick-search-group">
-        <div class="quick-search-group-title">${titulo}</div>
-        ${itens.map(renderItem).join('')}
-      </div>`;
-  }
+**Diagnóstico:** o app tem 5 tipos de dado com data (exams, tasks, sessions,
+classSchedule, reviews), mas só 3–4 deles alimentavam os dois sistemas de
+aviso:
+- `.ics` (calendário assinável): tinha exams/tasks/sessions/classSchedule,
+  **faltava `reviews`** (revisão espaçada, gerada automaticamente por
+  `review-system.js` toda vez que uma aula é registrada no Diário).
+- Push de verdade (`api/send-reminders.js`, funciona com app fechado/celular
+  bloqueado): tinha só exams/tasks/sessions, **faltava `reviews` E
+  `classSchedule`** (aulas).
 
-  function renderResultados(app, resultados) {
-    const { materias, provas, tarefas, sessoes, topicos, materiais } = resultados;
-    const total = materias.length + provas.length + tarefas.length + sessoes.length + topicos.length + materiais.length;
+**Arquivos alterados** (todos já com `node --check` OK, prontos em
+`/mnt/user-data/outputs/arquivos-atualizados/`):
 
-    if (!total) {
-      return '<p class="quick-search-hint text-secondary">Nada encontrado. Tente outro termo.</p>';
-    }
+1. `database.js` — `DEFAULT_APP_DATA().settings.studyReminders` ganhou
+   `reviewsHoursBefore: 24` e `classMinutesBefore: 15`.
+2. `calendar-feed.js` — `buildSnapshot()` agora inclui `reviews` no objeto
+   publicado em `calendar_feeds/{token}`.
+3. `api/calendar/feed.js` — `buildIcs()` agora gera VEVENT pra cada revisão
+   (`🔁 Revisão: ...`, alarme 1 dia antes). Comentários/CALDESC atualizados.
+4. `api/send-reminders.js` — maior mudança:
+   - Nova função `nowPartsInTimezone(ms, tz)` (usa `Intl.DateTimeFormat`)
+     pra descobrir dia da semana + minuto do dia "agora" no fuso do
+     usuário — necessário porque aula é recorrente semanal, sem data
+     absoluta salva.
+   - `findDueReminders()` ganhou dois blocos novos: um pra `reviews` (igual
+     ao de tasks, usando `dateOnlyToMs`) e um pra `classSchedule` (só
+     dispara no dia certo da semana, dentro da janela antes do horário de
+     início; chave de dedupe inclui a data do dia pra não travar pra
+     sempre).
+5. `views.js` — dois novos `<select>` na aba Configurações → Calendário:
+   "Avisar revisão espaçada com quantas horas de antecedência?" e "Avisar
+   aula com quantos minutos de antecedência?". Texto do toggle principal
+   atualizado pra mencionar revisões e aulas.
+6. `app.js` — o `forEach` que liga os `<select>` de preferência de lembrete
+   ao `saveReminderPrefs` foi estendido de `['exams','tasks','sessions']`
+   pra incluir `'reviews'` e `'class'` (usando o `map` já existente,
+   só adicionei as duas entradas novas).
 
-    let html = '';
+## ⚠️ O que FALTA fazer
 
-    html += renderGrupo('📚 Matérias', materias, m => `
-      <div class="quick-search-item quick-search-item-materia">
-        <span class="quick-search-item-label"><i class="fas fa-book"></i> ${esc(m.nome)}</span>
-        <div class="quick-search-item-actions">
-          <button type="button" class="qs-action" data-qs-action="estudar" data-qs-materia="${esc(m.nome)}" title="Iniciar sessão de estudo"><i class="fas fa-clock"></i> Estudar</button>
-          <button type="button" class="qs-action" data-qs-action="editar-materia" data-qs-id="${esc(m.id)}" title="Editar matéria"><i class="fas fa-edit"></i></button>
-          <button type="button" class="qs-action" data-qs-action="add-prova" data-qs-materia="${esc(m.nome)}" title="Adicionar prova/trabalho"><i class="fas fa-graduation-cap"></i></button>
-          <button type="button" class="qs-action" data-qs-action="add-tarefa" data-qs-materia="${esc(m.nome)}" title="Adicionar tarefa"><i class="fas fa-tasks"></i></button>
-        </div>
-      </div>`);
+1. **Usuário precisa baixar os 6 arquivos de
+   `/mnt/user-data/outputs/arquivos-atualizados/` e substituir no repo
+   local**, depois `git add`, `commit`, `push`. Ainda NÃO foi commitado/
+   deployado — os arquivos só existem no ambiente sandbox deste chat até
+   agora.
+   - Arquivos: `database.js`, `calendar-feed.js`, `app.js`, `views.js`,
+     `api/calendar/feed.js`, `api/send-reminders.js`
+2. **Testar depois do deploy:**
+   - Abrir Configurações → Calendário → confirmar que aparecem os 2 novos
+     selects (revisão / aula) e que salvam sem erro (toast de sucesso).
+   - Assinar o link `.ics` de novo (ou forçar refresh no app de calendário)
+     e conferir se aparecem eventos "🔁 Revisão: ..." nos dias certos.
+   - Testar o push manualmente: mais fácil é temporariamente reduzir
+     `classMinutesBefore`/`reviewsHoursBefore` bem baixo E ter uma aula/
+     revisão que caia dentro da janela, então chamar a rota
+     `/api/send-reminders` manualmente (com o header
+     `Authorization: Bearer <CRON_SECRET>`) e ver se `notificationsSent`
+     subiu no JSON de resposta.
+3. **Não testado/validado de verdade ainda:** a lógica de fuso horário do
+   bloco de aulas em `nowPartsInTimezone` (usa `Intl.DateTimeFormat` com
+   `timeZone`) — a lógica foi revisada com cuidado e o arquivo passa no
+   `node --check`, mas não rodei um teste real comparando com horário de
+   Brasília de verdade. Se o aviso de aula chegar na hora errada (adiantado
+   ou atrasado), o primeiro lugar pra olhar é essa função.
+4. **Pendência antiga, não resolvida ainda:** o card "Catálogo comunitário"
+   em Configurações (busca/compartilha grade, vem de
+   `curriculum-catalog.js`) tem o mesmo bug que o painel de tema tinha —
+   aparece colado em toda aba de Configurações, não só na aba dele. O
+   usuário foi perguntado se queria corrigir isso e ainda não respondeu.
 
-    html += renderGrupo('🎓 Provas e trabalhos', provas, e => `
-      <div class="quick-search-item" data-qs-action="editar-prova" data-qs-id="${esc(e.id)}">
-        <span class="quick-search-item-label"><i class="fas fa-graduation-cap"></i> ${esc(e.titulo)} <small class="text-secondary">${esc(e.materia)}</small></span>
-      </div>`);
+## Coisas específicas do ambiente (pra não repetir investigação)
 
-    html += renderGrupo('📋 Tarefas', tarefas, t => `
-      <div class="quick-search-item" data-qs-action="editar-tarefa" data-qs-id="${esc(t.id)}">
-        <span class="quick-search-item-label"><i class="fas fa-tasks"></i> ${esc(t.titulo)} <small class="text-secondary">${esc(t.materia)}</small></span>
-      </div>`);
-
-    html += renderGrupo('⏰ Sessões de estudo', sessoes, s => `
-      <div class="quick-search-item" data-qs-action="editar-sessao" data-qs-id="${esc(s.id)}">
-        <span class="quick-search-item-label"><i class="fas fa-clock"></i> ${esc(s.materia)} <small class="text-secondary">${esc(s.topico || s.tipo || '')}</small></span>
-      </div>`);
-
-    html += renderGrupo('🗺️ Mapa de aprendizado', topicos, t => `
-      <div class="quick-search-item" data-qs-action="editar-topico" data-qs-id="${esc(t.id)}">
-        <span class="quick-search-item-label"><i class="fas fa-map"></i> ${esc(t.nome)} <small class="text-secondary">${esc(t.materia)}</small></span>
-      </div>`);
-
-    html += renderGrupo('📁 Materiais', materiais, m => `
-      <div class="quick-search-item" data-qs-action="editar-material" data-qs-id="${esc(m.id)}">
-        <span class="quick-search-item-label"><i class="fas fa-folder"></i> ${esc(m.titulo)} <small class="text-secondary">${esc(m.materia)}</small></span>
-      </div>`);
-
-    return html;
-  }
-
-  function executarAcao(app, action, dataset) {
-    switch (action) {
-      case 'estudar':
-        app.openModal('sessao', { materia: dataset.qsMateria });
-        break;
-      case 'editar-materia':
-        app.editarMateria(dataset.qsId);
-        break;
-      case 'add-prova':
-        app.openModal('prova', { materia: dataset.qsMateria });
-        break;
-      case 'add-tarefa':
-        app.openModal('tarefa', { materia: dataset.qsMateria });
-        break;
-      case 'editar-prova':
-        app.editarProva(dataset.qsId);
-        break;
-      case 'editar-tarefa':
-        app.editarTarefa(dataset.qsId);
-        break;
-      case 'editar-sessao':
-        app.editarSessao(dataset.qsId);
-        break;
-      case 'editar-topico':
-        app.editarTopico(dataset.qsId);
-        break;
-      case 'editar-material':
-        app.editarMaterial(dataset.qsId);
-        break;
-      default:
-        return;
-    }
-  }
-
-  let overlayEl = null;
-
-  function close() {
-    if (!overlayEl) return;
-    overlayEl.classList.remove('is-visible');
-    setTimeout(() => { overlayEl?.remove(); overlayEl = null; }, 150);
-  }
-
-  function open() {
-    if (overlayEl) { document.getElementById('quick-search-input')?.focus(); return; }
-    if (!window.app?.data) return;
-
-    overlayEl = buildOverlay();
-    document.body.appendChild(overlayEl);
-    requestAnimationFrame(() => overlayEl.classList.add('is-visible'));
-
-    const input = document.getElementById('quick-search-input');
-    const results = document.getElementById('quick-search-results');
-    input.focus();
-
-    input.addEventListener('input', () => {
-      const resultados = coletarResultados(window.app, input.value);
-      results.innerHTML = renderResultados(window.app, resultados);
-    });
-
-    results.addEventListener('click', e => {
-      const target = e.target.closest('[data-qs-action]');
-      if (!target) return;
-      executarAcao(window.app, target.dataset.qsAction, target.dataset);
-      close();
-    });
-
-    document.getElementById('quick-search-close')?.addEventListener('click', close);
-    overlayEl.addEventListener('click', e => { if (e.target === overlayEl) close(); });
-  }
-
-  function ensureButton() {
-    const actions = document.querySelector('.header-actions');
-    if (!actions || document.getElementById('quick-search-btn')) return;
-    const btn = document.createElement('button');
-    btn.className = 'btn-icon';
-    btn.id = 'quick-search-btn';
-    btn.type = 'button';
-    btn.title = 'Busca rápida (Ctrl+K)';
-    btn.innerHTML = '<i class="fas fa-search"></i>';
-    btn.addEventListener('click', open);
-    actions.insertBefore(btn, actions.firstChild);
-  }
-
-  document.addEventListener('app-ready', ensureButton);
-
-  document.addEventListener('keydown', e => {
-    const isSearchShortcut = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k';
-    if (isSearchShortcut) { e.preventDefault(); open(); return; }
-    if (e.key === 'Escape' && overlayEl) close();
-  });
-})();
+- Vercel: Build Command = `node inject-env.js`, Output Directory = `.`.
+  Não mude essas duas configs — já foram confirmadas corretas.
+- `.vercelignore` existe DE PROPÓSITO pra ignorar `.gitignore` como filtro
+  de deploy (senão `env-config.js` gerado no build seria descartado por
+  causa de uma entrada antiga). Não apagar esse arquivo.
+- O projeto tem 3 funções serverless (`api/send-reminders.js`,
+  `api/gemini.js`, `api/calendar/feed.js`), por isso o build roda o script
+  de build 4x nos logs (1x geral + 1x por função) — é normal, não é bug.
+- `api/calendar/feed.js` usa rota fixa com querystring (`?token=`) em vez
+  de rota dinâmica (`[token].js`) por causa de um bug de plataforma da
+  Vercel (meados de 2026) com rotas dinâmicas retornando 404 — está
+  documentado no topo do próprio arquivo.
