@@ -302,6 +302,7 @@ class StudyLifeControl {
         document.getElementById('form-materia')?.addEventListener('submit', e => this.handleMateriaSubmit(e));
         document.getElementById('form-curriculum')?.addEventListener('submit', e => this.handleCurriculumSubmit(e));
         document.getElementById('form-extra-course')?.addEventListener('submit', e => this.handleExtraCourseSubmit(e));
+        document.getElementById('extra-course-tipo')?.addEventListener('change', () => this.updateExtraCourseTypeUI());
         document.getElementById('form-aula')?.addEventListener('submit', e => this.handleAulaSubmit(e));
         document.getElementById('form-daily-log')?.addEventListener('submit', e => this.handleDailyLogSubmit(e));
         document.getElementById('form-class-diary')?.addEventListener('submit', e => this.handleClassDiarySubmit(e));
@@ -429,6 +430,7 @@ class StudyLifeControl {
             case 'materias': html = this.viewRenderer.renderMaterias(); break;
             case 'grade-curricular': html = this.viewRenderer.renderGradeCurricular(); break;
             case 'cursos-extras': html = this.viewRenderer.renderCursosExtras(); break;
+            case 'ajuda': html = window.renderHelpPage ? window.renderHelpPage() : '<p class="text-secondary">Ajuda indisponível.</p>'; break;
             default: html = this.viewRenderer.renderDashboard();
         }
 
@@ -479,6 +481,20 @@ class StudyLifeControl {
 
             document.querySelectorAll('.btn-excluir-prova').forEach(btn => {
                 btn.addEventListener('click', e => this.excluirProva(e.currentTarget.dataset.id));
+            });
+
+            document.querySelectorAll('.btn-concluir-prova').forEach(btn => {
+                btn.addEventListener('click', e => this.toggleExamConcluida(e.currentTarget.dataset.id));
+            });
+
+            document.querySelectorAll('[data-toggle-materia-prova]').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    const card = e.currentTarget.closest('.materia-map');
+                    const body = card?.querySelector('.materia-map-body');
+                    if (!card || !body) return;
+                    const collapsed = card.classList.toggle('materia-map-collapsed');
+                    body.hidden = collapsed;
+                });
             });
         }
 
@@ -531,6 +547,16 @@ class StudyLifeControl {
 
             document.querySelectorAll('.btn-excluir-topico').forEach(btn => {
                 btn.addEventListener('click', e => this.excluirTopico(e.currentTarget.dataset.id));
+            });
+
+            document.querySelectorAll('[data-toggle-materia-map]').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    const card = e.currentTarget.closest('.materia-map');
+                    const body = card?.querySelector('.materia-map-body');
+                    if (!card || !body) return;
+                    const collapsed = card.classList.toggle('materia-map-collapsed');
+                    body.hidden = collapsed;
+                });
             });
         }
 
@@ -675,10 +701,11 @@ class StudyLifeControl {
                 }
             });
 
-            ['sessions', 'reviews', 'class'].forEach(tipo => {
+            ['sessions', 'reviews', 'class', 'diario'].forEach(tipo => {
                 const map = {
                     sessions: 'sessionsMinutesBefore',
-                    reviews: 'reviewsHoursBefore', class: 'classMinutesBefore'
+                    reviews: 'reviewsHoursBefore', class: 'classMinutesBefore',
+                    diario: 'diaryReminderHour'
                 };
                 document.getElementById(`config-reminder-${tipo}`)?.addEventListener('change', async e => {
                     await window.pushNotifications?.saveReminderPrefs({ [map[tipo]]: parseInt(e.target.value, 10) });
@@ -740,6 +767,10 @@ class StudyLifeControl {
             document.getElementById('btn-relatar-problema')?.addEventListener('click', () => {
                 window.open('https://github.com/yur1ofc/study-life-control/issues/new', '_blank');
             });
+            document.getElementById('btn-abrir-ajuda')?.addEventListener('click', () => {
+                this.loadView('ajuda');
+                document.querySelectorAll('.nav-item').forEach(nav => nav.classList.toggle('active', nav.dataset.view === 'ajuda'));
+            });
         }
 
         if (view === 'materias') {
@@ -792,6 +823,10 @@ class StudyLifeControl {
             });
         }
 
+        if (view === 'ajuda') {
+            window.bindHelpActions?.(document.getElementById('view-container') || document);
+        }
+
         if (view === 'cursos-extras') {
             document.getElementById('btn-novo-extra-course')?.addEventListener('click', () => this.openModal('extra-course'));
 
@@ -803,6 +838,11 @@ class StudyLifeControl {
                 btn.addEventListener('click', e => this.excluirExtraCourse(e.currentTarget.dataset.id));
             });
         }
+
+        // Widget de hábitos de 1 toque (aparece no Dashboard, roda em toda view)
+        document.querySelectorAll('.toggle-habito-mini').forEach(btn => {
+            btn.addEventListener('click', e => this.toggleHabito(e.currentTarget.dataset.habito));
+        });
 
         document.getElementById('quick-sessao')?.addEventListener('click', () => this.openModal('sessao'));
         document.getElementById('quick-tarefa')?.addEventListener('click', () => this.openModal('tarefa'));
@@ -874,6 +914,18 @@ class StudyLifeControl {
         input.onkeypress = e => {
             if (e.key === 'Enter') sendMessage();
         };
+
+        // Aviso proativo: se houver algo que vale a pena o mentor puxar
+        // sozinho (diário de hoje vazio, revisão pendente, prova próxima),
+        // ele já manda como primeira mensagem, sem precisar que a pessoa
+        // pergunte primeiro.
+        try {
+            window.aiAssistant?.updateContext(this.data);
+            const proativo = window.aiAssistant?.getProactiveGreeting?.();
+            if (proativo) appendMessage('assistant', proativo);
+        } catch (error) {
+            console.warn('Aviso proativo do Mentor IA indisponível:', error);
+        }
 
         document.querySelectorAll('.sugestao-btn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -969,6 +1021,9 @@ class StudyLifeControl {
             document.getElementById('prova-data').value = data.data || '';
             document.getElementById('prova-peso').value = data.peso || 100;
             document.getElementById('prova-importancia').value = data.importancia || 'alta';
+            document.getElementById('prova-horario').value = data.horario || '';
+            document.getElementById('prova-local').value = data.local || '';
+            document.getElementById('prova-observacoes').value = data.observacoes || '';
         }
 
         if (modalType === 'topico') {
@@ -1053,12 +1108,18 @@ class StudyLifeControl {
             document.getElementById('extra-course-plataforma').value = data.plataforma || '';
             document.getElementById('extra-course-area').value = data.area || '';
             document.getElementById('extra-course-status').value = data.status || 'em-andamento';
+            document.getElementById('extra-course-tipo').value = data.tipoAcompanhamento || 'horas';
             document.getElementById('extra-course-meta-horas').value = data.metaHoras || '';
             document.getElementById('extra-course-horas-estudadas').value = data.horasEstudadas || '';
-            document.getElementById('extra-course-progresso').value = data.progresso || '';
+            document.getElementById('extra-course-total-modulos').value = data.totalModulos || '';
+            document.getElementById('extra-course-modulos-concluidos').value = data.modulosConcluidos || '';
+            document.getElementById('extra-course-data-fim').value = data.dataFimPrevista || '';
+            document.getElementById('extra-course-carga-total').value = data.cargaHorariaTotal || '';
+            document.getElementById('extra-course-progresso').value = data.progresso ?? '';
             document.getElementById('extra-course-data-inicio').value = data.dataInicio || '';
             document.getElementById('extra-course-link').value = data.link || '';
             document.getElementById('extra-course-observacoes').value = data.observacoes || '';
+            this.updateExtraCourseTypeUI();
         }
 
         const modal = document.getElementById(`modal-${modalType}`);
@@ -1248,6 +1309,18 @@ class StudyLifeControl {
 
         this.editingExamId = id;
         this.openModal('prova', prova);
+    }
+
+    async toggleExamConcluida(id) {
+        const prova = this.data.exams.find(p => p.id === id);
+        if (!prova) return;
+
+        const success = await dbService.updateItem('exams', id, { concluida: !prova.concluida });
+        if (success) {
+            prova.concluida = !prova.concluida;
+            this.loadView(this.currentView);
+            showToast(prova.concluida ? 'Marcado como concluído!' : 'Marcado como pendente.');
+        }
     }
 
     editarTopico(id) {
@@ -1520,6 +1593,9 @@ class StudyLifeControl {
             data: document.getElementById('prova-data').value,
             peso: parseInt(document.getElementById('prova-peso').value, 10) || 100,
             importancia: document.getElementById('prova-importancia').value,
+            horario: document.getElementById('prova-horario').value,
+            local: document.getElementById('prova-local').value,
+            observacoes: document.getElementById('prova-observacoes').value,
             concluida: false
         };
 
@@ -2109,10 +2185,17 @@ class StudyLifeControl {
             .reduce((a, s) => a + s.duracao, 0) / 60;
 
         const restantes = this.data.exams.filter(
-            e => e.materia === subject.nome && new Date(e.data) >= new Date()
+            e => e.materia === subject.nome && !e.concluida && new Date(e.data) >= new Date()
         );
 
-        const pesoRestante = restantes.reduce((a, e) => a + (e.peso || 0), 0);
+        // O peso de cada prova representa a fatia (%) que ela ainda vai
+        // valer na nota final. Toda prova nova nasce com peso 100 por
+        // padrão — se a pessoa cadastra várias sem ajustar esse campo, a
+        // soma passa de 100 (ex.: 5 provas x 100 = 500) e quebrava a conta,
+        // gerando um "necessário" bem menor que a nota desejada mesmo sem
+        // nenhuma nota lançada ainda. Limitamos a 100 porque não existe
+        // mais que 100% da nota ainda em aberto.
+        const pesoRestante = Math.min(100, restantes.reduce((a, e) => a + (Number(e.peso) || 0), 0));
 
         let notaNecessaria = subject.notaDesejada || 7;
         if (pesoRestante > 0) {
@@ -2876,17 +2959,70 @@ StudyLifeControl.prototype.handleCurriculumSubmit = async function(e) {
     this.resetModalStates();
 };
 
+StudyLifeControl.prototype.updateExtraCourseTypeUI = function() {
+    const tipo = document.getElementById('extra-course-tipo')?.value || 'horas';
+    const groups = {
+        horas: document.getElementById('extra-course-group-horas'),
+        modulos: document.getElementById('extra-course-group-modulos'),
+        data: document.getElementById('extra-course-group-data')
+    };
+    Object.entries(groups).forEach(([key, el]) => {
+        if (el) el.style.display = (key === tipo) ? '' : 'none';
+    });
+    const progressoLabel = document.getElementById('extra-course-progresso-label');
+    if (progressoLabel) {
+        progressoLabel.textContent = tipo === 'manual'
+            ? 'Percentual concluído (%)'
+            : 'Percentual concluído (opcional — calculado automático se deixar em branco)';
+    }
+};
+
 StudyLifeControl.prototype.handleExtraCourseSubmit = async function(e) {
     e.preventDefault();
+    const tipoAcompanhamento = document.getElementById('extra-course-tipo')?.value || 'horas';
+    const metaHoras = parseFloat(document.getElementById('extra-course-meta-horas')?.value) || 0;
+    const horasEstudadas = parseFloat(document.getElementById('extra-course-horas-estudadas')?.value) || 0;
+    const totalModulos = parseFloat(document.getElementById('extra-course-total-modulos')?.value) || 0;
+    const modulosConcluidos = parseFloat(document.getElementById('extra-course-modulos-concluidos')?.value) || 0;
+    const dataInicio = document.getElementById('extra-course-data-inicio')?.value || '';
+    const dataFimPrevista = document.getElementById('extra-course-data-fim')?.value || '';
+    const cargaHorariaTotal = parseFloat(document.getElementById('extra-course-carga-total')?.value) || 0;
+    const progressoRaw = document.getElementById('extra-course-progresso')?.value;
+
+    // Progresso: se a pessoa preencheu o campo manual, ele manda (funciona pra
+    // qualquer tipo de curso). Senão, calcula automático de acordo com o tipo
+    // de acompanhamento escolhido — cada tipo de curso tem seu próprio jeito
+    // de medir avanço (horas, módulos concluídos ou tempo decorrido no período).
+    let progresso;
+    if (progressoRaw !== '' && progressoRaw !== null && progressoRaw !== undefined) {
+        progresso = Math.min(100, Math.max(0, parseFloat(progressoRaw) || 0));
+    } else if (tipoAcompanhamento === 'modulos' && totalModulos > 0) {
+        progresso = Math.min(100, Math.max(0, Math.round((modulosConcluidos / totalModulos) * 100)));
+    } else if (tipoAcompanhamento === 'data' && dataInicio && dataFimPrevista) {
+        const inicio = new Date(dataInicio).getTime();
+        const fim = new Date(dataFimPrevista).getTime();
+        const hoje = Date.now();
+        progresso = fim > inicio ? Math.min(100, Math.max(0, Math.round(((hoje - inicio) / (fim - inicio)) * 100))) : 0;
+    } else if (tipoAcompanhamento === 'horas' && metaHoras > 0) {
+        progresso = Math.min(100, Math.max(0, Math.round((horasEstudadas / metaHoras) * 100)));
+    } else {
+        progresso = 0;
+    }
+
     const courseData = {
         nome: document.getElementById('extra-course-nome')?.value?.trim() || '',
         plataforma: document.getElementById('extra-course-plataforma')?.value?.trim() || '',
         area: document.getElementById('extra-course-area')?.value?.trim() || '',
         status: document.getElementById('extra-course-status')?.value || 'em-andamento',
-        metaHoras: parseFloat(document.getElementById('extra-course-meta-horas')?.value) || 0,
-        horasEstudadas: parseFloat(document.getElementById('extra-course-horas-estudadas')?.value) || 0,
-        progresso: parseFloat(document.getElementById('extra-course-progresso')?.value) || 0,
-        dataInicio: document.getElementById('extra-course-data-inicio')?.value || '',
+        tipoAcompanhamento,
+        metaHoras,
+        horasEstudadas,
+        totalModulos,
+        modulosConcluidos,
+        dataFimPrevista,
+        cargaHorariaTotal,
+        progresso,
+        dataInicio,
         link: document.getElementById('extra-course-link')?.value?.trim() || '',
         observacoes: document.getElementById('extra-course-observacoes')?.value?.trim() || ''
     };
@@ -3026,7 +3162,13 @@ StudyLifeControl.prototype.excluirExtraCourse = async function(id) {
         const average = this.calcularMedia(grades);
         const hours = sessions.reduce((a,s) => a + (Number(s?.duracao)||0), 0) / 60;
         const attended = diaries.filter(d => d?.presenca === 'present').length;
-        const attendance = diaries.length ? Math.round((attended / diaries.length) * 100) : 100;
+        // Sem diário registrado não significa 100% de presença — significa que
+        // não sabemos. Antes isso mascarava a falta de dados com um número
+        // otimista falso; agora fica null e quem exibe decide como avisar.
+        const attendance = diaries.length ? Math.round((attended / diaries.length) * 100) : null;
+        const hasDiaries = diaries.length > 0;
+        const hasSessions = sessions.length > 0;
+        const hasGrades = grades.length > 0;
         const lastStudy = sessions.sort((a,b) => new Date(b.data) - new Date(a.data))[0];
         const daysWithoutStudy = lastStudy ? diasDesde(lastStudy.data) : null;
         const risk = this.analyzeAcademicRisk().find(r => r.materia === subjectName) || null;
@@ -3051,6 +3193,9 @@ StudyLifeControl.prototype.excluirExtraCourse = async function(id) {
             riskReason: risk?.motivo || (daysWithoutStudy !== null && daysWithoutStudy >= 7 ? `${daysWithoutStudy} dias sem estudar` : 'sem alerta forte agora'),
             recommendation,
             daysWithoutStudy,
+            hasDiaries,
+            hasSessions,
+            hasGrades,
             lastDiary: diaries[0] || null,
             nextRequiredGrade: this.estimateNextRequiredGrade(subjectName, Number(subject?.notaDesejada || 7))
         };
@@ -3153,11 +3298,26 @@ StudyLifeControl.prototype.excluirExtraCourse = async function(id) {
         const safe = performances.filter(p => p.riskLevel === 'baixo');
         const attention = performances.filter(p => p.riskLevel === 'medio');
         const risk = performances.filter(p => p.riskLevel === 'alto');
-        const avgAttendance = performances.length ? Math.round(performances.reduce((a,p) => a + p.attendance, 0) / performances.length) : 100;
+        // Só entra na média quem realmente tem diário registrado — matéria
+        // sem nenhum registro não deve puxar a média geral pra cima.
+        const withAttendance = performances.filter(p => p.hasDiaries);
+        const avgAttendance = withAttendance.length ? Math.round(withAttendance.reduce((a,p) => a + p.attendance, 0) / withAttendance.length) : null;
         const avgGradeItems = performances.filter(p => p.average > 0);
         const generalAverage = avgGradeItems.length ? (avgGradeItems.reduce((a,p) => a + p.average, 0) / avgGradeItems.length).toFixed(1) : '0.0';
         const weekPending = (this.data.tasks || []).filter(t => !t?.concluida && diasAte(t.dataLimite) <= 7).length + this.getReviewItemsForDays(7).length;
-        return { safe, attention, risk, avgAttendance, generalAverage, weekPending, performances };
+        const totalHoursStudied = performances.reduce((a,p) => a + (Number(p.hours) || 0), 0);
+
+        // Dados que faltam registrar, por matéria — é o que alimenta o aviso
+        // "registre seus estudos" na página de Situação Acadêmica.
+        const missingSessions = performances.filter(p => !p.hasSessions).map(p => p.subject.nome);
+        const missingDiary = performances.filter(p => !p.hasDiaries).map(p => p.subject.nome);
+        const missingGrades = performances.filter(p => !p.hasGrades).map(p => p.subject.nome);
+        const noDataAtAll = performances.filter(p => !p.hasSessions && !p.hasDiaries && !p.hasGrades).map(p => p.subject.nome);
+
+        return {
+            safe, attention, risk, avgAttendance, generalAverage, weekPending, performances,
+            totalHoursStudied, missingSessions, missingDiary, missingGrades, noDataAtAll
+        };
     };
 
     const originalHandleClassDiarySubmit = proto.handleClassDiarySubmit;

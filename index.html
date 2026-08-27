@@ -513,6 +513,20 @@
                         <option value="baixa">Baixa - Pouco peso</option>
                     </select>
                 </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Horário <span class="text-secondary">(opcional)</span></label>
+                        <input type="time" id="prova-horario">
+                    </div>
+                    <div class="form-group">
+                        <label>Local/Sala <span class="text-secondary">(opcional)</span></label>
+                        <input type="text" id="prova-local" placeholder="Ex: Sala 12, online...">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>O que cai / observações <span class="text-secondary">(opcional)</span></label>
+                    <textarea id="prova-observacoes" rows="2" placeholder="Ex: capítulos 3 a 5, levar calculadora..."></textarea>
+                </div>
                 <div class="form-actions">
                     <button type="submit" class="btn-primary">Salvar</button>
                 </div>
@@ -854,6 +868,15 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group">
+                        <label>Como você quer acompanhar esse curso?</label>
+                        <select id="extra-course-tipo">
+                            <option value="horas">Por carga horária (Duolingo, YouTube, curso avulso)</option>
+                            <option value="modulos">Por módulos/aulas (Udemy, Alura, playlist)</option>
+                            <option value="data">Por período (curso com início e fim, tipo escola)</option>
+                            <option value="manual">Só acompanhar manualmente (%)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label>Status</label>
                         <select id="extra-course-status">
                             <option value="planejado">Planejado</option>
@@ -862,19 +885,35 @@
                             <option value="pausado">Pausado</option>
                         </select>
                     </div>
+                </div>
+                <div class="form-row" id="extra-course-group-horas">
                     <div class="form-group">
                         <label>Meta total (horas)</label>
                         <input type="number" id="extra-course-meta-horas" min="0" placeholder="Ex: 120">
                     </div>
-                </div>
-                <div class="form-row">
                     <div class="form-group">
                         <label>Horas já estudadas</label>
                         <input type="number" id="extra-course-horas-estudadas" min="0" step="0.5" placeholder="Ex: 8">
                     </div>
+                </div>
+                <div class="form-row" id="extra-course-group-modulos">
                     <div class="form-group">
-                        <label>Percentual concluído (%)</label>
-                        <input type="number" id="extra-course-progresso" min="0" max="100" placeholder="Ex: 15">
+                        <label>Total de módulos/aulas</label>
+                        <input type="number" id="extra-course-total-modulos" min="0" placeholder="Ex: 40">
+                    </div>
+                    <div class="form-group">
+                        <label>Módulos/aulas concluídos</label>
+                        <input type="number" id="extra-course-modulos-concluidos" min="0" placeholder="Ex: 12">
+                    </div>
+                </div>
+                <div class="form-row" id="extra-course-group-data">
+                    <div class="form-group">
+                        <label>Data prevista de término</label>
+                        <input type="date" id="extra-course-data-fim">
+                    </div>
+                    <div class="form-group">
+                        <label>Carga horária total (opcional)</label>
+                        <input type="number" id="extra-course-carga-total" min="0" placeholder="Ex: 200">
                     </div>
                 </div>
                 <div class="form-row">
@@ -882,6 +921,12 @@
                         <label>Data de início</label>
                         <input type="date" id="extra-course-data-inicio">
                     </div>
+                    <div class="form-group">
+                        <label id="extra-course-progresso-label">Percentual concluído (%)</label>
+                        <input type="number" id="extra-course-progresso" min="0" max="100" placeholder="Deixe em branco p/ calcular automático">
+                    </div>
+                </div>
+                <div class="form-row">
                     <div class="form-group">
                         <label>Link (opcional)</label>
                         <input type="url" id="extra-course-link" placeholder="https://...">
@@ -929,19 +974,21 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>Energia do dia</label>
-                            <select id="diario-energia">
-                                <option value="baixa">🔴 Baixa</option>
-                                <option value="media" selected>🟡 Média</option>
-                                <option value="alta">🟢 Alta</option>
-                            </select>
+                            <input type="hidden" id="diario-energia" value="media">
+                            <div class="diario-pill-group" data-pill-target="diario-energia">
+                                <button type="button" class="diario-pill" data-val="baixa">🔴 Baixa</button>
+                                <button type="button" class="diario-pill active" data-val="media">🟡 Média</button>
+                                <button type="button" class="diario-pill" data-val="alta">🟢 Alta</button>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label>Foco do dia</label>
-                            <select id="diario-foco">
-                                <option value="ruim">🔴 Ruim</option>
-                                <option value="normal" selected>🟡 Normal</option>
-                                <option value="bom">🟢 Bom</option>
-                            </select>
+                            <input type="hidden" id="diario-foco" value="normal">
+                            <div class="diario-pill-group" data-pill-target="diario-foco">
+                                <button type="button" class="diario-pill" data-val="ruim">🔴 Ruim</button>
+                                <button type="button" class="diario-pill active" data-val="normal">🟡 Normal</button>
+                                <button type="button" class="diario-pill" data-val="bom">🟢 Bom</button>
+                            </div>
                         </div>
                     </div>
                     <div class="form-row">
@@ -1069,6 +1116,9 @@
     <script src="xp-widget.js"></script>
     <script src="calendar-feed.js"></script>
     <script src="push-notifications.js"></script>
+    <script src="auto-notification-prompt.js"></script>
+    <script src="exam-study-popup.js"></script>
+    <script src="quick-search.js"></script>
     <script src="export-data.js"></script>
     <script src="feedback-widget.js"></script>
     <link rel="stylesheet" href="launch-polish.css">

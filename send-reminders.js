@@ -67,18 +67,37 @@ function setupWebPush() {
 }
 
 // Datas e horários salvos pelo app (exams.data, tasks.dataLimite,
-// sessions.data) não guardam fuso horário — vêm de campos <input
-// type="date"> / type="datetime-local">, que só têm os dígitos da hora
-// LOCAL do navegador de quem preencheu. Assumimos horário de Brasília
-// (UTC-3, fixo, já que o Brasil não tem mais horário de verão desde
-// 2019). Se algum dia o app atender fora do Brasil, isso precisa virar
-// um fuso por usuário salvo no cadastro.
+// reviews.data, sessions.data) não guardam fuso horário — vêm de campos
+// <input type="date"> / type="datetime-local">, que só têm os dígitos da
+// hora LOCAL do navegador de quem preencheu. Assumimos horário de
+// Brasília (UTC-3, fixo, já que o Brasil não tem mais horário de verão
+// desde 2019). Se algum dia o app atender fora do Brasil, isso precisa
+// virar um fuso por usuário salvo no cadastro.
 const FUSO_BRASIL = '-03:00';
 
 function dateOnlyToMs(yyyyMmDd) {
   if (!yyyyMmDd) return null;
   const t = Date.parse(`${yyyyMmDd}T00:00:00${FUSO_BRASIL}`);
   return Number.isNaN(t) ? null : t;
+}
+
+// "Agora" já deslocado -3h, pra poder ler getUTCHours()/toISOString() e
+// obter a hora e a data de calendário corretas em Brasília sem depender
+// do fuso do servidor (Vercel roda em UTC).
+function agoraBrasilia(now) {
+  return new Date(now - 3 * 3600000);
+}
+
+function calcularStreakDiario(dailyLogs, hojeStr) {
+  const datasComLog = new Set((dailyLogs || []).map(l => l.data));
+  let streak = 0;
+  const cursor = new Date(`${hojeStr}T00:00:00Z`);
+  if (!datasComLog.has(hojeStr)) cursor.setUTCDate(cursor.getUTCDate() - 1);
+  while (datasComLog.has(cursor.toISOString().slice(0, 10))) {
+    streak++;
+    cursor.setUTCDate(cursor.getUTCDate() - 1);
+  }
+  return streak;
 }
 
 function localDateTimeToMs(isoLocal) {
@@ -137,6 +156,26 @@ function findDueReminders(data, now) {
     due.push(...checkpointsDevidos(taskMs, 'task', t.id, '✅ Tarefa', corpo, now, already));
   });
 
+  // Revisão espaçada: essa preferência (reviewsHoursBefore) já existia na
+  // tela de Configurações e era salva, mas nunca tinha sido lida aqui —
+  // por isso a notificação nunca disparava, em nenhuma hipótese. Segue o
+  // mesmo padrão de "X horas antes" que sessão/aula já usam.
+  const reviewsHoursBefore = Number(prefs.reviewsHoursBefore ?? 24);
+  (data.reviews || []).forEach(r => {
+    if (r.concluida) return;
+    const key = `review:${r.id}`;
+    if (already.has(key)) return;
+    const reviewMs = dateOnlyToMs(r.data);
+    if (reviewMs == null) return;
+    const triggerMs = reviewMs - reviewsHoursBefore * 3600000;
+    // janela vai até 24h depois do dia da revisão, não só até o instante
+    // exato — como reviewMs é meia-noite do dia, sem essa folga o aviso
+    // teria que disparar exatamente à 00h pra não perder a janela.
+    if (now >= triggerMs && now < reviewMs + JANELA_CHECKPOINT_MS) {
+      due.push({ key, title: '🔁 Revisão espaçada', body: `${r.materia}${r.topico ? ` — ${r.topico}` : ''}` });
+    }
+  });
+
   const sessionsMinutesBefore = Number(prefs.sessionsMinutesBefore ?? 15);
   (data.sessions || []).forEach(s => {
     if (s.concluida) return;
@@ -149,6 +188,29 @@ function findDueReminders(data, now) {
       due.push({ key, title: '📚 Sessão de estudo já já', body: `${s.materia}${s.topico ? ` — ${s.topico}` : ''}` });
     }
   });
+
+  // Diário: se a hora configurada já passou (fuso Brasília) e o usuário
+  // ainda não registrou nada hoje (nem "Meu dia" nem diário de aula),
+  // manda 1 aviso — dedupe por dia (`diario:AAAA-MM-DD`), então mesmo o
+  // cron rodando várias vezes só dispara uma vez por dia, e some sozinho
+  // no dia seguinte por não bater mais a condição de horário.
+  const diarioHora = Number(prefs.diaryReminderHour ?? 20);
+  const bAgora = agoraBrasilia(now);
+  const hojeBr = bAgora.toISOString().slice(0, 10);
+  const diarioKey = `diario:${hojeBr}`;
+  if (!already.has(diarioKey) && bAgora.getUTCHours() >= diarioHora) {
+    const jaRegistrouHoje =
+      (data.dailyLogs || []).some(l => l.data === hojeBr) ||
+      (data.classDiaries || []).some(d => d.data === hojeBr);
+    if (!jaRegistrouHoje) {
+      const streak = calcularStreakDiario(data.dailyLogs, hojeBr);
+      due.push({
+        key: diarioKey,
+        title: streak > 0 ? `🔥 ${streak} dia${streak === 1 ? '' : 's'} seguido${streak === 1 ? '' : 's'} — não perca hoje!` : '📖 Registre seu dia',
+        body: 'Você ainda não preencheu o Diário hoje. Leva menos de 1 minuto no modo rápido.'
+      });
+    }
+  }
 
   return due;
 }

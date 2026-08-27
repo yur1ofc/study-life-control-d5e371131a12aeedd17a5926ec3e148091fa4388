@@ -12,8 +12,17 @@
 //   FIREBASE_API_KEY    → a mesma que você já usa no front (Web API key do Firebase)
 //   FIREBASE_PROJECT_ID → a mesma que você já usa no front
 //
-// Também é preciso liberar a coleção "ai_usage" no firestore.rules — veja o
-// bloco novo em firestore.rules incluído nesta atualização.
+// Também é preciso liberar as coleções "ai_usage" e "gemini_usage_global" no
+// firestore.rules — veja os blocos em firestore.rules incluídos nesta
+// atualização.
+//
+// PRIORIDADE: esta função (import de grade) é a mais importante pra usuário
+// NOVO — é o primeiro contato dele com o app, no onboarding. Por isso ela
+// tem prioridade sobre o chat do Mentor IA na cota compartilhada do Gemini:
+// só é bloqueada pelo teto GLOBAL absoluto (GEMINI_TOTAL_DAILY_LIMIT), nunca
+// pela fatia reservada (GEMINI_IMPORT_RESERVE) — essa fatia é sempre dela.
+// Detalhes e como ajustar os números: api/_lib/gemini-shared-quota.js.
+const sharedQuota = require('./_lib/gemini-shared-quota');
 
 // Lista de modelos tentados em ordem. "gemini-flash-latest" é o mais rápido/barato,
 // mas de vez em quando fica sobrecarregado nos horários de pico do Google e devolve
@@ -155,6 +164,25 @@ module.exports = async function handler(req, res) {
   } catch (err) {
     console.error('[api/gemini] erro ao checar limite de uso:', err.message);
     // segue mesmo assim — não deixa um erro de contagem bloquear o usuário
+  }
+
+  // Cota GLOBAL compartilhada com o chat do Mentor IA. O import tem
+  // prioridade: só é barrado no teto ABSOLUTO do site (nunca pela fatia
+  // reservada pra ele — essa é sempre sua). Isso praticamente nunca deve
+  // disparar na prática; é só o limite de segurança de última instância.
+  try {
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    const sharedCount = await sharedQuota.readSharedCount(idToken, projectId);
+    if (sharedCount !== null) {
+      if (sharedCount >= sharedQuota.TOTAL_DAILY_LIMIT) {
+        console.warn(`[api/gemini] teto global absoluto do dia atingido (${sharedCount}/${sharedQuota.TOTAL_DAILY_LIMIT}).`);
+        return res.status(503).json({ error: 'O site atingiu o limite de uso de IA por hoje (alta demanda). Tente novamente mais tarde ou cadastre a grade manualmente por enquanto.' });
+      }
+      await sharedQuota.incrementSharedCount(idToken, projectId, sharedCount);
+    }
+  } catch (err) {
+    console.error('[api/gemini] erro ao checar cota global:', err.message);
+    // não bloqueia a importação por causa disso — prioridade é não travar o onboarding
   }
 
   try {

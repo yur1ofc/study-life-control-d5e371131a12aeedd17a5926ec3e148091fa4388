@@ -750,6 +750,7 @@
     if (typeof originalRenderConfiguracoes === 'function') {
       proto.renderConfiguracoes = function (aba) {
         const original = originalRenderConfiguracoes.call(this, aba);
+        if (aba !== 'sobre') return original;
         const extra = `
           <div class="catalog-preview" style="margin-top:18px">
             <h4>Catálogo comunitário</h4>

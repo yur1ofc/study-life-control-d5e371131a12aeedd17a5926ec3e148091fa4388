@@ -16,6 +16,48 @@ class ViewRenderer {
         return escapeHtml(value ?? '');
     }
 
+    // Lista única de hábitos, usada na tela de Hábitos e no widget rápido do Dashboard
+    getHabitosDefinition() {
+        return [
+            { id: 'estudar', nome: 'Estudar', icone: 'fa-book' },
+            { id: 'revisar', nome: 'Revisar conteúdo', icone: 'fa-sync-alt' },
+            { id: 'dormir', nome: 'Dormir bem', icone: 'fa-bed' },
+            { id: 'aula', nome: 'Ir para aula', icone: 'fa-university' },
+            { id: 'exercicio', nome: 'Fazer exercícios', icone: 'fa-dumbbell' },
+            { id: 'agua', nome: 'Beber água', icone: 'fa-tint' },
+            { id: 'anotacoes', nome: 'Ler anotações', icone: 'fa-sticky-note' }
+        ];
+    }
+
+    // Widget compacto de 1 toque: marca hábitos do dia sem precisar abrir a tela de Hábitos
+    renderHabitosWidget() {
+        const habitos = this.getHabitosDefinition();
+        const hoje = toDateString();
+        const feitos = habitos.filter(h => this.app.data.habits.some(hb => hb.id === h.id && toDateString(hb.data) === hoje)).length;
+
+        return `
+            <div class="card habitos-widget-card">
+                <div class="card-header">
+                    <h3><i class="fas fa-heart"></i> Hábitos de Hoje</h3>
+                    <span class="tag ${feitos === habitos.length ? 'success' : ''}">${feitos}/${habitos.length}</span>
+                </div>
+                <div class="card-body">
+                    <div class="habitos-widget-grid">
+                        ${habitos.map(h => {
+                            const feito = this.app.data.habits.some(hb => hb.id === h.id && toDateString(hb.data) === hoje);
+                            return `
+                                <button type="button" class="habito-chip toggle-habito-mini ${feito ? 'active' : ''}" data-habito="${this.esc(h.id)}" title="${this.esc(h.nome)}">
+                                    <i class="fas ${feito ? 'fa-check-circle' : h.icone}"></i>
+                                    <span>${this.esc(h.nome)}</span>
+                                </button>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
     renderDashboard() {
         const hoje = new Date();
         const alerts = this.app.generateAlerts();
@@ -73,6 +115,8 @@ class ViewRenderer {
                     ${alerts.map(a => this.renderAlert(a)).join('')}
                 </div>
             ` : ''}
+
+            ${this.renderHabitosWidget()}
 
             <div class="dashboard-grid">
                 <div class="card">
@@ -292,7 +336,7 @@ class ViewRenderer {
                     <div class="chat-messages" id="chat-messages">
                         <div class="message assistant">
                             <div class="message-content">
-                                Olá! Sou seu mentor IA. Eu puxo praticamente tudo do teu site: plano do dia, tarefas, provas, notas, presença, materiais, currículo, cursos extras, rotina e gamificação. Você pode escrever normal, tipo: “me dá um raio-x completo”, “o que está atrasado?” ou “como estou em Física?”. 
+                                Olá! Sou seu mentor IA. Eu puxo praticamente tudo do teu site: plano do dia, tarefas, provas, notas, presença, materiais, currículo, cursos extras, rotina, gamificação, Mapa de Aprendizado e Diário de Aula. Você pode escrever normal, tipo: “me dá um raio-x completo”, “o que está atrasado?”, “o que estudar agora?”, “o que eu vi hoje?” ou qualquer outra pergunta — se eu não souber por regra fixa, eu uso IA de verdade com os teus dados para responder.
                             </div>
                         </div>
                     </div>
@@ -323,6 +367,12 @@ class ViewRenderer {
                         </button>
                         <button class="sugestao-btn" data-pergunta="Dica de estudo">
                             <i class="fas fa-lightbulb"></i> Dica de estudo
+                        </button>
+                        <button class="sugestao-btn" data-pergunta="O que eu vi hoje? Quero revisar o conteúdo de hoje.">
+                            <i class="fas fa-book-open"></i> Revisar aula de hoje
+                        </button>
+                        <button class="sugestao-btn" data-pergunta="O que estudar agora, por onde eu começo?">
+                            <i class="fas fa-route"></i> Trilha de estudo
                         </button>
                         <button class="sugestao-btn" data-pergunta="Me dá um raio-x completo">
                             <i class="fas fa-heartbeat"></i> Raio-x completo
@@ -748,6 +798,41 @@ class ViewRenderer {
         `;
     }
 
+    renderProvaMeta(e) {
+        const partes = [this.esc(e.tipo), formatarData(e.data)];
+        if (e.horario) partes.push(`⏰ ${this.esc(e.horario)}`);
+        if (e.local) partes.push(`📍 ${this.esc(e.local)}`);
+        if (e.peso && e.peso !== 100) partes.push(`peso ${this.esc(e.peso)}%`);
+        return partes.join(' • ');
+    }
+
+    renderProvaItem(e, { passada = false } = {}) {
+        return `
+            <li class="prova-item">
+                <div>
+                    <strong>${this.esc(e.titulo)}</strong>
+                    <small>${this.renderProvaMeta(e)}</small>
+                    ${e.observacoes ? `<small class="prova-obs"><i class="fas fa-circle-info"></i> ${this.esc(e.observacoes)}</small>` : ''}
+                </div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    ${passada
+                        ? `<span class="tag ${e.concluida ? 'success' : 'warning'}">${e.concluida ? 'Concluído' : 'Data passada'}</span>`
+                        : `<span class="tag ${this.app.getExamRiskClass(e)}">${diasAte(e.data)} dias</span>`
+                    }
+                    <button class="btn-icon btn-concluir-prova" data-id="${this.esc(e.id)}" title="${e.concluida ? 'Marcar como pendente' : 'Marcar como concluído'}">
+                        <i class="fas ${e.concluida ? 'fa-rotate-left' : 'fa-check'}"></i>
+                    </button>
+                    <button class="btn-icon btn-editar-prova" data-id="${this.esc(e.id)}" title="Editar evento">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn-icon btn-excluir-prova" data-id="${this.esc(e.id)}" title="Excluir evento" style="color: var(--accent-danger);">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </li>
+        `;
+    }
+
     renderProvas() {
         const agora = toDateOnly(new Date());
         const { atuais: examsAtuais, arquivadas } = this.app.filterSemestreAtual(this.app.data.exams, 'materia');
@@ -759,7 +844,17 @@ class ViewRenderer {
         const passadas = examsAtuais
             .filter(e => toDateOnly(e.data) < agora || e.concluida)
             .sort((a, b) => new Date(b.data) - new Date(a.data))
-            .slice(0, 10);
+            .slice(0, 15);
+
+        // Agrupa os próximos eventos por matéria, ordenando os grupos pelo evento mais próximo
+        const grupos = {};
+        proximas.forEach(e => {
+            if (!grupos[e.materia]) grupos[e.materia] = [];
+            grupos[e.materia].push(e);
+        });
+        const materiasOrdenadas = Object.keys(grupos).sort((a, b) =>
+            new Date(grupos[a][0].data) - new Date(grupos[b][0].data)
+        );
 
         return `
             <div class="view-header">
@@ -768,57 +863,35 @@ class ViewRenderer {
             </div>
             ${arquivadas ? `<p class="text-secondary archived-note"><i class="fas fa-box-archive"></i> ${arquivadas} matéria${arquivadas > 1 ? 's' : ''} arquivada${arquivadas > 1 ? 's' : ''} (fora do semestre atual) — as provas continuam salvas em Configurações › Grade Curricular › Semestres anteriores.</p>` : ''}
 
-            <div class="dashboard-grid">
-                <div class="card">
-                    <div class="card-header"><h3>📅 Próximos (${proximas.length})</h3></div>
-                    <div class="card-body">
-                        <ul class="item-list">
-                            ${proximas.map(e => `
-                                <li>
-                                    <div>
-                                        <strong>${this.esc(e.titulo)}</strong>
-                                        <small>${this.esc(e.materia)} • ${this.esc(e.tipo)} • ${formatarData(e.data)}</small>
-                                    </div>
-                                    <div style="display:flex; gap:8px;">
-                                        <span class="tag ${this.app.getExamRiskClass(e)}">${diasAte(e.data)} dias</span>
-                                        <button class="btn-icon btn-editar-prova" data-id="${this.esc(e.id)}" title="Editar evento">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <button class="btn-icon btn-excluir-prova" data-id="${this.esc(e.id)}" title="Excluir evento" style="color: var(--accent-danger);">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </li>
-                            `).join('')}
-                            ${!proximas.length ? '<li>Nenhum evento próximo</li>' : ''}
-                        </ul>
-                    </div>
-                </div>
+            <h3 class="section-subtitle">📅 Próximos por matéria (${proximas.length})</h3>
+            <div class="mapa-grid mapa-grid-compact">
+                ${materiasOrdenadas.map(materia => {
+                    const eventos = grupos[materia];
+                    return `
+                        <div class="card materia-map" data-materia-prova="${this.esc(materia)}">
+                            <button type="button" class="card-header materia-map-toggle" data-toggle-materia-prova>
+                                <h3>${this.esc(materia)}</h3>
+                                <span class="badge">${eventos.length} evento${eventos.length === 1 ? '' : 's'} • próx. ${diasAte(eventos[0].data)}d</span>
+                                <i class="fas fa-chevron-down materia-map-chevron"></i>
+                            </button>
+                            <div class="card-body materia-map-body">
+                                <ul class="item-list">
+                                    ${eventos.map(e => this.renderProvaItem(e)).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+                ${!materiasOrdenadas.length ? '<p class="text-secondary">Nenhum evento próximo</p>' : ''}
+            </div>
 
-                <div class="card">
-                    <div class="card-header"><h3>📜 Eventos Passados</h3></div>
-                    <div class="card-body">
-                        <ul class="item-list">
-                            ${passadas.map(e => `
-                                <li>
-                                    <div>
-                                        <strong>${this.esc(e.titulo)}</strong>
-                                        <small>${this.esc(e.materia)} • ${formatarData(e.data)}</small>
-                                    </div>
-                                    <div style="display:flex; gap:8px;">
-                                        <span class="tag success">Concluído</span>
-                                        <button class="btn-icon btn-editar-prova" data-id="${this.esc(e.id)}" title="Editar evento">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <button class="btn-icon btn-excluir-prova" data-id="${this.esc(e.id)}" title="Excluir evento" style="color: var(--accent-danger);">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </li>
-                            `).join('')}
-                            ${!passadas.length ? '<li>Nenhum evento passado</li>' : ''}
-                        </ul>
-                    </div>
+            <div class="card" style="margin-top:20px;">
+                <div class="card-header"><h3>📜 Eventos Passados</h3></div>
+                <div class="card-body">
+                    <ul class="item-list">
+                        ${passadas.map(e => this.renderProvaItem(e, { passada: true })).join('')}
+                        ${!passadas.length ? '<li>Nenhum evento passado</li>' : ''}
+                    </ul>
                 </div>
             </div>
         `;
@@ -831,16 +904,18 @@ class ViewRenderer {
                 <button class="btn-primary" id="btn-novo-topico"><i class="fas fa-plus"></i> Novo Tópico</button>
             </div>
 
-            <div class="mapa-grid">
+            <div class="mapa-grid mapa-grid-compact">
                 ${this.app.data.subjects.map(s => {
                     const topicos = this.app.data.learningMap.filter(t => t.materia === s.nome);
+                    const dominados = topicos.filter(t => String(t.status).toLowerCase() === 'dominado').length;
                     return `
-                        <div class="card materia-map">
-                            <div class="card-header">
+                        <div class="card materia-map materia-map-collapsed" data-materia-map="${this.esc(s.nome)}">
+                            <button type="button" class="card-header materia-map-toggle" data-toggle-materia-map>
                                 <h3>${this.esc(s.nome)}</h3>
-                                <span class="badge">${topicos.length} tópicos</span>
-                            </div>
-                            <div class="card-body">
+                                <span class="badge">${topicos.length} tópico${topicos.length === 1 ? '' : 's'}${dominados ? ` • ${dominados} dominado${dominados === 1 ? '' : 's'}` : ''}</span>
+                                <i class="fas fa-chevron-down materia-map-chevron"></i>
+                            </button>
+                            <div class="card-body materia-map-body" hidden>
                                 ${topicos.map(t => `
                                     <div class="topico-item">
                                         <div class="topico-info">
@@ -872,11 +947,29 @@ class ViewRenderer {
     }
 
     renderMateriais() {
+        const totalMateriais = this.app.data.materials.length;
+
         return `
             <div class="view-header">
                 <h2><i class="fas fa-folder"></i> Materiais de Estudo</h2>
                 <button class="btn-primary" id="btn-novo-material"><i class="fas fa-plus"></i> Novo Material</button>
             </div>
+
+            ${!totalMateriais ? `
+                <div class="card materiais-intro-card">
+                    <div class="card-body">
+                        <h3><i class="fas fa-lightbulb"></i> Pra que serve essa tela?</h3>
+                        <p class="text-secondary">É onde você guarda, por matéria, tudo que usa pra estudar — sem precisar procurar de novo depois. Cada item fica um clique de distância dentro da matéria certa.</p>
+                        <div class="materiais-intro-grid">
+                            <div class="materiais-intro-item"><i class="fas fa-link"></i><div><strong>Link</strong><span>Site, PDF online, playlist, artigo</span></div></div>
+                            <div class="materiais-intro-item"><i class="fas fa-file-pdf"></i><div><strong>PDF</strong><span>Apostila, slide da aula, resumo</span></div></div>
+                            <div class="materiais-intro-item"><i class="fas fa-video"></i><div><strong>Vídeo</strong><span>Aula gravada, videoaula do YouTube</span></div></div>
+                            <div class="materiais-intro-item"><i class="fas fa-sticky-note"></i><div><strong>Anotação</strong><span>Texto livre: fórmulas, resumo, lembrete</span></div></div>
+                        </div>
+                        <p class="text-secondary" style="margin-top:12px;">Ex: antes de uma prova, abra a matéria aqui e já tem tudo junto — em vez de vasculhar o WhatsApp ou o Drive.</p>
+                    </div>
+                </div>
+            ` : ''}
 
             <div class="materiais-grid">
                 ${this.app.data.subjects.map(s => {
@@ -1079,15 +1172,7 @@ class ViewRenderer {
     }
 
     renderHabitos() {
-        const habitos = [
-            { id: 'estudar', nome: 'Estudar', icone: 'fa-book' },
-            { id: 'revisar', nome: 'Revisar conteúdo', icone: 'fa-sync-alt' },
-            { id: 'dormir', nome: 'Dormir bem', icone: 'fa-bed' },
-            { id: 'aula', nome: 'Ir para aula', icone: 'fa-university' },
-            { id: 'exercicio', nome: 'Fazer exercícios', icone: 'fa-dumbbell' },
-            { id: 'agua', nome: 'Beber água', icone: 'fa-tint' },
-            { id: 'anotacoes', nome: 'Ler anotações', icone: 'fa-sticky-note' }
-        ];
+        const habitos = this.getHabitosDefinition();
 
         const hoje = toDateString();
 
@@ -1152,6 +1237,11 @@ class ViewRenderer {
         const maxHorasMateria = horasPorMateria.length ? Math.max(...horasPorMateria.map(h => h.horas)) : 1;
         const maxHorasTipo = horasPorTipo.length ? Math.max(...horasPorTipo.map(t => t.horas)) : 1;
 
+        const situacao = this.app.getAcademicSituationSummary ? this.app.getAcademicSituationSummary() : null;
+        const { atuais: examsAtuais } = this.app.filterSemestreAtual(this.app.data.exams, 'materia');
+        const provasConcluidas = examsAtuais.filter(e => e.concluida).length;
+        const provasPendentes = examsAtuais.length - provasConcluidas;
+
         return `
             <h2><i class="fas fa-chart-bar"></i> Estatísticas</h2>
 
@@ -1187,6 +1277,32 @@ class ViewRenderer {
                         <p>concluídas</p>
                     </div>
                 </div>
+
+                ${situacao ? `
+                <div class="card">
+                    <div class="card-header"><h3>🎓 Média Geral</h3></div>
+                    <div class="card-body text-center">
+                        <div class="big-number">${this.esc(situacao.generalAverage)}</div>
+                        <p>nas matérias com nota lançada</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header"><h3>🙋 Presença Média</h3></div>
+                    <div class="card-body text-center">
+                        <div class="big-number">${situacao.avgAttendance !== null ? `${situacao.avgAttendance}%` : '—'}</div>
+                        <p>${situacao.avgAttendance !== null ? 'nas matérias com diário registrado' : 'registre o Diário de Aula para ver'}</p>
+                    </div>
+                </div>
+                ` : ''}
+
+                <div class="card">
+                    <div class="card-header"><h3>📝 Provas e Trabalhos</h3></div>
+                    <div class="card-body text-center">
+                        <div class="big-number">${provasConcluidas}/${examsAtuais.length}</div>
+                        <p>${provasPendentes > 0 ? `${provasPendentes} pendente${provasPendentes > 1 ? 's' : ''}` : 'tudo em dia'}</p>
+                    </div>
+                </div>
             </div>
 
             <div class="card">
@@ -1201,6 +1317,7 @@ class ViewRenderer {
                             <div class="stat-value">${item.horas.toFixed(1)}h</div>
                         </div>
                     `).join('')}
+                    ${!horasPorMateria.length ? '<p class="text-secondary">Nenhuma sessão de estudo registrada ainda.</p>' : ''}
                 </div>
             </div>
 
@@ -1219,6 +1336,7 @@ class ViewRenderer {
                                 </div>
                             </div>
                         `).join('')}
+                        ${!horasPorTipo.length ? '<p class="text-secondary">Nenhum dado ainda.</p>' : ''}
                     </div>
                 </div>
             </div>
@@ -1226,6 +1344,15 @@ class ViewRenderer {
     }
 
     renderModoFoco() {
+        const hoje = toDateString();
+        const sessoesHoje = (this.app.data.sessions || [])
+            .filter(s => !s.concluida && toDateString(s.data) === hoje)
+            .sort((a, b) => new Date(a.data) - new Date(b.data));
+        const materias = (this.app.data.subjects || []).slice().sort((a, b) => a.nome.localeCompare(b.nome));
+
+        const optsSessao = sessoesHoje.map(s => `<option value="${this.esc(s.id)}" data-materia="${this.esc(s.materia)}" data-duracao="${this.esc(s.duracao || '')}">${this.esc(s.materia)} • ${this.esc(s.tipo)} (${formatarHora(s.data)})</option>`).join('');
+        const optsMateria = materias.map(m => `<option value="${this.esc(m.nome)}">${this.esc(m.nome)}</option>`).join('');
+
         return `
             <h2><i class="fas fa-clock"></i> Modo Foco</h2>
 
@@ -1234,6 +1361,15 @@ class ViewRenderer {
                     <div class="timer-display" id="timer-display">25:00</div>
 
                     <div class="timer-settings">
+                        ${sessoesHoje.length ? `
+                        <select id="timer-sessao-vinculada" class="timer-select">
+                            <option value="">🔓 Sessão livre (não vincular)</option>
+                            ${optsSessao}
+                        </select>` : ''}
+                        <select id="timer-materia" class="timer-select">
+                            <option value="">Sem matéria específica</option>
+                            ${optsMateria}
+                        </select>
                         <select id="timer-duracao" class="timer-select">
                             <option value="25">Pomodoro (25 min)</option>
                             <option value="50">Estudo longo (50 min)</option>
@@ -1241,6 +1377,9 @@ class ViewRenderer {
                             <option value="15">Pausa curta (15 min)</option>
                         </select>
                     </div>
+                    <p class="text-secondary" id="timer-vinculo-info" style="font-size:0.85em;margin-top:-8px;">
+                        ${sessoesHoje.length ? 'Vincule a uma sessão programada de hoje para marcá-la como concluída automaticamente ao terminar o foco.' : 'Nenhuma sessão programada para hoje — crie uma em "Sessões de Estudo" para poder vinculá-la aqui.'}
+                    </p>
 
                     <div class="timer-controls">
                         <button class="timer-btn start" id="timer-start">
@@ -1277,7 +1416,8 @@ class ViewRenderer {
         const abas = [
             { id: 'geral',    icon: 'fa-sliders-h',   label: 'Geral',      desc: 'Notificações, planejamento e modo pesado' },
             { id: 'perfil',   icon: 'fa-user',        label: 'Perfil e conta', desc: 'Dados pessoais, semestre atual e sair da conta' },
-            { id: 'calendario', icon: 'fa-calendar-alt', label: 'Calendário', desc: 'Assinatura de calendário e alarmes de estudo' },
+            { id: 'notificacoes', icon: 'fa-bell',    label: 'Notificações', desc: 'Alarmes push de provas, tarefas, sessões, revisões e aulas' },
+            { id: 'calendario', icon: 'fa-calendar-alt', label: 'Calendário', desc: 'Assinatura de calendário externo (Google, Apple, Outlook)' },
             { id: 'tema',     icon: 'fa-palette',     label: 'Tema',       desc: 'Aparência e tamanho da fonte' },
             { id: 'dados',    icon: 'fa-database',    label: 'Dados',      desc: 'Backup, restauração e limpeza de dados' },
             { id: 'sobre',    icon: 'fa-info-circle', label: 'Sobre',      desc: 'Versão do app e conta conectada' },
@@ -1421,8 +1561,6 @@ class ViewRenderer {
         if (aba === 'calendario') {
             const token = s.calendarToken || null;
             const urls = token && window.calendarFeed ? window.calendarFeed.feedUrls(token) : null;
-            const reminders = s.studyReminders || {};
-            const pushOk = window.pushNotifications?.isSupported?.();
 
             const tzAtual = window.calendarFeed?.getTimezone?.() || s.timezone || 'America/Sao_Paulo';
             const tzDetectado = window.calendarFeed?.detectedTimezone?.() || null;
@@ -1501,9 +1639,15 @@ class ViewRenderer {
                     Os apps de calendário costumam buscar atualizações a cada 12–24h — não é instantâneo, mas não precisa
                     fazer nada manualmente depois de assinar uma vez.
                 </p>
-            `}
+            `}`;
+        }
 
-            <div class="config-section-title" style="margin-top:28px;">🔔 Alarmes de estudo (notificação push)</div>
+        if (aba === 'notificacoes') {
+            const reminders = s.studyReminders || {};
+            const pushOk = window.pushNotifications?.isSupported?.();
+
+            conteudo = `
+            <div class="config-section-title">🔔 Alarmes de estudo (notificação push)</div>
             ${!pushOk ? `
                 <p style="font-size:.88rem;color:var(--text-secondary);">
                     Esse navegador não suporta notificações push.
@@ -1518,38 +1662,62 @@ class ViewRenderer {
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
-                <div style="margin-top:14px;">
-                    <label style="font-size:.85rem;font-weight:600;color:var(--text-secondary);">Prova, tarefa ou trabalho — quando avisar?</label>
+
+                <p style="font-size:.85rem;color:var(--text-secondary);margin-top:16px;">
+                    É só ativar acima — os horários de aviso já vêm prontos com um padrão que funciona bem,
+                    sem precisar mexer em nada:
+                </p>
+
+                <div style="margin-top:10px;">
+                    <label style="font-size:.8rem;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.03em;">Prova, tarefa ou trabalho</label>
                     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
                         ${['7 dias antes', '5 dias antes', '3 dias antes', '1 dia antes', 'No dia da entrega'].map(l => `
                             <span style="padding:6px 12px;border-radius:999px;background:var(--bg-tertiary);border:1px solid var(--border);font-size:.78rem;color:var(--text-primary);">${l}</span>
                         `).join('')}
                     </div>
-                    <p style="font-size:.78rem;color:var(--text-tertiary);margin-top:8px;">
-                        Esses avisos são automáticos e fixos (não dá pra desligar um por um) — quanto mais perto da data, mais vezes você é lembrado.
+                    <p style="font-size:.78rem;color:var(--text-tertiary);margin-top:6px;">
+                        Automático e fixo — quanto mais perto da data, mais vezes você é lembrado.
                     </p>
                 </div>
-                <div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:14px;">
-                    <div class="wiz-field">
-                        <label>Avisar sessão de estudo com quantos minutos de antecedência?</label>
-                        <select id="config-reminder-sessions">
-                            ${[5, 10, 15, 30, 60].map(m => `<option value="${m}" ${Number(reminders.sessionsMinutesBefore ?? 15) === m ? 'selected' : ''}>${m} min antes</option>`).join('')}
-                        </select>
-                    </div>
-                    <div class="wiz-field">
-                        <label>Avisar revisão espaçada com quantas horas de antecedência?</label>
-                        <select id="config-reminder-reviews">
-                            ${[6, 12, 24, 48, 72].map(h => `<option value="${h}" ${Number(reminders.reviewsHoursBefore ?? 24) === h ? 'selected' : ''}>${h}h antes</option>`).join('')}
-                        </select>
-                    </div>
-                    <div class="wiz-field">
-                        <label>Avisar aula com quantos minutos de antecedência?</label>
-                        <select id="config-reminder-class">
-                            ${[5, 10, 15, 30, 60].map(m => `<option value="${m}" ${Number(reminders.classMinutesBefore ?? 15) === m ? 'selected' : ''}>${m} min antes</option>`).join('')}
-                        </select>
-                    </div>
+
+                <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;">
+                    <span style="padding:6px 12px;border-radius:999px;background:var(--bg-tertiary);border:1px solid var(--border);font-size:.78rem;color:var(--text-primary);">Sessão de estudo · ${Number(reminders.sessionsMinutesBefore ?? 15)} min antes</span>
+                    <span style="padding:6px 12px;border-radius:999px;background:var(--bg-tertiary);border:1px solid var(--border);font-size:.78rem;color:var(--text-primary);">Revisão espaçada · ${Number(reminders.reviewsHoursBefore ?? 24)}h antes</span>
+                    <span style="padding:6px 12px;border-radius:999px;background:var(--bg-tertiary);border:1px solid var(--border);font-size:.78rem;color:var(--text-primary);">Aula · ${Number(reminders.classMinutesBefore ?? 15)} min antes</span>
+                    <span style="padding:6px 12px;border-radius:999px;background:var(--bg-tertiary);border:1px solid var(--border);font-size:.78rem;color:var(--text-primary);">📖 Diário do dia · se não registrar até ${Number(reminders.diaryReminderHour ?? 20)}h</span>
                 </div>
-                <p style="font-size:.8rem;color:var(--text-tertiary);margin-top:10px;">
+
+                <details style="margin-top:18px;">
+                    <summary style="cursor:pointer;font-weight:600;font-size:.85rem;color:var(--text-secondary);">Personalizar horários (opcional)</summary>
+                    <div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:14px;">
+                        <div class="wiz-field">
+                            <label>Avisar sessão de estudo com quantos minutos de antecedência?</label>
+                            <select id="config-reminder-sessions">
+                                ${[5, 10, 15, 30, 60].map(m => `<option value="${m}" ${Number(reminders.sessionsMinutesBefore ?? 15) === m ? 'selected' : ''}>${m} min antes</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="wiz-field">
+                            <label>Avisar revisão espaçada com quantas horas de antecedência?</label>
+                            <select id="config-reminder-reviews">
+                                ${[6, 12, 24, 48, 72].map(h => `<option value="${h}" ${Number(reminders.reviewsHoursBefore ?? 24) === h ? 'selected' : ''}>${h}h antes</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="wiz-field">
+                            <label>Avisar aula com quantos minutos de antecedência?</label>
+                            <select id="config-reminder-class">
+                                ${[5, 10, 15, 30, 60].map(m => `<option value="${m}" ${Number(reminders.classMinutesBefore ?? 15) === m ? 'selected' : ''}>${m} min antes</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="wiz-field">
+                            <label>Lembrar de preencher o Diário a partir de que horas, se ainda não registrou o dia?</label>
+                            <select id="config-reminder-diario">
+                                ${[18, 19, 20, 21, 22].map(h => `<option value="${h}" ${Number(reminders.diaryReminderHour ?? 20) === h ? 'selected' : ''}>${h}h</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+                </details>
+
+                <p style="font-size:.8rem;color:var(--text-tertiary);margin-top:16px;">
                     No iPhone, notificação push só funciona depois de instalar o site na tela de início
                     (Compartilhar → Adicionar à Tela de Início) — o Safari em aba comum não recebe push do iOS.
                 </p>
@@ -1627,6 +1795,9 @@ class ViewRenderer {
                     <p style="color:var(--text-secondary);margin-top:4px;font-size:.9rem">${email}</p>
                 </div>
                 <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;">
+                    <button class="btn-secondary" id="btn-abrir-ajuda">
+                        <i class="fas fa-question-circle"></i> Central de Ajuda
+                    </button>
                     <a href="https://github.com/yur1ofc/study-life-control" target="_blank" class="btn-secondary" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">
                         <i class="fab fa-github"></i> GitHub
                     </a>
@@ -2225,9 +2396,26 @@ class ViewRenderer {
             </div>
             <div class="dashboard-grid">
                 ${cursos.map(curso => {
+                    const tipo = curso.tipoAcompanhamento || 'horas';
                     const meta = Number(curso.metaHoras) || 0;
                     const estudadas = Number(curso.horasEstudadas) || 0;
-                    const progresso = Number(curso.progresso) || (meta ? Math.round((estudadas / meta) * 100) : 0);
+                    const progresso = Math.min(100, Math.max(0, Number(curso.progresso) || (meta ? Math.round((estudadas / meta) * 100) : 0)));
+
+                    let linhaAcompanhamento = `<p><strong>Horas:</strong> ${estudadas}h${meta ? ` / ${meta}h` : ''}</p>`;
+                    if (tipo === 'modulos') {
+                        const total = Number(curso.totalModulos) || 0;
+                        const feitos = Number(curso.modulosConcluidos) || 0;
+                        linhaAcompanhamento = `<p><strong>Módulos/aulas:</strong> ${feitos}${total ? ` / ${total}` : ''}</p>`;
+                    } else if (tipo === 'data') {
+                        const inicio = curso.dataInicio ? new Date(curso.dataInicio + 'T00:00:00').toLocaleDateString('pt-BR') : 'não informada';
+                        const fim = curso.dataFimPrevista ? new Date(curso.dataFimPrevista + 'T00:00:00').toLocaleDateString('pt-BR') : 'não informada';
+                        const faltam = curso.dataFimPrevista ? Math.ceil((new Date(curso.dataFimPrevista + 'T00:00:00') - new Date()) / 86400000) : null;
+                        const faltamTexto = faltam === null ? '' : (faltam >= 0 ? ` (faltam ${faltam}d)` : ' (prazo encerrado)');
+                        linhaAcompanhamento = `<p><strong>Período:</strong> ${inicio} até ${fim}${faltamTexto}</p>`;
+                    } else if (tipo === 'manual') {
+                        linhaAcompanhamento = '';
+                    }
+
                     return `
                         <div class="card">
                             <div class="card-header">
@@ -2237,9 +2425,9 @@ class ViewRenderer {
                             <div class="card-body">
                                 <p><strong>Plataforma:</strong> ${this.esc(curso.plataforma || 'Não informada')}</p>
                                 <p><strong>Área:</strong> ${this.esc(curso.area || 'Não informada')}</p>
-                                <p><strong>Horas:</strong> ${estudadas}h${meta ? ` / ${meta}h` : ''}</p>
-                                <div class="progress-bar"><div class="progress-fill" style="width:${Math.min(100, progresso)}%"></div></div>
-                                <p class="muted-text">${Math.min(100, progresso)}% concluído</p>
+                                ${linhaAcompanhamento}
+                                <div class="progress-bar"><div class="progress-fill" style="width:${progresso}%"></div></div>
+                                <p class="muted-text">${progresso}% concluído</p>
                                 ${curso.link ? `<p><a href="${this.esc(curso.link)}" target="_blank" rel="noopener noreferrer">Abrir link do curso</a></p>` : ''}
                                 ${curso.observacoes ? `<small>${this.esc(curso.observacoes)}</small>` : ''}
                                 <div class="curriculum-actions">
@@ -2250,7 +2438,7 @@ class ViewRenderer {
                         </div>
                     `;
                 }).join('')}
-                ${!cursos.length ? `<div class="card"><div class="card-body empty-state"><h3>Nenhum curso extra cadastrado</h3><p>Registre aqui Duolingo, cursos online, treinamentos e estudos fora da faculdade.</p></div></div>` : ''}
+                ${!cursos.length ? `<div class="card"><div class="card-body empty-state"><h3>Nenhum curso extra cadastrado</h3><p>Registre aqui Duolingo, cursos online, treinamentos e estudos fora da faculdade — por horas, por módulos ou por período, do jeito que fizer mais sentido pra cada curso.</p></div></div>` : ''}
             </div>
         `;
     }

@@ -966,6 +966,72 @@ button:active,
     border-bottom: none;
 }
 
+.prova-item > div:first-child {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.materiais-intro-card {
+    margin-bottom: 20px;
+    background: linear-gradient(135deg, rgba(59,130,246,.08), rgba(124,58,237,.06));
+    border: 1px solid rgba(99,102,241,.16);
+}
+
+.materiais-intro-card h3 {
+    margin: 0 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.materiais-intro-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.materiais-intro-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+}
+
+.materiais-intro-item i {
+    color: var(--accent-primary);
+    font-size: 18px;
+    margin-top: 2px;
+}
+
+.materiais-intro-item strong {
+    display: block;
+}
+
+.materiais-intro-item span {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.section-subtitle {
+    margin: 24px 0 12px;
+    font-size: 15px;
+    color: var(--text-secondary);
+}
+
+.prova-obs {
+    color: var(--text-secondary);
+    font-style: italic;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 480px;
+}
+
 /* =========================
    ALERTAS / RISCOS
 ========================= */
@@ -1295,6 +1361,38 @@ button:active,
     height: fit-content;
 }
 
+.materia-map-toggle {
+    width: 100%;
+    background: none;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    padding: inherit;
+}
+
+.materia-map-toggle h3 {
+    flex: 1;
+    margin: 0;
+}
+
+.materia-map-chevron {
+    transition: transform 0.2s ease;
+    color: var(--text-secondary);
+}
+
+.materia-map-collapsed .materia-map-chevron {
+    transform: rotate(-90deg);
+}
+
+.materia-map-body {
+    animation: fadeIn 0.15s ease;
+}
+
 .topico-item {
     background: var(--bg-tertiary);
     border-radius: 12px;
@@ -1483,6 +1581,63 @@ button:active,
 .habito-info i {
     width: 20px;
     color: var(--accent-primary);
+}
+
+/* Widget compacto de hábitos (Dashboard) — 1 toque, sem abrir a tela de Hábitos */
+.habitos-widget-card {
+    margin-bottom: 20px;
+}
+
+.habitos-widget-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.habito-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.habito-chip:active {
+    transform: scale(0.96);
+}
+
+.habito-chip:hover {
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.habito-chip.active {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: #fff;
+}
+
+.habito-chip i {
+    font-size: 14px;
+}
+
+@media (max-width: 640px) {
+    .habito-chip span {
+        display: none;
+    }
+    .habito-chip {
+        padding: 10px 12px;
+    }
+    .habito-chip i {
+        font-size: 16px;
+    }
 }
 
 .consistency-chart {
@@ -2351,15 +2506,18 @@ input:checked + .toggle-slider:before {
 }
 
 /* Celular: espremer 7 colunas na largura da tela deixa o texto ilegível
-   (nome da matéria cortado tipo "FÍS..."). Em vez disso, cada dia ganha
-   uma largura mínima que cabe o nome, e a semana toda rola na horizontal
-   — igual Google Calendar. A coluna de horas fica fixa (sticky) enquanto
-   os dias rolam, e o JS já centraliza no dia de hoje ao abrir. */
+   (nome da matéria cortado tipo "FÍS..."). Em vez disso, cada dia ocupa
+   quase a tela toda (um dia "por vez"), e a semana toda rola na
+   horizontal com o dedo — igual o app de Calendário do Google/Apple no
+   celular. Snap "mandatory" trava exatamente num dia de cada vez (antes
+   era "proximity", que deixava 2-3 dias cortados visíveis ao mesmo
+   tempo). A coluna de horas fica fixa (sticky) enquanto os dias rolam,
+   e o JS já centraliza no dia de hoje ao abrir. */
 @media (max-width: 640px) {
     .wgrid-wrap {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
-        scroll-snap-type: x proximity;
+        scroll-snap-type: x mandatory;
     }
     .wgrid-hours-col {
         position: sticky;
@@ -2368,17 +2526,18 @@ input:checked + .toggle-slider:before {
     }
     .wgrid-days {
         display: grid;
-        grid-template-columns: repeat(7, minmax(108px, 1fr));
+        grid-template-columns: repeat(7, minmax(min(86vw, 360px), 1fr));
         flex-shrink: 0;
     }
     .wgrid-day-col {
         scroll-snap-align: start;
+        scroll-snap-stop: always;
     }
-    .wgrid-day-header { font-size: 11.5px; height: 36px; }
-    .wgrid-hour-corner { height: 36px; }
-    .wgrid-event { font-size: 10.5px; padding: 3px 6px; }
-    .wgrid-event strong { font-size: 11px; }
-    .wgrid-event span { font-size: 9.5px; display: block; }
+    .wgrid-day-header { font-size: 13px; height: 40px; }
+    .wgrid-hour-corner { height: 40px; }
+    .wgrid-event { font-size: 12.5px; padding: 5px 8px; }
+    .wgrid-event strong { font-size: 13px; }
+    .wgrid-event span { font-size: 11px; display: block; }
 }
 
 /* Telas grandes / TV: aumenta um pouco a fonte pra ficar legível de longe */
@@ -4223,6 +4382,37 @@ body.sidebar-open .mobile-nav-overlay {
   }
 }
 
+/* Botão de feedback (#slc-feedback-btn, injetado por feedback-widget.js):
+   no desktop a sidebar fica sempre visível e ocupa a faixa esquerda da
+   tela, então o botão fixo "left:20px" ficava em cima do rodapé da
+   sidebar (usuário, streak, "O que estudar agora?"). Empurra ele pra
+   depois da sidebar. No mobile a sidebar vira gaveta (escondida por
+   padrão), então o botão volta pra encostar na borda esquerda normal. */
+#slc-feedback-btn,
+#slc-feedback-nudge {
+  left: calc(var(--sidebar-width) + 20px);
+}
+
+@media (max-width: 980px) {
+  #slc-feedback-btn,
+  #slc-feedback-nudge {
+    left: 20px;
+  }
+}
+
+/* Enquanto a gaveta da sidebar tá aberta no mobile (body.sidebar-open),
+   os botões flutuantes (feedback, "+" de quick-add, barra inferior)
+   tinham z-index mais alto que a sidebar e ficavam por cima da gaveta,
+   cortando/tampando os itens do menu — por isso ela parecia "cortada".
+   Some com eles enquanto a gaveta estiver aberta. */
+body.sidebar-open #slc-feedback-btn,
+body.sidebar-open #slc-feedback-nudge,
+body.sidebar-open #slc-quick-add-btn,
+body.sidebar-open #slc-quick-menu,
+body.sidebar-open #slc-bottom-nav {
+  display: none !important;
+}
+
 
 /* Tutorial interativo + ajuda */
 .help-header-actions{display:flex;gap:10px;flex-wrap:wrap}
@@ -5171,4 +5361,422 @@ body.sidebar-open .mobile-nav-overlay {
     .diary-freq-row .diary-freq-label {
         width: 84px;
     }
+}
+
+/* ── Registro rápido: pílulas, estrelas e ações de atalho ── */
+
+.diario-quick-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.diario-pill-group {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.diario-pill {
+    padding: 9px 14px;
+    border-radius: 99px;
+    border: 1.5px solid var(--border);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-size: .88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .15s;
+    user-select: none;
+}
+
+.diario-pill:hover {
+    border-color: var(--accent-primary);
+}
+
+.diario-pill.active {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: #fff;
+}
+
+.diario-pill.active.presenca-absent {
+    background: var(--accent-danger);
+    border-color: var(--accent-danger);
+}
+
+.diario-star-picker {
+    display: flex;
+    gap: 4px;
+    font-size: 22px;
+    line-height: 1;
+}
+
+.diario-star-picker button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px;
+    color: var(--border);
+    transition: color .1s;
+}
+
+.diario-star-picker button.filled {
+    color: #f5b301;
+}
+
+.diario-aula-compact-head {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    margin-bottom: 12px;
+}
+
+.diario-aula-compact-head .form-group {
+    margin-bottom: 0;
+    flex: 1;
+    min-width: 140px;
+}
+
+.diario-aula-details {
+    margin-top: 10px;
+    border-top: 1px dashed var(--border);
+    padding-top: 10px;
+}
+
+.diario-aula-details > summary {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: .85rem;
+    color: var(--accent-primary);
+    list-style: none;
+}
+
+.diario-aula-details > summary::-webkit-details-marker {
+    display: none;
+}
+
+.diario-aula-details > summary::before {
+    content: '+ ';
+}
+
+.diario-aula-details[open] > summary::before {
+    content: '– ';
+}
+
+.diario-aula-details > div {
+    margin-top: 12px;
+}
+
+.diario-sugestao-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: .78rem;
+    color: var(--text-tertiary);
+    margin-bottom: 6px;
+}
+
+/* ===== Faixa automática de permissão de notificação ===== */
+.auto-notif-banner {
+    position: fixed;
+    left: 50%;
+    bottom: -120px;
+    transform: translateX(-50%);
+    width: min(480px, calc(100% - 32px));
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 9999;
+    transition: bottom 0.25s ease;
+}
+
+.auto-notif-banner.is-visible {
+    bottom: 20px;
+}
+
+.auto-notif-banner-icon {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--accent-primary);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+
+.auto-notif-banner-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.auto-notif-banner-text strong {
+    font-size: 0.92rem;
+}
+
+.auto-notif-banner-text span {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.auto-notif-banner-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.auto-notif-btn {
+    border: none;
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.auto-notif-btn.primary {
+    background: var(--accent-primary);
+    color: #fff;
+}
+
+.auto-notif-btn.secondary {
+    background: transparent;
+    color: var(--text-secondary);
+}
+
+@media (max-width: 520px) {
+    .auto-notif-banner {
+        flex-direction: column;
+        align-items: flex-start;
+        text-align: left;
+    }
+    .auto-notif-banner-actions {
+        flex-direction: row;
+        width: 100%;
+    }
+    .auto-notif-btn { flex: 1; }
+}
+
+/* ===== Popup de sugestão de sessão de estudo antes de prova/trabalho ===== */
+.exam-popup-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    padding: 16px;
+}
+
+.exam-popup-overlay.is-visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.exam-popup-card {
+    background: var(--bg-secondary);
+    border-radius: 18px;
+    padding: 28px;
+    width: min(420px, 100%);
+    text-align: center;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+    transform: translateY(10px);
+    transition: transform 0.2s ease;
+}
+
+.exam-popup-overlay.is-visible .exam-popup-card {
+    transform: translateY(0);
+}
+
+.exam-popup-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--accent-primary);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    margin: 0 auto 14px;
+}
+
+.exam-popup-card h3 {
+    margin-bottom: 6px;
+}
+
+.exam-popup-card .wiz-field {
+    margin-top: 14px;
+}
+
+.exam-popup-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.exam-popup-actions button {
+    flex: 1;
+}
+
+/* ===== Cabeçalho: ícones agrupados num "rail" em vez de soltos ===== */
+.header-actions {
+    background: var(--bg-tertiary);
+    border-radius: 14px;
+    padding: 4px;
+    gap: 2px;
+}
+
+.header-actions .btn-icon,
+.header-actions .notification-badge {
+    border-radius: 10px;
+}
+
+.header-actions .btn-icon:hover,
+.header-actions .notification-badge:hover {
+    background: var(--bg-primary);
+}
+
+/* ===== Busca rápida universal ===== */
+.quick-search-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 10vh 16px 16px;
+    z-index: 10001;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+}
+
+.quick-search-overlay.is-visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.quick-search-box {
+    background: var(--bg-secondary);
+    border-radius: 16px;
+    width: min(560px, 100%);
+    max-height: 70vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    overflow: hidden;
+    transform: translateY(-8px);
+    transition: transform 0.15s ease;
+}
+
+.quick-search-overlay.is-visible .quick-search-box {
+    transform: translateY(0);
+}
+
+.quick-search-input-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.quick-search-input-row i.fa-search {
+    color: var(--text-secondary);
+}
+
+.quick-search-input-row input {
+    flex: 1;
+    border: none;
+    background: none;
+    outline: none;
+    font-size: 15px;
+    color: var(--text-primary);
+}
+
+.quick-search-results {
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.quick-search-hint {
+    padding: 24px 12px;
+    text-align: center;
+    font-size: 0.9rem;
+}
+
+.quick-search-group-title {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+    padding: 10px 10px 4px;
+}
+
+.quick-search-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+.quick-search-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.quick-search-item-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.92rem;
+}
+
+.quick-search-item-materia {
+    cursor: default;
+}
+
+.quick-search-item-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.qs-action {
+    border: none;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.qs-action:hover {
+    background: var(--accent-primary);
+    color: #fff;
 }

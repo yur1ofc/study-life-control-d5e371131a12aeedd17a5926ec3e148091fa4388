@@ -90,6 +90,17 @@
       .situation-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;}
       .situation-kpi{padding:14px;border-radius:18px;background:rgba(15,23,42,.12);}
       .situation-list{display:grid;gap:10px;}
+      .situation-reminder-banner{margin-bottom:16px;padding:16px 18px;border-radius:20px;background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(239,68,68,.06));border:1px solid rgba(245,158,11,.22);}
+      .situation-reminder-head{display:flex;gap:12px;align-items:flex-start;}
+      .situation-reminder-head i{font-size:1.2rem;color:#fbbf24;margin-top:2px;}
+      .situation-reminder-head h3{margin:0 0 4px;font-size:1rem;}
+      .situation-reminder-head p{margin:0;opacity:.85;font-size:.9rem;}
+      .reminder-block{margin-top:12px;}
+      .reminder-block strong{display:block;font-size:.85rem;opacity:.9;margin-bottom:8px;}
+      .reminder-chip-row{display:flex;flex-wrap:wrap;gap:8px;}
+      .reminder-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(245,158,11,.28);background:rgba(15,23,42,.5);color:inherit;border-radius:999px;padding:8px 12px;font-size:.82rem;cursor:pointer;transition:transform .15s ease,background .15s ease;}
+      .reminder-chip:hover{transform:translateY(-1px);background:rgba(30,41,59,.7);}
+      .subject-missing-data-note{margin-top:10px;padding:8px 10px;border-radius:12px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.18);font-size:.8rem;opacity:.92;}
       .report-stack{display:grid;gap:14px;margin-top:18px;}
       .calendar-grid + .agenda-filters{margin-top:18px;}
       .impact-grid,.notification-grid,.gamification-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin:18px 0;}
@@ -274,6 +285,27 @@
     if (heavyBtn) heavyBtn.onclick = () => { configureFocusMode(app, 'heavy-focus'); app.startTimer(); };
     if (breakBtn) breakBtn.onclick = () => { configureFocusMode(app, 'break'); app.startTimer(); };
     if (nextBtn) nextBtn.onclick = () => { const state = ensureFocusState(app); configureFocusMode(app, state.phase === 'break' ? 'focus' : 'break'); app.startTimer(); };
+
+    const sessaoSelect = el('timer-sessao-vinculada');
+    const materiaSelect = el('timer-materia');
+    const duracaoSelect = el('timer-duracao');
+    if (sessaoSelect) {
+      sessaoSelect.onchange = () => {
+        app.focusLinkedSessionId = sessaoSelect.value || null;
+        const opt = sessaoSelect.selectedOptions[0];
+        if (app.focusLinkedSessionId && opt) {
+          if (materiaSelect) { materiaSelect.value = opt.dataset.materia || ''; materiaSelect.disabled = true; }
+          if (duracaoSelect && opt.dataset.duracao) {
+            const durNum = Number(opt.dataset.duracao);
+            const hasOpt = Array.from(duracaoSelect.options).some(o => Number(o.value) === durNum);
+            if (hasOpt) duracaoSelect.value = String(durNum);
+          }
+        } else if (materiaSelect) {
+          materiaSelect.disabled = false;
+        }
+      };
+    }
+    if (materiaSelect) materiaSelect.onchange = () => { app.focusMateria = materiaSelect.value || ''; };
     updateFocusUI(app);
   }
 
@@ -296,10 +328,27 @@
           state.canAdvance = true;
           if (state.phase === 'focus') {
             state.completedFocusBlocks += 1;
-            const item = { id: generateId(), materia: 'Modo Foco', tipo: 'foco', duracao: Math.round((this.timerDuration || 0) / 60), data: new Date().toISOString(), concluida: true, topico: 'Bloco de foco concluído' };
-            await dbService.addItem('sessions', item);
-            if (window.reviewSystem?.gerarRevisoesFromSessao) await window.reviewSystem.gerarRevisoesFromSessao(item);
-            showToast('Bloco de foco concluído. Hora do descanso.', 'success');
+            const duracaoReal = Math.round((this.timerDuration || 0) / 60);
+            const linkedId = this.focusLinkedSessionId;
+            const sessaoVinculada = linkedId ? this.data.sessions.find(s => s.id === linkedId && !s.concluida) : null;
+
+            if (sessaoVinculada) {
+              const ok = await dbService.updateItem('sessions', sessaoVinculada.id, { concluida: true, duracaoReal });
+              if (ok) {
+                sessaoVinculada.concluida = true;
+                sessaoVinculada.duracaoReal = duracaoReal;
+                if (this.updateStreak) this.updateStreak();
+                if (window.reviewSystem?.gerarRevisoesFromSessao) await window.reviewSystem.gerarRevisoesFromSessao(sessaoVinculada);
+              }
+              this.focusLinkedSessionId = null;
+              showToast(`Sessão "${sessaoVinculada.materia}" concluída via Modo Foco!`, 'success');
+            } else {
+              const materia = this.focusMateria || 'Modo Foco';
+              const item = { id: generateId(), materia, tipo: 'foco', duracao: duracaoReal, data: new Date().toISOString(), concluida: true, topico: 'Bloco de foco concluído' };
+              await dbService.addItem('sessions', item);
+              if (window.reviewSystem?.gerarRevisoesFromSessao) await window.reviewSystem.gerarRevisoesFromSessao(item);
+              showToast('Bloco de foco concluído. Hora do descanso.', 'success');
+            }
           } else {
             showToast('Descanso concluído. Bora voltar para o foco.', 'info');
           }
@@ -307,6 +356,9 @@
           if (this.currentView === 'foco') {
             const list = el('sessoes-foco-hoje');
             if (list && this.viewRenderer?.renderSessoesFocoHoje) list.innerHTML = this.viewRenderer.renderSessoesFocoHoje();
+            if (state.phase === 'focus') {
+              this.loadView('foco');
+            }
           }
         }
       }, 1000);
@@ -372,20 +424,25 @@
   function renderSubjectPerformance(view) {
     const subjects = (view.app.data.subjects || []).map(s => view.app.getSubjectPerformance(s.nome)).filter(Boolean);
     return `
-      <div class="subject-performance-grid">${subjects.map(item => `
+      <div class="subject-performance-grid">${subjects.map(item => {
+        const attendanceLabel = item.hasDiaries ? `${item.attendance}%` : 'Sem dados';
+        const attendanceWidth = item.hasDiaries ? Math.max(8, Math.min(100, item.attendance)) : 0;
+        return `
         <div class="subject-performance-card">
           <div class="subject-performance-head"><div><h3>${view.esc(item.subject.nome)}</h3><small>${view.esc(item.recommendation)}</small></div><span class="risk-pill ${view.esc(item.riskLevel)}">${view.esc(item.riskLevel)}</span></div>
           <div class="subject-performance-metrics">
             <div class="subject-metric"><span>Média atual</span><strong>${item.average > 0 ? item.average.toFixed(1) : '—'}</strong></div>
             <div class="subject-metric"><span>Horas estudadas</span><strong>${item.hours.toFixed(1)}h</strong></div>
-            <div class="subject-metric"><span>Frequência</span><strong>${item.attendance}%</strong></div>
+            <div class="subject-metric"><span>Frequência</span><strong>${attendanceLabel}</strong></div>
             <div class="subject-metric"><span>Tarefas pendentes</span><strong>${item.tasksPending}</strong></div>
             <div class="subject-metric"><span>Provas futuras</span><strong>${item.upcomingExamsCount}</strong></div>
             <div class="subject-metric"><span>Nota ideal na próxima</span><strong>${item.nextRequiredGrade}</strong></div>
           </div>
-          <div class="progress-bar"><div class="progress-fill" style="width:${Math.max(8, Math.min(100, item.attendance))}%"></div></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${attendanceWidth}%"></div></div>
           <small>Risco atual: ${view.esc(item.riskReason)}</small>
-        </div>`).join('')}</div>`;
+          ${(!item.hasSessions || !item.hasDiaries || !item.hasGrades) ? `<div class="subject-missing-data-note"><i class="fas fa-circle-info"></i> ${[!item.hasSessions ? 'sem sessão de estudo' : null, !item.hasDiaries ? 'sem diário de aula' : null, !item.hasGrades ? 'sem nota lançada' : null].filter(Boolean).join(' · ')} — registre pra essa análise ficar mais precisa.</div>` : ''}
+        </div>`;
+      }).join('')}</div>`;
   }
 
   function renderAgendaPanel(view) {
@@ -901,14 +958,17 @@
   function renderSituationPage(view) {
     const summary = view.app.getAcademicSituationSummary();
     const makeList = (items, empty) => items.length ? items.map(item => `<div class="agenda-item"><div><strong>${view.esc(item.subject.nome)}</strong><small>${view.esc(item.recommendation)}</small></div><span class="risk-pill ${view.esc(item.riskLevel)}">${view.esc(item.riskLevel)}</span></div>`).join('') : `<p class="text-secondary">${empty}</p>`;
+    const reminder = renderDataReminderBanner(view, summary);
     return `
       <div class="view-header"><h2><i class="fas fa-heartbeat"></i> Situação Acadêmica</h2></div>
+      ${reminder}
       <div class="situation-kpis">
         <div class="situation-kpi"><span>Matérias seguras</span><strong>${summary.safe.length}</strong></div>
         <div class="situation-kpi"><span>Em atenção</span><strong>${summary.attention.length}</strong></div>
         <div class="situation-kpi"><span>Em risco</span><strong>${summary.risk.length}</strong></div>
-        <div class="situation-kpi"><span>Frequência média</span><strong>${summary.avgAttendance}%</strong></div>
+        <div class="situation-kpi"><span>Frequência média</span><strong>${summary.avgAttendance !== null ? summary.avgAttendance + '%' : '—'}</strong></div>
         <div class="situation-kpi"><span>Média geral</span><strong>${summary.generalAverage}</strong></div>
+        <div class="situation-kpi"><span>Horas estudadas</span><strong>${summary.totalHoursStudied.toFixed(1)}h</strong></div>
         <div class="situation-kpi"><span>Pendências da semana</span><strong>${summary.weekPending}</strong></div>
       </div>
       <div class="situation-grid">
@@ -917,6 +977,62 @@
         <div class="situation-card"><h3>Em risco</h3><div class="situation-list">${makeList(summary.risk, 'Nenhuma matéria crítica agora.')}</div></div>
       </div>`;
   }
+
+  // Banner que avisa quando faltam dados reais (sessões, diário de aula ou
+  // notas) pra situação acadêmica não ficar mostrando números otimistas
+  // que não refletem o que a pessoa realmente estudou/registrou.
+  function renderDataReminderBanner(view, summary) {
+    const totalSubjects = summary.performances.length;
+    if (!totalSubjects) return '';
+
+    const noData = summary.noDataAtAll || [];
+    const missingSessionsOnly = (summary.missingSessions || []).filter(nome => !noData.includes(nome));
+    const missingDiaryOnly = (summary.missingDiary || []).filter(nome => !noData.includes(nome));
+    const missingGradesOnly = (summary.missingGrades || []).filter(nome => !noData.includes(nome));
+
+    if (!noData.length && !missingSessionsOnly.length && !missingDiaryOnly.length && !missingGradesOnly.length) return '';
+
+    const chip = (nome, action, label) => `<button type="button" class="reminder-chip" data-reminder-action="${action}" data-reminder-materia="${view.esc(nome)}"><i class="fas fa-plus"></i> ${view.esc(nome)} — ${label}</button>`;
+
+    const blocks = [];
+    if (noData.length) {
+      blocks.push(`<div class="reminder-block"><strong>Sem nenhum registro ainda:</strong><div class="reminder-chip-row">${noData.map(nome => chip(nome, 'sessao', 'registrar estudo')).join('')}</div></div>`);
+    }
+    if (missingSessionsOnly.length) {
+      blocks.push(`<div class="reminder-block"><strong>Sem sessão de estudo registrada:</strong><div class="reminder-chip-row">${missingSessionsOnly.map(nome => chip(nome, 'sessao', 'registrar sessão')).join('')}</div></div>`);
+    }
+    if (missingDiaryOnly.length) {
+      blocks.push(`<div class="reminder-block"><strong>Sem diário de aula registrado:</strong><div class="reminder-chip-row">${missingDiaryOnly.map(nome => chip(nome, 'diario', 'registrar diário')).join('')}</div></div>`);
+    }
+    if (missingGradesOnly.length) {
+      blocks.push(`<div class="reminder-block"><strong>Sem nota lançada ainda:</strong><div class="reminder-chip-row">${missingGradesOnly.map(nome => chip(nome, 'nota', 'lançar nota')).join('')}</div></div>`);
+    }
+
+    return `
+      <div class="situation-reminder-banner">
+        <div class="situation-reminder-head">
+          <i class="fas fa-triangle-exclamation"></i>
+          <div><h3>Estude e registre aqui</h3><p>Sua situação acadêmica só fica precisa com dados reais. Toque numa matéria abaixo pra registrar o que faltou.</p></div>
+        </div>
+        ${blocks.join('')}
+      </div>`;
+  }
+
+  function bindSituationPageActions(app) {
+    document.querySelectorAll('[data-reminder-action]').forEach(btn => {
+      if (btn.dataset.bound) return;
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', () => {
+        const action = btn.dataset.reminderAction;
+        const materia = btn.dataset.reminderMateria || '';
+        if (action === 'sessao') app.openModal?.('sessao', { materia });
+        else if (action === 'nota') app.openModal?.('nota', { materia });
+        else if (action === 'diario') window.diaryView?.openModal?.(null, materia);
+      });
+    });
+  }
+
+
 
   function patchViewRenderer() {
     if (!window.ViewRenderer || window.ViewRenderer.prototype[PATCH_FLAG]) return;
@@ -1029,6 +1145,7 @@
         if (!container) return;
         container.innerHTML = renderSituationPage(this.viewRenderer);
         window.aiAssistant?.updateContext(this.data);
+        setTimeout(() => bindSituationPageActions(this), 30);
         return;
       }
       if (view === 'diario') {

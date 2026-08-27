@@ -451,11 +451,17 @@
         return this.gerarPlanoHoje();
       }
 
-      if (p.includes('plano para a semana') || p.includes('plano semanal') || p.includes('semana')) {
+      // "semana" sozinha é genérica demais (aparece em "essa semana eu me senti
+      // muito perdido nas provas, o que eu faço?"). Só dispara o plano fixo
+      // quando o pedido é curto e direto; frases longas caem no fallback → IA.
+      const palavras = p.split(' ').filter(Boolean).length;
+      if (p.includes('plano para a semana') || p.includes('plano semanal') || (p.includes('semana') && palavras <= 6)) {
         return this.gerarPlanoSemanal();
       }
 
-      if (p.includes('próximas provas') || p.includes('proximas provas') || p.includes('provas') || p.includes('trabalhos')) {
+      // "provas"/"trabalhos" soltos também sequestravam perguntas abertas
+      // (ex: "tenho muito medo de provas, como lido com essa ansiedade?").
+      if (p.includes('próximas provas') || p.includes('proximas provas') || ((p.includes('provas') || p.includes('trabalhos')) && palavras <= 6)) {
         return this.listarProvas();
       }
 
@@ -479,7 +485,11 @@
         return this._buildSubjectStatusAnswer(materiaEncontrada.nome);
       }
 
-      if (materiaEncontrada && (p.includes('quanto estudei') || p.includes('horas') || p.includes('estudei'))) {
+      // "horas" solta + matéria detectada pegava qualquer pergunta que citasse
+      // a matéria de passagem (ex: "Cálculo é puxado, quantas horas de sono
+      // eu preciso pra render mais?"). Só dispara sem outro gatilho quando a
+      // frase é curta e direta.
+      if (materiaEncontrada && (p.includes('quanto estudei') || p.includes('quantas horas') || p.includes('estudei') || (p.includes('horas') && palavras <= 6))) {
         const horas = this.getHorasEstudadasMateria(materiaEncontrada.nome);
         return `Você estudou ${horas.toFixed(1)}h de ${materiaEncontrada.nome} no total.${horas < 3 ? ' Ainda está pouco para ter folga na matéria.' : ''}`;
       }
@@ -848,7 +858,15 @@
     const materia = this._findSubjectInQuestion(texto);
     const memory = this.getMemorySnapshot();
 
-    if (p.includes('recuperação') || p.includes('recuperacao') || p.includes('anti procrast') || p.includes('procrast')) {
+    // "procrast" sozinho também pegava perguntas abertas e reflexivas (ex:
+    // "me ajuda a ENTENDER POR QUE eu sempre PROCRASTINO antes de prova"),
+    // impedindo essas perguntas de chegarem na IA de verdade. Agora só
+    // dispara o plano fixo de recuperação para pedidos curtos e diretos
+    // (ex: "procrastinando muito", "modo anti-procrastinação") — perguntas
+    // longas/reflexivas sobre o "porquê" caem no fallback e vão pra IA.
+    const pareceComandoDeRecuperacao = p.includes('recuperação') || p.includes('recuperacao') || p.includes('anti procrast') ||
+      (p.includes('procrast') && p.split(' ').filter(Boolean).length <= 5);
+    if (pareceComandoDeRecuperacao) {
       const plano = window.app?.getRecoveryPlan?.(3);
       if (!plano) return 'Ainda não vi sinais fortes de acúmulo. Continue mantendo constância.';
       return [
@@ -857,7 +875,10 @@
       ].join('\n');
     }
 
-    if (p.includes('meta') || p.includes('metas')) {
+    // "meta"/"metas" como substring pegava palavras comuns que não têm nada a
+    // ver com metas de estudo: "metade", "metabolismo", "metáfora" etc. contêm
+    // "meta" dentro. Usa fronteira de palavra pra só bater na palavra inteira.
+    if (/\bmetas?\b/.test(p)) {
       const goals = window.app?.getStudyGoalsSnapshot?.();
       if (!goals) return 'Cadastre mais dados para eu acompanhar suas metas.';
       return `Metas atuais: ${goals.weeklyHours.toFixed(1)}h/${goals.goals.weeklyHours}h na semana, ${goals.monthlyHours.toFixed(1)}h/${goals.goals.monthlyHours}h no mês, ${goals.weeklyPomodoros}/${goals.goals.weeklyPomodoros} pomodoros e ${goals.weeklyReviewsDone}/${goals.goals.weeklyReviews} revisões.`;
@@ -886,7 +907,7 @@ ${report.monthly}`;
           `Raio-x de ${materia.nome}:`,
           `- média atual: ${perf.average > 0 ? perf.average.toFixed(1) : 'sem notas ainda'}`,
           `- horas estudadas: ${perf.hours.toFixed(1)}h`,
-          `- presença: ${perf.attendance}%`,
+          `- presença: ${perf.hasDiaries ? perf.attendance + '%' : 'sem diário de aula registrado ainda'}`,
           `- tarefas pendentes: ${perf.tasksPending}`,
           `- provas futuras: ${perf.upcomingExamsCount}`,
           `- risco: ${perf.riskLevel} (${perf.riskReason})`,
@@ -1201,7 +1222,10 @@ ${report.monthly}`;
     if (normalized.includes('tudo bem') || normalized.includes('como voce esta') || normalized.includes('como vc esta')) {
       return 'Tô bem e pronto pra ser útil. Me pede qualquer coisa do teu site: resumo geral, tarefas atrasadas, matéria mais crítica, próximas provas, presença, notas, rotina ou plano do dia.';
     }
-    if (normalized.includes('obrigad') || normalized.includes('valeu')) {
+    // "valeu" sozinho aparece dentro de perguntas reais (ex: "quero saber se
+    // valeu a pena minha estratégia de revisão essa semana"). Só trata como
+    // agradecimento quando a mensagem inteira é curta.
+    if (normalized.includes('obrigad') || (normalized.includes('valeu') && normalized.split(' ').filter(Boolean).length <= 4)) {
       return 'Tamo junto. Se quiser, agora eu posso ir além e te dar a próxima melhor ação com base no teu momento atual.';
     }
     if (normalized.includes('quem e voce') || normalized.includes('quem é voce')) {
@@ -1215,13 +1239,21 @@ ${report.monthly}`;
     const raw = String(pergunta || '').trim();
     if (!raw) return 'Me manda uma pergunta. Eu consigo usar praticamente tudo do teu site para te responder.';
     const p = normalize(raw);
+    const wc = p.split(' ').filter(Boolean).length;
     const materia = this._findSubjectInQuestion(raw);
     const app = window.app;
 
     const smallTalk = this._smallTalk(p);
     if (smallTalk) return smallTalk;
 
-    if (p.includes('o que voce faz') || p.includes('o que vc faz') || p.includes('como voce pode ajudar') || p.includes('ajuda') || p.includes('comandos') || p.includes('o que voce consegue')) {
+    // "ajuda" sozinha é palavra comum demais (aparece em "me AJUDA a
+    // entender...", "me AJUDA a organizar...") — antes isso sequestrava
+    // qualquer pergunta aberta que contivesse a palavra e nunca deixava a
+    // pergunta chegar na IA de verdade. Agora só dispara pra pedidos curtos
+    // e diretos de "o que você faz" (ex: "ajuda", "me ajuda", "preciso de
+    // ajuda"), não quando "ajuda" é só um verbo dentro de uma frase maior.
+    const pedidoDeAjudaGenerico = /^(ajuda|me ajuda|preciso de ajuda|pode me ajudar|help)[.! ]*$/.test(p.trim());
+    if (p.includes('o que voce faz') || p.includes('o que vc faz') || p.includes('como voce pode ajudar') || pedidoDeAjudaGenerico || p.includes('comandos') || p.includes('o que voce consegue')) {
       return this._getMentorCapabilities();
     }
 
@@ -1253,7 +1285,16 @@ ${report.monthly}`;
       ].join('\n');
     }
 
-    if (p.includes('tarefa') || p.includes('pendencia') || p.includes('pendência') || p.includes('atrasada') || p.includes('atrasado')) {
+    // "atrasada"/"atrasado" sozinhas também são genéricas demais (ex: "pra
+    // eu não ficar ATRASADO na disciplina..." não é uma pergunta sobre
+    // tarefas). Só tratam como pergunta de tarefas/pendências quando a
+    // frase inteira é curta e direta sobre isso — senão, "tarefa"/
+    // "pendencia" explícitos continuam cobrindo o caso normal.
+    const perguntaDiretaDeAtraso = /^(o que esta atrasado|estou atrasado|to atrasado|atrasad[oa]s?)$/.test(p.trim());
+    // "tarefa"/"pendencia" soltas também sequestravam frases maiores (ex:
+    // "essa tarefa de casa está difícil, o professor não explicou direito,
+    // o que eu faço?"). Só bate direto quando a frase é curta.
+    if (perguntaDiretaDeAtraso || ((p.includes('tarefa') || p.includes('pendencia') || p.includes('pendência')) && wc <= 6)) {
       const pending = this._getPendingTasks();
       const overdue = this._getOverdueTasks();
       if (!pending.length) return 'Você não tem tarefas pendentes agora.';
@@ -1265,7 +1306,11 @@ ${report.monthly}`;
       ].join('\n');
     }
 
-    if (p.includes('presenca') || p.includes('presença') || p.includes('falta') || p.includes('faltas')) {
+    // "falta" é uma das palavras mais genéricas do português ("me falta
+    // disciplina", "o que falta pra eu passar", "sinto falta de motivação").
+    // Só trata como pergunta de presença/frequência quando é direta e curta,
+    // ou quando vem com "presença"/"presenca" explícito.
+    if (p.includes('presenca') || p.includes('presença') || ((p.includes('falta') || p.includes('faltas')) && wc <= 5)) {
       return this._getAttendanceSummary(materia?.nome || null);
     }
 
@@ -1281,15 +1326,25 @@ ${report.monthly}`;
       return this._getExtraCoursesSummary();
     }
 
-    if (p.includes('diario') || p.includes('diário') || p.includes('rotina') || p.includes('energia') || p.includes('foco de hoje')) {
+    // "rotina"/"energia" soltas pegavam perguntas maiores (ex: "minha rotina
+    // de sono está uma bagunça, isso afeta minhas notas?"). Só bate direto
+    // quando curta; senão cai no fallback → IA.
+    if (p.includes('diario') || p.includes('diário') || p.includes('foco de hoje') || ((p.includes('rotina') || p.includes('energia')) && wc <= 6)) {
       return this._getDailyLogSummary();
     }
 
-    if (p.includes('gamificacao') || p.includes('gamificação') || p.includes('xp') || p.includes('nivel') || p.includes('nível') || p.includes('streak') || p.includes('conquista')) {
+    // "xp"/"nivel" soltos são arriscados (ex: "nível de dificuldade dessa
+    // prova me deixou na dúvida se foco nela ou nas outras"). Fronteira de
+    // palavra + frase curta reduz o risco de sequestrar pergunta aberta.
+    if (p.includes('gamificacao') || p.includes('gamificação') || p.includes('streak') || p.includes('conquista') ||
+      ((/\bxp\b/.test(p) || /\bnivel\b/.test(p) || /\bnível\b/.test(p)) && wc <= 6)) {
       return this._getGamificationSummary();
     }
 
-    if (materia && (p.includes('nota') || p.includes('media') || p.includes('média') || p.includes('quanto preciso'))) {
+    // "nota"/"media" como substring pegavam palavras comuns sem relação:
+    // "anotação" contém "nota", "imediatamente" contém "media". Fronteira de
+    // palavra evita esse falso positivo.
+    if (materia && (/\bnotas?\b/.test(p) || /\bmedia\b/.test(p) || /\bmédia\b/.test(p) || p.includes('quanto preciso'))) {
       const perf = app?.getSubjectPerformance?.(materia.nome);
       if (perf) {
         return [
@@ -1301,7 +1356,7 @@ ${report.monthly}`;
       }
     }
 
-    if (materia && (p.includes('presenca') || p.includes('presença') || p.includes('falta') || p.includes('faltas'))) {
+    if (materia && (p.includes('presenca') || p.includes('presença') || ((p.includes('falta') || p.includes('faltas')) && wc <= 6))) {
       return this._getAttendanceSummary(materia.nome);
     }
 
@@ -1332,7 +1387,11 @@ ${report.monthly}`;
       if (report) return report.daily;
     }
 
-    if (p.includes('mes') || p.includes('mês')) {
+    // "mes" como substring é o pior caso encontrado: "mesmo" (uma das
+    // palavras mais comuns do português) contém "mes" dentro. Sem fronteira
+    // de palavra, praticamente qualquer frase com "mesmo" + "resumo"/
+    // "relatório" batia aqui em vez de ir pra IA. Fronteira de palavra resolve.
+    if (/\bmes(es)?\b/.test(p)) {
       const report = app?.getAutoReports?.();
       if (report && (p.includes('resum') || p.includes('relatorio') || p.includes('relatório'))) return report.monthly;
     }
@@ -1971,4 +2030,514 @@ ${report.monthly}`;
 
   proto.__mentorV8Patched = true;
   console.info('[MentorIA v8] Regras avançadas ativadas (nota necessária, tendência, melhor horário) — sem chamadas de API externa.');
+})();
+
+// ════════════════════════════════════════════════════════════════════════
+// __mentor_upgrade_v9_ai__
+// Upgrade grande do Mentor IA:
+//   1) Ele passa a enxergar de verdade o Mapa de Aprendizado (tópico a
+//      tópico, não só a matéria inteira) para sugerir "estude isso, depois
+//      aquilo" com prioridade calculada (dificuldade, confiança, tempo sem
+//      revisar, dúvidas do diário, prova próxima).
+//   2) Ele passa a puxar o Diário de Aula do dia para oferecer revisão do
+//      que a pessoa viu na aula. Se não tiver nada registrado hoje, ele
+//      pergunta "o que você viu hoje? quer revisar agora?" e usa a resposta
+//      livre da pessoa para revisar ali mesmo, na hora.
+//   3) Quando a pergunta foge do que as regras rápidas (v5-v8) sabem
+//      responder, ele escala para uma IA de verdade (Gemini, via
+//      /api/mentor-chat) alimentada com um "raio-x" completo e atualizado
+//      dos dados reais do usuário — assim o mentor deixa de "não entender"
+//      perguntas abertas e vira, de fato, um mentor inteligente.
+// Tudo isso continua funcionando OFFLINE/sem IA externa quando o usuário
+// não está logado ou a IA está indisponível — nesse caso ele cai de volta
+// nas respostas determinísticas de sempre.
+// ════════════════════════════════════════════════════════════════════════
+(function () {
+  if (!window.AIAssistant || window.AIAssistant.prototype.__mentorV9Patched) return;
+  const proto = window.AIAssistant.prototype;
+
+  const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
+  const safeToDate = (value) => {
+    if (!value) return null;
+    const d = value?.toDate ? value.toDate() : new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
+  const todayISO = () => new Date().toISOString().slice(0, 10);
+
+  const isSameDate = (value, isoDay) => {
+    const d = safeToDate(value);
+    if (!d) return false;
+    return d.toISOString().slice(0, 10) === isoDay;
+  };
+
+  const daysSince = (value) => {
+    const d = safeToDate(value);
+    if (!d) return 999;
+    return Math.floor((Date.now() - d.getTime()) / 86400000);
+  };
+
+  const fmtDate = (value) => {
+    const d = safeToDate(value);
+    if (!d) return 'data não informada';
+    return d.toLocaleDateString('pt-BR');
+  };
+
+  // ── 1) DIÁRIO — revisão do conteúdo de hoje ─────────────────────────────
+
+  proto._getDiaryEntriesForDate = function (isoDay) {
+    return (this.context.classDiaries || []).filter(item => isSameDate(item?.data, isoDay));
+  };
+
+  proto._buildDiaryEntryBlock = function (entry) {
+    const linhas = [`**${entry.materia || 'Matéria não informada'}** (${fmtDate(entry.data)})`];
+    if (entry.conteudoExplicado) linhas.push(`- Conteúdo: ${entry.conteudoExplicado}`);
+    if (entry.exerciciosPassados) linhas.push(`- Exercícios passados: ${entry.exerciciosPassados}`);
+    if (entry.trabalhoAnunciado) linhas.push(`- Trabalho anunciado: ${entry.trabalhoAnunciado}`);
+    if (entry.entendi) linhas.push(`- O que você disse ter entendido: ${entry.entendi}`);
+    if (entry.naoEntendi) linhas.push(`- ⚠️ O que você marcou como NÃO entendido: ${entry.naoEntendi}`);
+    if (entry.duvidaPendente) linhas.push(`- ❓ Dúvida pendente: ${entry.duvidaPendente}`);
+    if (entry.dificuldade) linhas.push(`- Dificuldade sentida: ${entry.dificuldade}/5`);
+    if (entry.precisoRevisar) linhas.push('- 🔁 Marcado para revisar');
+    return linhas.join('\n');
+  };
+
+  // Perguntas de revisão determinísticas (sem custo de IA), geradas a partir
+  // do que a pessoa escreveu no diário. Funcionam como "chão" caso a chamada
+  // de IA (mais rica, ver _askMentorAI) falhe ou não seja possível.
+  proto._buildQuickReviewQuestions = function (entry) {
+    const perguntas = [];
+    const primeiraFrase = (texto) => String(texto || '').split(/[.,;]/)[0].trim();
+
+    if (entry.conteudoExplicado) {
+      perguntas.push(`Sem olhar o caderno: explique com suas palavras o que foi "${primeiraFrase(entry.conteudoExplicado)}".`);
+    }
+    if (entry.naoEntendi) {
+      perguntas.push(`Você marcou que não entendeu "${primeiraFrase(entry.naoEntendi)}" — tenta explicar de novo agora e vê exatamente onde trava.`);
+    }
+    if (entry.duvidaPendente) {
+      perguntas.push(`Sua dúvida pendente era "${primeiraFrase(entry.duvidaPendente)}" — já foi resolvida? Se não, essa é a prioridade de hoje.`);
+    }
+    if (!perguntas.length && entry.exerciciosPassados) {
+      perguntas.push(`Refaça um dos exercícios passados (${primeiraFrase(entry.exerciciosPassados)}) sem consultar a resolução.`);
+    }
+    return perguntas;
+  };
+
+  proto._buildTodayReviewAnswer = function () {
+    const hoje = todayISO();
+    const entradas = this._getDiaryEntriesForDate(hoje);
+
+    if (!entradas.length) {
+      this._awaitingTodayContent = { since: Date.now() };
+      return [
+        'Você ainda não registrou nenhuma aula no Diário hoje.',
+        '',
+        '📝 **O que você viu hoje?** Me conta rapidinho o conteúdo (pode ser só o assunto e a matéria) que eu já te ajudo a revisar agora mesmo, aqui no chat.',
+        '',
+        'Se preferir registrar oficialmente (fica salvo e entra nas revisões espaçadas automáticas), abre o **Diário de Aula** e preenche por lá.'
+      ].join('\n');
+    }
+
+    const blocos = entradas.map(entry => {
+      const bloco = [this._buildDiaryEntryBlock(entry)];
+      const perguntas = this._buildQuickReviewQuestions(entry);
+      if (perguntas.length) {
+        bloco.push('', 'Pra revisar agora:', ...perguntas.map(q => `- ${q}`));
+      }
+      return bloco.join('\n');
+    });
+
+    const pendencias = entradas.filter(e => e.naoEntendi || e.duvidaPendente);
+    const rodape = pendencias.length
+      ? `\n\n⚠️ Tem ${pendencias.length} ponto(s) marcado(s) como não entendido/dúvida pendente hoje — vale muito revisar isso agora enquanto está fresco, antes de passar pra outra matéria.`
+      : '\n\nSem pontos marcados como dúvida hoje — bom sinal. Se quiser aprofundar, me pede pra te fazer mais perguntas sobre o conteúdo.';
+
+    return [`📚 Aula(s) registrada(s) hoje (${entradas.length}):`, '', blocos.join('\n\n')].join('\n') + rodape;
+  };
+
+  proto._detectTodayReviewIntent = function (p) {
+    return /o que (eu )?vi hoje|o que (eu )?estudei hoje|revisar (a )?aula de hoje|revisar (o )?conteudo de hoje|revisar hoje|revisao de hoje|revisao do dia|resumo da aula de hoje|resumo do dia de hoje|conteudo de hoje|aula de hoje|o que rolou na aula/.test(p);
+  };
+
+  // Se o mentor tinha acabado de perguntar "o que você viu hoje?", a próxima
+  // mensagem livre do usuário (que não pareça um comando conhecido) é
+  // tratada como sendo essa resposta.
+  proto._isAwaitingTodayContentReply = function (pergunta) {
+    if (!this._awaitingTodayContent) return false;
+    const elapsedMin = (Date.now() - this._awaitingTodayContent.since) / 60000;
+    if (elapsedMin > 20) { this._awaitingTodayContent = null; return false; }
+    const p = norm(pergunta);
+    const pareceComando = /^(oi|ola|obrigad|valeu|quem e voce|plano|risco|prova|revisa[o]|presenca|material|curriculo|nota|media|raio)/.test(p) || p.length < 6;
+    return !pareceComando;
+  };
+
+  // ── 2) MAPA DE APRENDIZADO — trilha de estudo por tópico ───────────────
+
+  const STATUS_WEIGHT = { 'nao-comecei': 10, estudando: 16, revisando: 12, dominado: 2 };
+  const STATUS_LABEL = { 'nao-comecei': 'ainda não começou', estudando: 'está estudando', revisando: 'está revisando', dominado: 'já domina' };
+
+  proto._diasAteProva = function (prova) {
+    const d = safeToDate(prova?.data);
+    if (!d) return 999;
+    return Math.ceil((d.getTime() - Date.now()) / 86400000);
+  };
+
+  proto._scoreLearningTopic = function (topico) {
+    const ctx = this.context;
+    const subject = (ctx.subjects || []).find(s => s?.nome === topico.materia);
+    const dificuldadeMateria = Number(subject?.dificuldade) || 3;
+    const dificuldadeTopico = Number(topico.dificuldade) || 3;
+    const confianca = Number(topico.confianca) || 3;
+    const dias = daysSince(topico.ultimaRevisao);
+    const prova = this.getProximasProvas(21).find(p => p?.materia === topico.materia);
+
+    let score = STATUS_WEIGHT[topico.status] ?? 8;
+    score += dificuldadeTopico * 3;
+    score += dificuldadeMateria * 1.5;
+    score += (5 - confianca) * 4; // quanto menor a confiança, maior a prioridade
+    score += Math.min(dias, 30) * 0.6; // quanto mais tempo sem revisar, maior a prioridade
+
+    const diarioMateria = (ctx.classDiaries || [])
+      .filter(d => d?.materia === topico.materia)
+      .sort((a, b) => new Date(b.data) - new Date(a.data))[0];
+    const temDuvidaNoDiario = !!(diarioMateria && (diarioMateria.naoEntendi || diarioMateria.duvidaPendente) && daysSince(diarioMateria.data) <= 14);
+    if (temDuvidaNoDiario) score += 18;
+
+    if (prova) score += Math.max(0, 20 - Math.max(0, this._diasAteProva(prova)));
+
+    return { score, dificuldadeTopico, confianca, dias, prova, temDuvidaNoDiario };
+  };
+
+  proto._buildLearningMapStudyPlan = function (limite = 6) {
+    const topicos = (this.context.learningMap || []).filter(t => t?.status !== 'dominado' || daysSince(t?.ultimaRevisao) > 20);
+    if (!topicos.length) return null;
+
+    const ranqueados = topicos
+      .map(topico => ({ topico, ...this._scoreLearningTopic(topico) }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limite);
+
+    const linhas = ranqueados.map((item, index) => {
+      const t = item.topico;
+      const motivos = [STATUS_LABEL[t.status] || 'status desconhecido'];
+      if (item.confianca <= 2) motivos.push('sua confiança nesse tópico está baixa');
+      if (item.dificuldadeTopico >= 4) motivos.push('tópico marcado como difícil');
+      if (item.dias >= 10) motivos.push(`sem revisar há ${item.dias} dia(s)`);
+      if (item.prova) motivos.push(`prova de ${t.materia} em ${this._diasAteProva(item.prova)} dia(s)`);
+      if (item.temDuvidaNoDiario) motivos.push('você marcou dúvida sobre isso no diário recentemente');
+
+      return `${index + 1}. **${t.nome}** (${t.materia}) — ${motivos.join(', ')}.`;
+    });
+
+    return [
+      '🗺️ Pela sua trilha no Mapa de Aprendizado, essa é a ordem que eu seguiria:',
+      ...linhas,
+      '',
+      'Sugestão prática: comece pelo item 1, estude/revise até se sentir mais seguro (aumente a confiança dele no Mapa de Aprendizado), e só então avance pro próximo — assim você fecha um tópico de cada vez em vez de espalhar o estudo.'
+    ].join('\n');
+  };
+
+  proto._detectLearningMapIntent = function (p) {
+    return /o que estudar|oque estudar|por onde (eu )?come[cç]o|proximo topico|proximos topicos|sequencia de estudo|trilha de estudo|ordem de estudo|prioridade de estudo|quais topicos|mapa de aprendizado/.test(p);
+  };
+
+  // Enriquece sugerirEstudoAgora() (usado no botão rápido e em outras telas)
+  // para trazer também o recorte por tópico do Mapa de Aprendizado, não só a
+  // matéria inteira.
+  if (typeof proto.sugerirEstudoAgora === 'function' && !proto.__sugerirEstudoAgoraV9Wrapped) {
+    const _origSugerirEstudoAgora = proto.sugerirEstudoAgora;
+    proto.sugerirEstudoAgora = function () {
+      const base = _origSugerirEstudoAgora.call(this);
+      const trilha = this._buildLearningMapStudyPlan(4);
+      if (!trilha) return base;
+      return `${base}\n\n${trilha}`;
+    };
+    proto.__sugerirEstudoAgoraV9Wrapped = true;
+  }
+
+  // ── 3) IA REAL (Gemini via /api/mentor-chat) para perguntas abertas ────
+
+  proto._buildMentorSystemInstruction = function () {
+    return {
+      parts: [{
+        text: [
+          'Você é o "Mentor IA" de um app de organização acadêmica, respondendo em português do Brasil.',
+          'Ajude o usuário a estudar melhor com base SOMENTE nos dados reais dele, listados no "Contexto atual do usuário" enviado junto da pergunta.',
+          '',
+          'Regras importantes:',
+          '- Nunca invente notas, matérias, provas, tópicos ou conteúdos que não estejam no contexto.',
+          '- Se faltar um dado que ajudaria (ex: sem notas, Mapa de Aprendizado vazio, sem diário), diga isso com naturalidade e sugira cadastrar/registrar na aba correspondente do site.',
+          '- Quando o usuário perguntar o que estudar, cruze Mapa de Aprendizado + Diário de Aula + provas próximas e responda com uma ordem prática (estude isso, depois aquilo), com motivo curto para cada item.',
+          '- Quando o usuário quiser revisar conteúdo de aula, use o que está no Diário daquela matéria/data; se não houver diário de hoje, pergunte objetivamente o que a pessoa viu na aula e ajude a revisar ali mesmo, na conversa.',
+          '- Seja direto, encorajador e realista, sem enrolação. Respostas de tamanho médio (não gigantes). Pode usar "-" para listas e "**negrito**" para destacar.',
+          '- Você não tem acesso à internet nem a nada fora do contexto fornecido — não responda perguntas de conhecimento geral fora do escopo de estudos/organização acadêmica da pessoa; nesses casos, redirecione gentilmente de volta ao propósito do mentor.',
+          '- Não repita o contexto inteiro na resposta; use-o só para embasar o que for perguntado.'
+        ].join('\n')
+      }]
+    };
+  };
+
+  proto._buildMentorContextSnapshot = function () {
+    const ctx = this.context;
+    const user = ctx.user || {};
+    const hoje = todayISO();
+    const linhas = [];
+
+    linhas.push(`Perfil: nome=${user.nome || '?'}; curso=${user.curso || '?'}; universidade=${user.universidade || '?'}; semestre=${user.semestre || '?'}.`);
+
+    const subjects = ctx.subjects || [];
+    if (subjects.length) {
+      linhas.push('\nMatérias cadastradas:');
+      subjects.forEach(s => {
+        const notas = (ctx.grades || []).filter(g => g?.materia === s?.nome);
+        const media = notas.length ? notas.reduce((a, b) => a + (Number(b.valor) || 0), 0) / notas.length : null;
+        const horas = this.getHorasEstudadasMateria(s?.nome);
+        const faltas = this.getFaltasMateria(s?.nome);
+        linhas.push(`- ${s.nome}: dificuldade ${Number(s.dificuldade) || 3}/5, ${horas.toFixed(1)}h estudadas${media != null ? `, média ~${media.toFixed(1)}` : ', sem notas ainda'}${faltas ? `, ${faltas} falta(s)` : ''}.`);
+      });
+    } else {
+      linhas.push('\nNenhuma matéria cadastrada ainda.');
+    }
+
+    const topicos = ctx.learningMap || [];
+    if (topicos.length) {
+      linhas.push('\nMapa de Aprendizado (tópicos por matéria):');
+      const porMateria = {};
+      topicos.slice(0, 40).forEach(t => {
+        (porMateria[t.materia] = porMateria[t.materia] || []).push(t);
+      });
+      Object.entries(porMateria).forEach(([materia, itens]) => {
+        linhas.push(`- ${materia}: ${itens.map(t => `${t.nome} [${t.status}, confiança ${t.confianca}/5, ${daysSince(t.ultimaRevisao)}d sem revisar]`).join('; ')}`);
+      });
+    } else {
+      linhas.push('\nMapa de Aprendizado ainda vazio (usuário não cadastrou tópicos de estudo).');
+    }
+
+    const diarioHoje = this._getDiaryEntriesForDate(hoje);
+    if (diarioHoje.length) {
+      linhas.push('\nDiário de HOJE:');
+      diarioHoje.forEach(e => linhas.push(`- ${e.materia}: ${e.conteudoExplicado || '(sem conteúdo anotado)'}${e.naoEntendi ? ` | não entendeu: ${e.naoEntendi}` : ''}${e.duvidaPendente ? ` | dúvida: ${e.duvidaPendente}` : ''}`));
+    } else {
+      linhas.push('\nDiário de HOJE: nada registrado ainda.');
+    }
+
+    const idsHoje = new Set(diarioHoje.map(e => e.id));
+    const diarioRecente = (ctx.classDiaries || [])
+      .filter(e => !idsHoje.has(e.id))
+      .slice()
+      .sort((a, b) => new Date(b.data) - new Date(a.data))
+      .slice(0, 6);
+    if (diarioRecente.length) {
+      linhas.push('\nÚltimos registros do Diário (antes de hoje):');
+      diarioRecente.forEach(e => linhas.push(`- ${fmtDate(e.data)} ${e.materia}: ${e.conteudoExplicado || '(sem conteúdo anotado)'}${e.precisoRevisar ? ' [marcado p/ revisar]' : ''}`));
+    }
+
+    const provas = this.getProximasProvas(21);
+    if (provas.length) {
+      linhas.push('\nProvas/trabalhos próximos (21 dias):');
+      provas.slice(0, 10).forEach(p => linhas.push(`- ${p.titulo} (${p.materia}) em ${fmtDate(p.data)}, faltam ${this._diasAteProva(p)}d.`));
+    }
+
+    const tarefas = (ctx.tasks || []).filter(t => !t?.concluida);
+    if (tarefas.length) {
+      linhas.push(`\nTarefas pendentes (${tarefas.length}, mostrando até 8):`);
+      tarefas.slice(0, 8).forEach(t => linhas.push(`- ${t.titulo} (${t.materia || 'sem matéria'}), prazo ${fmtDate(t.dataLimite || t.data)}.`));
+    }
+
+    const revisoes = this.getRevisoesPendentes();
+    if (revisoes.length) {
+      linhas.push(`\nRevisões espaçadas pendentes hoje: ${revisoes.map(r => `${r.materia} (${r.topico || 'geral'})`).join(', ')}.`);
+    }
+
+    return linhas.join('\n');
+  };
+
+  proto._askMentorAI = async function (pergunta) {
+    this._ensureSessionMemory?.();
+
+    const user = window.auth?.currentUser;
+    if (!user) return null; // sem login: caller decide o fallback
+
+    let idToken;
+    try {
+      idToken = await user.getIdToken();
+    } catch {
+      return null;
+    }
+
+    const contextoTexto = this._buildMentorContextSnapshot();
+    const historico = (this.sessionMemory || []).slice(-6);
+
+    const contents = [];
+    historico.forEach(turn => {
+      if (turn.question) contents.push({ role: 'user', parts: [{ text: turn.question }] });
+      if (turn.answer) contents.push({ role: 'model', parts: [{ text: String(turn.answer).slice(0, 2000) }] });
+    });
+    contents.push({
+      role: 'user',
+      parts: [{ text: `Contexto atual do usuário (dados reais do site):\n${contextoTexto}\n\nPergunta do usuário: ${pergunta}` }]
+    });
+
+    try {
+      const response = await fetch('/api/mentor-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ contents, systemInstruction: this._buildMentorSystemInstruction() })
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        const msg = (typeof err?.error === 'string' ? err.error : err?.error?.message) || `Erro HTTP ${response.status}`;
+        if (response.status === 429) return msg; // limite diário: mostra a mensagem amigável direto
+        console.warn('[MentorIA] falha na chamada de IA, caindo para o modo por regras:', msg);
+        return null;
+      }
+
+      const data = await response.json();
+      const texto = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      return texto || null;
+    } catch (err) {
+      console.warn('[MentorIA] erro de rede na chamada de IA:', err.message);
+      return null;
+    }
+  };
+
+  // ── Capacidades atualizadas (aparece em "o que você faz?") ─────────────
+  if (typeof proto._getMentorCapabilities === 'function' && !proto.__mentorCapabilitiesV9Wrapped) {
+    const _origCaps = proto._getMentorCapabilities;
+    proto._getMentorCapabilities = function () {
+      return [
+        _origCaps.call(this),
+        '',
+        'E agora também:',
+        '- monto uma trilha de estudo por TÓPICO do seu Mapa de Aprendizado (não só por matéria) — pergunte "o que estudar?"',
+        '- reviso com você o conteúdo que registrou no Diário de Aula hoje — pergunte "o que eu vi hoje?" ou "revisar aula de hoje"',
+        '- se você não registrou nada no diário ainda hoje, eu pergunto o que você viu e já ajudo a revisar na hora',
+        '- quando a pergunta foge do que essas respostas rápidas cobrem, eu uso uma IA de verdade (com todos os seus dados) para responder de forma mais livre'
+      ].join('\n');
+    };
+    proto.__mentorCapabilitiesV9Wrapped = true;
+  }
+
+  // ── Patch final do ask() — pluga diário, mapa de aprendizado e IA real ──
+
+  const FALLBACK_MARKER = 'Posso responder com base nos seus dados reais.';
+
+  const _origAskV9 = proto.ask;
+  proto.ask = async function (pergunta) {
+    this._ensureSessionMemory?.();
+    const raw = String(pergunta || '').trim();
+    if (!raw) return _origAskV9.call(this, pergunta);
+    const p = norm(raw);
+
+    // 1) O mentor tinha acabado de perguntar "o que você viu hoje?" — trata a
+    // resposta livre do usuário como o conteúdo da aula a revisar.
+    if (this._isAwaitingTodayContentReply(raw)) {
+      this._awaitingTodayContent = null;
+      const respostaIA = await this._askMentorAI(
+        `O usuário está me contando o que viu na aula de hoje (ainda não registrado no Diário de Aula): "${raw}". ` +
+        'Ajude a revisar esse conteúdo agora: faça um mini-resumo dos pontos que costumam ser mais importantes nesse tema, e proponha 2-3 perguntas de verificação de aprendizado sobre o que ele descreveu. ' +
+        'No final, sugira registrar isso oficialmente no Diário de Aula do site (assim entra nas revisões espaçadas automáticas).'
+      );
+      const resposta = respostaIA || [
+        'Anotado! Aqui vai uma revisão rápida baseada no que você me contou:',
+        `- Reforce mentalmente os pontos principais de: ${raw}`,
+        '- Tente explicar esse conteúdo em voz alta, sem olhar anotações.',
+        '- Se sobrar dúvida em alguma parte, essa é sua prioridade de revisão agora.',
+        '',
+        'Dica: registre isso no Diário de Aula pra ficar salvo e entrar nas revisões espaçadas automáticas do site.'
+      ].join('\n');
+      this._rememberTurn(raw, resposta, { intent: 'diary-capture' });
+      return resposta;
+    }
+
+    // 2) Revisão do conteúdo/aula de hoje (puxa o Diário)
+    if (this._detectTodayReviewIntent(p)) {
+      const resposta = this._buildTodayReviewAnswer();
+      this._rememberTurn(raw, resposta, { intent: 'diary-review' });
+      return resposta;
+    }
+
+    // 3) Trilha de estudo por tópico (puxa o Mapa de Aprendizado)
+    if (this._detectLearningMapIntent(p)) {
+      const trilha = this._buildLearningMapStudyPlan();
+      const resposta = trilha || this.sugerirEstudoAgora();
+      this._rememberTurn(raw, resposta, { intent: 'learning-map' });
+      return resposta;
+    }
+
+    // 4) Deixa a cadeia de regras determinísticas (v5-v8) tentar primeiro —
+    // é instantânea, gratuita e cobre a maioria dos comandos conhecidos.
+    let resposta = await _origAskV9.call(this, pergunta);
+
+    // 5) Se as regras não souberam responder (fallback genérico), escala
+    // para a IA de verdade, com todo o contexto do usuário — é isso que faz
+    // o mentor responder qualquer pergunta aberta, não só comandos prontos.
+    const pareceGenerico = typeof resposta === 'string' && resposta.includes(FALLBACK_MARKER);
+    if (pareceGenerico) {
+      const respostaIA = await this._askMentorAI(raw);
+      if (respostaIA) resposta = respostaIA;
+    }
+
+    this._rememberTurn(raw, resposta, {});
+    return resposta;
+  };
+
+  proto.__mentorV9Patched = true;
+  console.info('[MentorIA v9] Mapa de Aprendizado + Diário + IA real (Gemini) ativados.');
+})();
+
+
+// ════════════════════════════════════════════════════════════════════════
+// __mentor_upgrade_v9_proactive__
+// Saudação/insight proativo: quando o usuário abre a aba do Mentor IA, se
+// houver algo que realmente vale a pena avisar (diário do dia vazio à
+// tarde, revisão espaçada pendente hoje, prova muito próxima), o mentor já
+// puxa isso sozinho como primeira mensagem — sem precisar que a pessoa
+// pergunte. Ver hook em app.js (setupIAEvents).
+// ════════════════════════════════════════════════════════════════════════
+(function () {
+  if (!window.AIAssistant || window.AIAssistant.prototype.__mentorProactivePatched) return;
+  const proto = window.AIAssistant.prototype;
+
+  const safeToDate = (value) => {
+    if (!value) return null;
+    const d = value?.toDate ? value.toDate() : new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+  const todayISO = () => new Date().toISOString().slice(0, 10);
+  const isSameDate = (value, isoDay) => {
+    const d = safeToDate(value);
+    if (!d) return false;
+    return d.toISOString().slice(0, 10) === isoDay;
+  };
+
+  proto.getProactiveGreeting = function () {
+    const hoje = todayISO();
+    const hora = new Date().getHours();
+    const avisos = [];
+
+    const diarioHoje = (this.context.classDiaries || []).filter(item => isSameDate(item?.data, hoje));
+    if (!diarioHoje.length && hora >= 15) {
+      avisos.push('👋 Vi que você ainda não registrou nenhuma aula no Diário hoje. O que você viu hoje? Quer que eu te ajude a revisar o conteúdo agora?');
+    }
+
+    const revisoes = this.getRevisoesPendentes ? this.getRevisoesPendentes() : [];
+    if (revisoes.length) {
+      avisos.push(`🔁 Você tem ${revisoes.length} revisão(ões) espaçada(s) programada(s) para hoje: ${revisoes.slice(0, 3).map(r => r.materia).join(', ')}.`);
+    }
+
+    const provasProximas = this.getProximasProvas ? this.getProximasProvas(3) : [];
+    if (provasProximas.length) {
+      const detalhes = provasProximas.map(p => `${p.titulo} (${p.materia}) em ${this._diasAteProva ? this._diasAteProva(p) : '?'} dia(s)`).join('; ');
+      avisos.push(`⚠️ Prova bem próxima: ${detalhes}. Se quiser, eu monto um plano focado nisso agora.`);
+    }
+
+    if (!avisos.length) return null;
+    return avisos.join('\n\n');
+  };
+
+  proto.__mentorProactivePatched = true;
 })();

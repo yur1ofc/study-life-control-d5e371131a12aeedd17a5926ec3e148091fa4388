@@ -388,7 +388,7 @@
         if (window.app && window.app.loadView) window.app.loadView('mentor-ia');
         markNavActive('mentor-ia');
         setTimeout(() => {
-          const input = document.querySelector('#mentor-ia-input, #ai-chat-input, .mentor-chat-input textarea, .mentor-chat-input input');
+          const input = document.querySelector('#chat-input, #mentor-ia-input, #ai-chat-input, .mentor-chat-input textarea, .mentor-chat-input input');
           if (input) {
             input.value = question;
             input.dispatchEvent(new Event('input', { bubbles: true }));

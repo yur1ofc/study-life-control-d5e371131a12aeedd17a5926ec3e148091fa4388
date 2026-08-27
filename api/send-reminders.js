@@ -82,6 +82,25 @@ function localDateTimeToMs(isoLocal) {
   return Number.isNaN(t) ? null : t;
 }
 
+// "Agora" já deslocado -3h, pra poder ler getUTCHours()/toISOString() e
+// obter a hora e a data de calendário corretas em Brasília, independente
+// do fuso do servidor (Vercel roda em UTC).
+function agoraBrasilia(now) {
+  return new Date(now - 3 * 3600000);
+}
+
+function calcularStreakDiario(dailyLogs, hojeStr) {
+  const datasComLog = new Set((dailyLogs || []).map(l => l.data));
+  let streak = 0;
+  const cursor = new Date(`${hojeStr}T00:00:00Z`);
+  if (!datasComLog.has(hojeStr)) cursor.setUTCDate(cursor.getUTCDate() - 1);
+  while (datasComLog.has(cursor.toISOString().slice(0, 10))) {
+    streak++;
+    cursor.setUTCDate(cursor.getUTCDate() - 1);
+  }
+  return streak;
+}
+
 // Descobre quais itens de um usuário "vencem" dentro da janela de aviso e
 // ainda não foram notificados.
 function findDueReminders(data, now) {
@@ -127,6 +146,28 @@ function findDueReminders(data, now) {
       due.push({ key, title: '📚 Sessão de estudo já já', body: `${s.materia}${s.topico ? ` — ${s.topico}` : ''}` });
     }
   });
+
+  // Diário: se a hora configurada já passou (fuso Brasília) e o usuário
+  // ainda não registrou nada hoje (nem "Meu dia" nem diário de aula),
+  // manda 1 aviso — dedupe por dia (`diario:AAAA-MM-DD`), então mesmo o
+  // cron rodando várias vezes só dispara uma vez por dia.
+  const diarioHora = Number(prefs.diaryReminderHour ?? 20);
+  const bAgora = agoraBrasilia(now);
+  const hojeBr = bAgora.toISOString().slice(0, 10);
+  const diarioKey = `diario:${hojeBr}`;
+  if (!already.has(diarioKey) && bAgora.getUTCHours() >= diarioHora) {
+    const jaRegistrouHoje =
+      (data.dailyLogs || []).some(l => l.data === hojeBr) ||
+      (data.classDiaries || []).some(d => d.data === hojeBr);
+    if (!jaRegistrouHoje) {
+      const streak = calcularStreakDiario(data.dailyLogs, hojeBr);
+      due.push({
+        key: diarioKey,
+        title: streak > 0 ? `🔥 ${streak} dia${streak === 1 ? '' : 's'} seguido${streak === 1 ? '' : 's'} — não perca hoje!` : '📖 Registre seu dia',
+        body: 'Você ainda não preencheu o Diário hoje. Leva menos de 1 minuto no modo rápido.'
+      });
+    }
+  }
 
   return due;
 }

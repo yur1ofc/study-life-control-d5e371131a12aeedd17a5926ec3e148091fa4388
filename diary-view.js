@@ -34,6 +34,104 @@ class DiaryView {
         return `${formatarData(dataStr)} • ${diaSemana}`;
     }
 
+    temRegistroHoje(app) {
+        const hoje = toDateString();
+        const temLog = (app.data.dailyLogs || []).some(l => l.data === hoje);
+        const temDiario = (app.data.classDiaries || []).some(d => d.data === hoje);
+        return temLog || temDiario;
+    }
+
+    // Aulas previstas na grade pro dia da semana de `data` (usado pra
+    // pré-preencher os blocos do modal sem o usuário ter que escolher
+    // a matéria toda vez).
+    aulasAgendadasPara(data) {
+        if (!window.scheduleManager) return [];
+        const diaSemana = parseDateSafe(data).getDay();
+        return window.scheduleManager.getAulasPorDia(diaSemana);
+    }
+
+    // Registro em 1 clique pra dias sem aula/estudo — evita ter que abrir
+    // o formulário inteiro só pra manter a sequência (streak) viva.
+    async marcarDiaLivre(app) {
+        const hoje = toDateString();
+        if (this.temRegistroHoje(app)) {
+            showToast('Hoje já tem registro — edite pelo histórico.', 'warning');
+            return;
+        }
+        await window.dailyLogService.registrarLog({
+            data: hoje,
+            energia: 'media',
+            foco: 'normal',
+            observacoes: 'Dia sem aula/estudo.'
+        });
+        if (app.currentView === 'diario') {
+            app.loadView('diario');
+        }
+    }
+
+    // Liga os grupos de pílulas (energia/foco do dia + presença de cada
+    // aula) a um input escondido, sem precisar de <select>. Idempotente:
+    // pode ser chamado de novo em cima do mesmo container sem duplicar
+    // listeners.
+    bindPillGroups(root = document) {
+        root.querySelectorAll('.diario-pill-group').forEach(group => {
+            if (group.dataset.bound) return;
+            group.dataset.bound = '1';
+            group.querySelectorAll('.diario-pill').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const val = btn.dataset.val;
+                    group.querySelectorAll('.diario-pill').forEach(b => b.classList.remove('active', 'presenca-absent'));
+                    btn.classList.add('active');
+                    if (val === 'absent') btn.classList.add('presenca-absent');
+
+                    let input = null;
+                    if (group.dataset.pillTarget) {
+                        input = document.getElementById(group.dataset.pillTarget);
+                    } else if (group.dataset.pillInputClass) {
+                        input = group.parentElement.querySelector(`input.${group.dataset.pillInputClass}`);
+                    }
+                    if (input) input.value = val;
+                });
+            });
+        });
+    }
+
+    // Ajusta o valor + o estado visual (.active) de um grupo de pílulas
+    // ligado a `hiddenId`, usado ao reabrir o modal pra editar um dia
+    // que já tinha energia/foco salvos.
+    setPillValue(hiddenId, val) {
+        const input = document.getElementById(hiddenId);
+        if (input) input.value = val;
+        const group = document.querySelector(`.diario-pill-group[data-pill-target="${hiddenId}"]`);
+        if (!group) return;
+        group.querySelectorAll('.diario-pill').forEach(b => {
+            b.classList.toggle('active', b.dataset.val === val);
+        });
+    }
+
+    // Estrelas clicáveis pra dificuldade (1-5), alimentando o mesmo input
+    // escondido que o resto do código já espera (.diario-aula-dificuldade).
+    bindStarPicker(container) {
+        const picker = container.querySelector('.diario-star-picker');
+        const input = container.querySelector('.diario-aula-dificuldade');
+        if (!picker || !input) return;
+
+        const pintar = n => {
+            picker.querySelectorAll('button').forEach(b => {
+                b.classList.toggle('filled', parseInt(b.dataset.val, 10) <= n);
+            });
+        };
+        pintar(parseInt(input.value, 10) || 3);
+
+        picker.querySelectorAll('button').forEach(b => {
+            b.addEventListener('click', () => {
+                const n = parseInt(b.dataset.val, 10);
+                input.value = n;
+                pintar(n);
+            });
+        });
+    }
+
     calcularStreak(app) {
         const logs = app.data.dailyLogs || [];
         const datasComLog = new Set(logs.map(l => l.data));
@@ -73,7 +171,10 @@ class DiaryView {
         return `
             <div class="view-header">
                 <h2><i class="fas fa-book-open"></i> Diário</h2>
-                <button class="btn-primary" id="diario-novo-btn"><i class="fas fa-plus"></i> Novo registro</button>
+                <div class="diario-quick-actions">
+                    ${this.temRegistroHoje(app) ? '' : `<button class="btn-secondary" id="diario-dia-livre-btn" title="Salva o dia em 1 clique, sem abrir o formulário completo"><i class="fas fa-mug-hot"></i> Dia sem nada pra registrar</button>`}
+                    <button class="btn-primary" id="diario-novo-btn"><i class="fas fa-plus"></i> Novo registro</button>
+                </div>
             </div>
 
             <div class="dashboard-grid">
@@ -323,6 +424,7 @@ class DiaryView {
     bindPageEvents(app) {
         document.getElementById('diario-novo-btn')?.addEventListener('click', () => this.openModal());
         document.getElementById('diario-empty-novo-btn')?.addEventListener('click', () => this.openModal());
+        document.getElementById('diario-dia-livre-btn')?.addEventListener('click', () => this.marcarDiaLivre(app));
 
         document.getElementById('diario-filtro-materia')?.addEventListener('change', e => {
             this.filtro.materia = e.target.value;
@@ -388,8 +490,8 @@ class DiaryView {
         document.getElementById('diario-data').value = data;
         document.getElementById('diario-estudo-inicio').value = log?.estudo?.inicio || '';
         document.getElementById('diario-estudo-fim').value = log?.estudo?.fim || '';
-        document.getElementById('diario-energia').value = log?.energia || 'media';
-        document.getElementById('diario-foco').value = log?.foco || 'normal';
+        this.setPillValue('diario-energia', log?.energia || 'media');
+        this.setPillValue('diario-foco', log?.foco || 'normal');
         document.getElementById('diario-trabalhou').checked = log?.trabalho?.trabalhou || false;
         document.getElementById('diario-trabalho-duracao').value = log?.trabalho?.duracao || 0;
         document.getElementById('diario-observacoes').value = log?.observacoes || '';
@@ -400,9 +502,19 @@ class DiaryView {
 
         if (diariosDoDia.length) {
             diariosDoDia.forEach(d => this.addAulaBlock(app, d));
+        } else if (prefillMateria) {
+            this.addAulaBlock(app, { materia: prefillMateria, data });
         } else {
-            const bloco = prefillMateria ? { materia: prefillMateria, data } : null;
-            this.addAulaBlock(app, bloco);
+            // Sem nenhum registro pra esse dia ainda: puxa automaticamente
+            // as matérias que estão na grade de horários pra esse dia da
+            // semana, já marcadas como "presente" — só precisa ajustar se
+            // faltou ou tirar o bloco que não se aplica.
+            const aulasDaGrade = this.aulasAgendadasPara(data);
+            if (aulasDaGrade.length) {
+                aulasDaGrade.forEach(a => this.addAulaBlock(app, { materia: a.materia, data, presenca: 'present', _daGrade: true }));
+            } else {
+                this.addAulaBlock(app, null);
+            }
         }
 
         modal.style.display = 'block';
@@ -416,13 +528,19 @@ class DiaryView {
         const subjects = app.data.subjects || [];
         const materiaAtual = existente?.materia || '';
 
+        const presencaAtual = existente?.presenca === 'absent' ? 'absent' : 'present';
+        const dificuldadeAtual = existente?.dificuldade || 3;
+        const veioDaGrade = !!existente?._daGrade;
+
         const div = document.createElement('div');
         div.className = 'diario-aula-block';
         div.dataset.index = idx;
         div.innerHTML = `
             <button type="button" class="diario-aula-block-remove" title="Remover essa aula"><i class="fas fa-times"></i></button>
             <input type="hidden" class="diario-aula-id" value="${existente?.id ? escapeHtml(existente.id) : ''}">
-            <div class="form-row">
+            ${veioDaGrade ? '<div class="diario-sugestao-tag"><i class="fas fa-magic"></i> Preenchido a partir da sua grade de horários</div>' : ''}
+
+            <div class="diario-aula-compact-head">
                 <div class="form-group">
                     <label>Matéria</label>
                     <select class="diario-aula-materia" required>
@@ -432,61 +550,72 @@ class DiaryView {
                 </div>
                 <div class="form-group">
                     <label>Presença</label>
-                    <select class="diario-aula-presenca">
-                        <option value="present" ${!existente || existente.presenca === 'present' ? 'selected' : ''}>✅ Fui</option>
-                        <option value="absent" ${existente?.presenca === 'absent' ? 'selected' : ''}>❌ Faltei</option>
-                    </select>
+                    <input type="hidden" class="diario-aula-presenca" value="${presencaAtual}">
+                    <div class="diario-pill-group" data-pill-input-class="diario-aula-presenca">
+                        <button type="button" class="diario-pill ${presencaAtual === 'present' ? 'active' : ''}" data-val="present">✅ Fui</button>
+                        <button type="button" class="diario-pill ${presencaAtual === 'absent' ? 'active presenca-absent' : ''}" data-val="absent">❌ Faltei</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Dificuldade</label>
+                    <input type="hidden" class="diario-aula-dificuldade" value="${dificuldadeAtual}">
+                    <div class="diario-star-picker">
+                        ${[1, 2, 3, 4, 5].map(n => `<button type="button" data-val="${n}">★</button>`).join('')}
+                    </div>
                 </div>
             </div>
+
             <div class="form-group">
-                <label>Conteúdo explicado</label>
-                <textarea class="diario-aula-conteudo" rows="2" placeholder="O que foi explicado?">${existente?.conteudoExplicado ? escapeHtml(existente.conteudoExplicado) : ''}</textarea>
+                <label><input type="checkbox" class="diario-aula-revisar" ${existente?.precisoRevisar ? 'checked' : ''}> Preciso revisar esse conteúdo depois</label>
             </div>
-            <div class="form-group">
-                <label>Exercícios passados</label>
-                <textarea class="diario-aula-exercicios" rows="2" placeholder="Lista de exercícios, páginas...">${existente?.exerciciosPassados ? escapeHtml(existente.exerciciosPassados) : ''}</textarea>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>O que eu entendi</label>
-                    <textarea class="diario-aula-entendi" rows="2">${existente?.entendi ? escapeHtml(existente.entendi) : ''}</textarea>
+
+            <details class="diario-aula-details">
+                <summary>Adicionar detalhes da aula (conteúdo, exercícios, dúvidas...)</summary>
+                <div>
+                    <div class="form-group">
+                        <label>Conteúdo explicado</label>
+                        <textarea class="diario-aula-conteudo" rows="2" placeholder="O que foi explicado?">${existente?.conteudoExplicado ? escapeHtml(existente.conteudoExplicado) : ''}</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Exercícios passados</label>
+                        <textarea class="diario-aula-exercicios" rows="2" placeholder="Lista de exercícios, páginas...">${existente?.exerciciosPassados ? escapeHtml(existente.exerciciosPassados) : ''}</textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>O que eu entendi</label>
+                            <textarea class="diario-aula-entendi" rows="2">${existente?.entendi ? escapeHtml(existente.entendi) : ''}</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>O que eu não entendi</label>
+                            <textarea class="diario-aula-nao-entendi" rows="2">${existente?.naoEntendi ? escapeHtml(existente.naoEntendi) : ''}</textarea>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Dúvida pendente</label>
+                            <input type="text" class="diario-aula-duvida" value="${existente?.duvidaPendente ? escapeHtml(existente.duvidaPendente) : ''}" placeholder="Ex: perguntar ao professor sobre integrais por partes">
+                        </div>
+                        <div class="form-group">
+                            <label>Links / anexos</label>
+                            <input type="text" class="diario-aula-links" value="${existente?.linksAnexos ? escapeHtml(existente.linksAnexos) : ''}">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Trabalho anunciado</label>
+                        <input type="text" class="diario-aula-trabalho" value="${existente?.trabalhoAnunciado ? escapeHtml(existente.trabalhoAnunciado) : ''}">
+                    </div>
+                    <div class="form-group">
+                        <label>Observações</label>
+                        <textarea class="diario-aula-observacoes" rows="2">${existente?.observacoes ? escapeHtml(existente.observacoes) : ''}</textarea>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>O que eu não entendi</label>
-                    <textarea class="diario-aula-nao-entendi" rows="2">${existente?.naoEntendi ? escapeHtml(existente.naoEntendi) : ''}</textarea>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Dúvida pendente</label>
-                    <input type="text" class="diario-aula-duvida" value="${existente?.duvidaPendente ? escapeHtml(existente.duvidaPendente) : ''}" placeholder="Ex: perguntar ao professor sobre integrais por partes">
-                </div>
-                <div class="form-group">
-                    <label>Links / anexos</label>
-                    <input type="text" class="diario-aula-links" value="${existente?.linksAnexos ? escapeHtml(existente.linksAnexos) : ''}">
-                </div>
-            </div>
-            <div class="form-group">
-                <label>Trabalho anunciado</label>
-                <input type="text" class="diario-aula-trabalho" value="${existente?.trabalhoAnunciado ? escapeHtml(existente.trabalhoAnunciado) : ''}">
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Dificuldade (1-5)</label>
-                    <input type="number" class="diario-aula-dificuldade" min="1" max="5" value="${existente?.dificuldade || 3}">
-                </div>
-                <div class="form-group">
-                    <label><input type="checkbox" class="diario-aula-revisar" ${existente?.precisoRevisar ? 'checked' : ''}> Preciso revisar</label>
-                </div>
-            </div>
-            <div class="form-group">
-                <label>Observações</label>
-                <textarea class="diario-aula-observacoes" rows="2">${existente?.observacoes ? escapeHtml(existente.observacoes) : ''}</textarea>
-            </div>
+            </details>
         `;
 
         div.querySelector('.diario-aula-block-remove').addEventListener('click', () => div.remove());
         container.appendChild(div);
+        this.bindPillGroups(div);
+        this.bindStarPicker(div);
     }
 
     async handleSubmit(e) {
@@ -554,4 +683,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('diario-add-aula-btn')?.addEventListener('click', () => {
         window.diaryView.addAulaBlock(window.app);
     });
+    // Pílulas de energia/foco do modal são estáticas no HTML (não são
+    // recriadas a cada abertura do modal), então só precisam ser ligadas
+    // uma vez aqui.
+    window.diaryView.bindPillGroups(document);
 });

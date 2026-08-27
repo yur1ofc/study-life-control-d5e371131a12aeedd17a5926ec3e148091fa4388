@@ -141,7 +141,7 @@
     btn.innerHTML = '<i class="fas fa-comment-dots"></i><span>Feedback</span>';
     btn.setAttribute('title', 'Mandar sugestão, bug ou elogio');
     btn.style.cssText = `
-      position:fixed;bottom:20px;left:20px;z-index:997;
+      position:fixed;bottom:20px;z-index:997;
       display:flex;align-items:center;gap:7px;
       padding:10px 16px 10px 14px;border-radius:999px;border:none;
       background:var(--bg-secondary);color:var(--text-primary);
@@ -185,7 +185,7 @@
     const nudge = document.createElement('div');
     nudge.id = 'slc-feedback-nudge';
     nudge.style.cssText = `
-      position:fixed;bottom:70px;left:20px;z-index:998;max-width:250px;
+      position:fixed;bottom:70px;z-index:998;max-width:250px;
       background:var(--bg-secondary);border:1px solid var(--border);
       border-radius:12px;padding:12px 14px;box-shadow:0 10px 26px rgba(0,0,0,.22);
       font-size:12.5px;color:var(--text-primary);
