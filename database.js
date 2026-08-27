@@ -25,10 +25,13 @@ const DEFAULT_APP_DATA = () => ({
     sentReminders: [],
     settings: {
         heavyMode: false,
-        notifications: true,
         autoPlan: true,
         // Token do feed de calendário (.ics) assinável — ver calendar-feed.js.
         calendarToken: null,
+        // Tema personalizado (cores, tamanho de fonte, arredondamento) —
+        // salvo na conta pra valer em qualquer aparelho logado, não só
+        // neste navegador. Ver theme-engine.js.
+        theme: { preset: 'dark', custom: {} },
         // Preferências de alarme/lembrete por push — ver push-notifications.js.
         studyReminders: {
             enabled: false,
@@ -109,6 +112,11 @@ const dbService = {
             if (window.app) {
                 window.app.data = data;
             }
+
+            // Reaplica o tema salvo NA CONTA (pode ser diferente do que
+            // estava em cache neste aparelho) — é isso que faz o tema
+            // valer por conta e não por aparelho.
+            window.themeEngine?.syncFromAccount(data.settings?.theme);
 
             saveLocalBackup(userId, data);
 

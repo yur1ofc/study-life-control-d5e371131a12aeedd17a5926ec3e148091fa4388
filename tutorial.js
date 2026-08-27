@@ -13,7 +13,7 @@
   ];
 
   const steps = [
-    { id: 'dashboard', view: 'dashboard', title: 'Bem-vindo ao Study Life Control', text: 'Esse é o seu painel principal. Aqui você acompanha horas estudadas, risco acadêmico, provas e o que precisa de atenção primeiro.', selector: '[data-tutorial="nav-dashboard"]' },
+    { id: 'dashboard', view: 'dashboard', title: 'Bem-vindo ao SLCampus', text: 'Esse é o seu painel principal. Aqui você acompanha horas estudadas, risco acadêmico, provas e o que precisa de atenção primeiro.', selector: '[data-tutorial="nav-dashboard"]' },
     { id: 'mentor', view: 'mentor-ia', title: 'Mentor IA', text: 'Aqui fica o seu assistente inteligente. Ele responde com base nos seus dados reais do site e ajuda a decidir o que estudar e onde você está pior.', selector: '[data-tutorial="nav-mentor"]' },
     { id: 'tarefas', view: 'tarefas', title: 'Tarefas e organização', text: 'Cadastre tarefas, trabalhos e pendências aqui. Isso alimenta as notificações, o plano de estudo e a visão de prioridade.', selector: '[data-tutorial="nav-tarefas"]' },
     { id: 'gamificacao', view: 'gamificacao', title: 'Nível, XP e conquistas', text: 'A gamificação transforma seu progresso em algo visível. Concluir tarefas, revisões e sessões gera XP e pode desbloquear conquistas.', selector: '[data-tutorial="nav-gamificacao"]' },

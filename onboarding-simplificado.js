@@ -309,7 +309,7 @@
         if (wrapper && document.getElementById('slc-onboarding-card')) {
           if (allDone(data)) {
             wrapper.remove();
-            if (typeof showToast === 'function') showToast('🎉 Você completou todos os primeiros passos! Bem-vindo ao Study Life Control.', 'success');
+            if (typeof showToast === 'function') showToast('🎉 Você completou todos os primeiros passos! Bem-vindo ao SLCampus.', 'success');
           } else {
             wrapper.innerHTML = renderChecklistCard(data);
             // Re-bind events

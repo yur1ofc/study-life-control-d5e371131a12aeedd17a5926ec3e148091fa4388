@@ -1,5 +1,5 @@
 {
-  "name": "Study Life Control",
+  "name": "SLCampus",
   "short_name": "SLC",
   "description": "Sistema inteligente para universit\u00e1rios organizarem estudos, tarefas, provas e rotina acad\u00eamica.",
   "start_url": "/",
@@ -9,12 +9,6 @@
   "lang": "pt-BR",
   "orientation": "portrait-primary",
   "icons": [
-    {
-      "src": "favicon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    },
     {
       "src": "icon-192.png",
       "sizes": "192x192",

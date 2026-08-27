@@ -1451,7 +1451,7 @@ class ViewRenderer {
             <div class="config-item">
                 <div class="config-info"><h4>Notificações</h4><p>Receber alertas e lembretes</p></div>
                 <label class="toggle-switch">
-                    <input type="checkbox" ${s.notifications ? 'checked' : ''} id="config-notificacoes">
+                    <input type="checkbox" ${s.studyReminders?.enabled ? 'checked' : ''} id="config-notificacoes">
                     <span class="toggle-slider"></span>
                 </label>
             </div>
@@ -1786,7 +1786,7 @@ class ViewRenderer {
             <div class="config-section-title">ℹ️ Sobre o app</div>
             <div style="display:flex;flex-direction:column;gap:12px;">
                 <div class="card" style="padding:18px;">
-                    <strong style="font-size:1.1rem">Study Life Control</strong>
+                    <strong style="font-size:1.1rem">SLCampus</strong>
                     <p style="color:var(--text-secondary);margin-top:4px">Sistema inteligente de planejamento acadêmico para universitários</p>
                     <p style="margin-top:8px;font-size:.88rem;color:var(--text-tertiary)">Versão 3.0.0 • Open Source</p>
                 </div>

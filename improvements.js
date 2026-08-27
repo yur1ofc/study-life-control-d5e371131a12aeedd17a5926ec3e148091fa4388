@@ -348,7 +348,7 @@
     const grades  = data.grades || [];
 
     const html = `
-      <html><head><title>Study Life Control — Relatório</title>
+      <html><head><title>SLCampus — Relatório</title>
       <style>
         body { font-family: Arial, sans-serif; padding: 32px; color: #1e293b; }
         h1 { font-size: 22px; margin-bottom: 4px; }
@@ -361,7 +361,7 @@
         .media { background:#fef3c7;color:#d97706; }
         .baixa { background:#dcfce7;color:#16a34a; }
       </style></head><body>
-      <h1>📚 Study Life Control</h1>
+      <h1>📚 SLCampus</h1>
       <p style="color:#64748b;font-size:13px;">Relatório gerado em ${new Date().toLocaleDateString('pt-BR')} • ${user.nome || 'Usuário'}</p>
       <h2>Tarefas Pendentes</h2>
       <table><tr><th>Tarefa</th><th>Matéria</th><th>Prazo</th><th>Prioridade</th></tr>

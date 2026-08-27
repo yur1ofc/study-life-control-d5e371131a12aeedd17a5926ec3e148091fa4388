@@ -132,7 +132,7 @@
 <div class="view-header"><h2><i class="fas fa-question-circle"></i> Central de Ajuda</h2></div>
 <div class="lr-help-hero">
   <div class="lr-help-hero-icon">🎓</div>
-  <div><h2>Como podemos ajudar?</h2><p>Tudo que você precisa para aproveitar ao máximo o Study Life Control.</p></div>
+  <div><h2>Como podemos ajudar?</h2><p>Tudo que você precisa para aproveitar ao máximo o SLCampus.</p></div>
 </div>
 <div class="lr-section-title">⚡ Atalhos rápidos</div>
 <div class="lr-shortcut-grid">

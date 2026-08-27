@@ -5,7 +5,7 @@
 // adicione ele aqui também — senão ele só entra no cache dinâmico depois
 // do primeiro acesso online, e falha se o usuário abrir o app offline
 // (ou logo após instalar como PWA) antes disso acontecer.
-const CACHE_VERSION = 'slc-v14';
+const CACHE_VERSION = 'slc-v15';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 
@@ -16,7 +16,7 @@ const STATIC_ASSETS = [
   './style.css',
   './launch-polish.css',
   './manifest.json',
-  './favicon.svg',
+  './logo.png',
   './icon-180.png',
   './icon-192.png',
   './icon-512.png',
@@ -173,10 +173,10 @@ self.addEventListener('push', event => {
   try {
     payload = event.data ? event.data.json() : {};
   } catch (error) {
-    payload = { title: 'Study Life Control', body: event.data ? event.data.text() : 'Você tem um lembrete de estudo.' };
+    payload = { title: 'SLCampus', body: event.data ? event.data.text() : 'Você tem um lembrete de estudo.' };
   }
 
-  const title = payload.title || 'Study Life Control';
+  const title = payload.title || 'SLCampus';
   const options = {
     body: payload.body || '',
     icon: './icon-192.png',

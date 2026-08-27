@@ -11,12 +11,9 @@
   <circle cx="1050" cy="120" r="200" fill="#2563eb" opacity="0.08"/>
   <circle cx="150" cy="520" r="160" fill="#8b5cf6" opacity="0.07"/>
   <!-- Logo icon -->
-  <rect x="80" y="80" width="72" height="72" rx="18" fill="#2563eb"/>
-  <line x1="100" y1="106" x2="132" y2="106" stroke="white" stroke-width="5" stroke-linecap="round"/>
-  <line x1="100" y1="120" x2="132" y2="120" stroke="white" stroke-width="5" stroke-linecap="round"/>
-  <line x1="100" y1="134" x2="122" y2="134" stroke="white" stroke-width="5" stroke-linecap="round"/>
+  <image x="80" y="80" width="72" height="72" href="icon-512.png"/>
   <!-- Main title -->
-  <text x="80" y="260" font-family="'Segoe UI', Arial, sans-serif" font-size="72" font-weight="800" fill="white">Study Life Control</text>
+  <text x="80" y="260" font-family="'Segoe UI', Arial, sans-serif" font-size="72" font-weight="800" fill="white">SLCampus</text>
   <!-- Subtitle -->
   <text x="80" y="330" font-family="'Segoe UI', Arial, sans-serif" font-size="34" fill="#94a3b8">Planejamento acadêmico inteligente para universitários</text>
   <!-- Feature pills -->

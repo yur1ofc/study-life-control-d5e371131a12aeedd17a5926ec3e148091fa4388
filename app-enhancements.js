@@ -74,7 +74,7 @@
     window.addEventListener('appinstalled', () => {
       card.hidden = true;
       deferredInstallPrompt = null;
-      window.showToast?.('Study Life Control instalado no dispositivo!', 'success');
+      window.showToast?.('SLCampus instalado no dispositivo!', 'success');
     });
   }
 

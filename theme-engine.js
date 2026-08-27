@@ -135,7 +135,14 @@
   };
 
   // ── Carrega / salva config ─────────────────────────────────────────────────
+  // Prioriza o tema salvo na CONTA (Firestore, carregado pelo app após o
+  // login) sobre o que está só no localStorage deste aparelho — assim o
+  // tema muda por conta, não por aparelho. O localStorage continua sendo
+  // usado como cache rápido pra pintar o tema certo antes do login carregar
+  // (evita flash de tema errado) e como fallback offline.
   function loadConfig() {
+    const accountTheme = window.app?.data?.settings?.theme;
+    if (accountTheme && accountTheme.preset) return accountTheme;
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       return raw ? JSON.parse(raw) : { preset: 'dark', custom: {} };
@@ -144,6 +151,29 @@
 
   function saveConfig(cfg) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
+    // Sincroniza com a conta, pra valer em qualquer dispositivo logado.
+    if (window.app?.data?.settings && window.dbService && window.auth?.currentUser) {
+      window.app.data.settings.theme = cfg;
+      window.dbService.saveData('settings', window.app.data.settings);
+    }
+  }
+
+  // Chamado pelo database.js assim que os dados da conta terminam de
+  // carregar (login ou troca de conta) — reaplica o tema salvo na conta,
+  // substituindo o que estava só no cache local deste aparelho.
+  function syncFromAccount(accountTheme) {
+    if (!accountTheme || !accountTheme.preset) return;
+    const cfgAtual = loadConfigLocalOnly();
+    if (JSON.stringify(cfgAtual) === JSON.stringify(accountTheme)) return;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(accountTheme));
+    applyPreset(accountTheme.preset, accountTheme.custom || {});
+  }
+
+  function loadConfigLocalOnly() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : { preset: 'dark', custom: {} };
+    } catch { return { preset: 'dark', custom: {} }; }
   }
 
   // ── Aplica vars no :root ───────────────────────────────────────────────────
@@ -160,6 +190,18 @@
     );
     // Garante legibilidade de botões sobre accent-primary
     root.style.setProperty('--btn-text', getContrastColor(vars['--accent-primary'] || '#3b82f6'));
+    // Tamanho da fonte: a maioria dos componentes usa px fixo (não rem),
+    // então só mudar --font-size-base não tinha efeito nenhum na prática.
+    // Aplica como um fator de escala (zoom) no app inteiro, que reescala
+    // tudo de verdade — texto, ícones, espaçamentos.
+    applyFontScale(vars['--font-size-base']);
+  }
+
+  function applyFontScale(fontSizeBase) {
+    const px = parseInt(fontSizeBase) || 15;
+    const scale = px / 15; // 15px é o tamanho "Normal" (padrão)
+    const app = document.getElementById('app') || document.body;
+    if (app) app.style.zoom = scale;
   }
 
   function isColorDark(hex) {
@@ -188,7 +230,7 @@
   function init() {
     const cfg = loadConfig();
     applyPreset(cfg.preset, cfg.custom);
-    window.__themeEngine = { PRESETS, applyPreset, loadConfig, saveConfig, getContrastColor, isColorDark };
+    window.__themeEngine = { PRESETS, applyPreset, loadConfig, saveConfig, syncFromAccount, getContrastColor, isColorDark };
   }
 
   // Aplica ANTES do render para evitar flash
@@ -329,9 +371,10 @@
         cfg.custom = {};
         saveConfig(cfg);
         applyPreset(cfg.preset, {});
-        // Re-render panel
-        const container = document.querySelector('#view-container, .view-content, main');
-        if (window.app?.loadView) window.app.loadView('configuracoes');
+        // Re-renderiza só a aba de Tema (sem voltar pro menu de categorias
+        // das configurações — window.app.loadView('configuracoes') sempre
+        // volta pro menu porque não sabe em qual aba a gente tava).
+        rerenderTemaTab();
       });
     });
 
@@ -357,7 +400,7 @@
       fontSlider.addEventListener('input', () => {
         const val = fontSlider.value + 'px';
         document.documentElement.style.setProperty('--font-size-base', val);
-        document.documentElement.style.fontSize = val;
+        applyFontScale(val);
         if (fontLabel) fontLabel.textContent = val;
         if (!cfg.custom) cfg.custom = {};
         cfg.custom['--font-size-base'] = val;
@@ -393,9 +436,20 @@
       cfg.custom = {};
       saveConfig(cfg);
       applyPreset('dark', {});
-      if (window.app?.loadView) window.app.loadView('configuracoes');
+      rerenderTemaTab();
       if (window.showToast) window.showToast('Tema restaurado para o padrão', 'success');
     });
+  }
+
+  // Re-renderiza a view de configurações direto na aba "tema", sem passar
+  // pelo menu de categorias (loadView('configuracoes') sempre volta pro
+  // menu porque não recebe qual aba estava aberta).
+  function rerenderTemaTab() {
+    const container = document.getElementById('view-container');
+    const app = window.app;
+    if (!container || !app?.viewRenderer) return;
+    container.innerHTML = app.viewRenderer.renderConfiguracoes('tema');
+    app.setupViewEvents?.('configuracoes');
   }
 
   function updatePreviewContrast() {
@@ -446,6 +500,6 @@
   });
 
   // Expõe globalmente
-  window.themeEngine = { renderThemePanel, bindThemePanel, PRESETS, loadConfig, saveConfig, applyPreset, init };
+  window.themeEngine = { renderThemePanel, bindThemePanel, PRESETS, loadConfig, saveConfig, applyPreset, syncFromAccount, init };
 
 })();

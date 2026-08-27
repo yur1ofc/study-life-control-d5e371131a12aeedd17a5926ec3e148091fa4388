@@ -601,6 +601,15 @@ button:active,
     margin-bottom: 20px;
 }
 
+/* Logo do SLCampus (imagem) reaproveitada em vários lugares do app */
+.brand-logo-img {
+    height: 28px;
+    width: auto;
+    object-fit: contain;
+    display: inline-block;
+    vertical-align: middle;
+}
+
 .login-header h1 {
     font-size: 28px;
     font-weight: 700;
@@ -649,6 +658,10 @@ button:active,
 .logo i {
     font-size: 28px;
     color: var(--accent-primary);
+}
+
+.logo .brand-logo-img {
+    height: 30px;
 }
 
 .sidebar-nav {
@@ -4815,6 +4828,7 @@ body.sidebar-open #slc-bottom-nav {
 }
 .login-brand i { font-size: 28px; color: #3b82f6; }
 .login-brand span { font-size: 18px; font-weight: 700; color: #f8fafc; }
+.login-brand .brand-logo-img { height: 34px; }
 .login-headline {
     font-size: 36px;
     font-weight: 800;
@@ -4879,6 +4893,12 @@ body.sidebar-open #slc-bottom-nav {
     -webkit-text-fill-color: transparent;
     background-clip: text;
     margin-bottom: 16px;
+    display: block;
+}
+
+.login-card .login-header .brand-logo-img {
+    height: 56px;
+    margin: 0 auto 16px;
     display: block;
 }
 

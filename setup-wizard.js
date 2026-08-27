@@ -79,7 +79,8 @@
   align-items: center;
   gap: 16px;
 }
-.wiz-logo { font-size: 1.1rem; font-weight: 800; color: var(--accent-primary); white-space: nowrap; }
+.wiz-logo { font-size: 1.1rem; font-weight: 800; color: var(--accent-primary); white-space: nowrap; display: flex; align-items: center; gap: 8px; }
+.wiz-logo .brand-logo-img { height: 24px; }
 .wiz-steps {
   display: flex;
   gap: 4px;
@@ -856,7 +857,7 @@ Regras:
     const html = `
 <div id="slc-wizard">
   <div class="wiz-topbar">
-    <div class="wiz-logo"><i class="fas fa-brain"></i> SLC</div>
+    <div class="wiz-logo"><img src="logo.png" alt="SLCampus" class="brand-logo-img"> SLC</div>
     <div class="wiz-steps">
       ${[1,2,3,4].map(n => {
         let cls = '';

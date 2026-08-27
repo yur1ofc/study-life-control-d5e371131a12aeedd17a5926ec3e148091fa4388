@@ -1,4 +1,4 @@
-# Study Life Control
+# SLCampus
 
 Sistema web para organização acadêmica de universitários, com foco em rotina de estudos, tarefas, provas, grade curricular, aulas, materiais e apoio por IA.
 

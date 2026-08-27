@@ -36,7 +36,7 @@
     try {
       const payload = {
         exportadoEm: new Date().toISOString(),
-        origem: 'Study Life Control',
+        origem: 'SLCampus',
         dados: app.data
       };
 

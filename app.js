@@ -609,10 +609,22 @@ class StudyLifeControl {
                 });
             });
 
-            // Aba Geral
+            // Aba Geral — mesmo interruptor de notificações da aba "Notificações"
+            // (os dois controlam a mesma coisa: settings.studyReminders.enabled)
             document.getElementById('config-notificacoes')?.addEventListener('change', async e => {
-                this.data.settings.notifications = e.target.checked;
-                await dbService.saveData('settings', this.data.settings);
+                const checkbox = e.target;
+                if (checkbox.checked) {
+                    try {
+                        await window.pushNotifications.enable();
+                        window.showToast?.('Notificações ativadas neste dispositivo!', 'success');
+                    } catch (error) {
+                        checkbox.checked = false;
+                        window.showToast?.(error.message || 'Não foi possível ativar as notificações.', 'error');
+                    }
+                } else {
+                    await window.pushNotifications.disable();
+                    window.showToast?.('Notificações desativadas neste dispositivo.', 'success');
+                }
             });
             document.getElementById('config-auto-plan')?.addEventListener('change', async e => {
                 this.data.settings.autoPlan = e.target.checked;
@@ -684,7 +696,7 @@ class StudyLifeControl {
                     .catch(() => document.execCommand('copy'));
             });
 
-            // Aba Calendário — alarmes push
+            // Aba Notificações — alarmes push (mesmo interruptor da aba Geral)
             document.getElementById('config-push-enabled')?.addEventListener('change', async e => {
                 const checkbox = e.target;
                 if (checkbox.checked) {
