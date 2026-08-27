@@ -1,62 +1,67 @@
-// firebase-config.js
-// As credenciais são injetadas pelo Vercel via variáveis de ambiente.
-// NUNCA commite valores reais aqui. Configure no painel do Vercel:
-// Settings → Environment Variables → adicione cada FIREBASE_* abaixo.
+// export-data.js
+// Botão "Exportar dados" na barra lateral — baixa um backup em JSON com
+// tudo que o usuário tem salvo (matérias, tarefas, provas, sessões etc.).
+// Não depende de nenhum serviço externo: é só window.app.data -> arquivo.
 
-const firebaseConfig = {
-  apiKey:            window.__ENV?.FIREBASE_API_KEY             || '',
-  authDomain:        window.__ENV?.FIREBASE_AUTH_DOMAIN         || '',
-  projectId:         window.__ENV?.FIREBASE_PROJECT_ID          || '',
-  storageBucket:     window.__ENV?.FIREBASE_STORAGE_BUCKET      || '',
-  messagingSenderId: window.__ENV?.FIREBASE_MESSAGING_SENDER_ID || '',
-  appId:             window.__ENV?.FIREBASE_APP_ID              || ''
-};
+(function () {
+  'use strict';
 
-const missingFirebaseKeys = Object.entries(firebaseConfig).filter(([, v]) => !v).map(([k]) => k);
+  function buildExportButton() {
+    const footer = document.querySelector('.sidebar-footer');
+    if (!footer || document.getElementById('export-data-btn')) return;
 
-if (missingFirebaseKeys.length) {
-  // Isso acontece quando window.__ENV não foi carregado (env-config.js ausente
-  // em produção, ou build do Vercel não rodou "node inject-env.js"). Em vez de
-  // deixar o Firebase estourar um erro confuso ("auth/invalid-api-key") e
-  // quebrar todos os scripts seguintes com "auth is not defined", mostramos
-  // um aviso claro na tela e criamos objetos "vazios" para não travar o resto.
-  console.error('[SLC] Firebase NÃO inicializado — variáveis de ambiente ausentes:', missingFirebaseKeys.join(', '));
-  console.error('[SLC] Configure as variáveis em Vercel → Settings → Environment Variables e garanta que o Build Command rode "node inject-env.js" (veja vercel.json).');
+    const btn = document.createElement('button');
+    btn.id = 'export-data-btn';
+    btn.className = 'btn-whats-now';
+    btn.style.cssText = 'margin-top:6px;';
+    btn.innerHTML = '<i class="fas fa-download"></i> Exportar meus dados';
+    btn.title = 'Baixa um backup em JSON com tudo que você cadastrou';
+    btn.addEventListener('click', exportData);
 
-  document.addEventListener('DOMContentLoaded', () => {
-    const banner = document.createElement('div');
-    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#b91c1c;color:#fff;padding:14px 18px;font:600 14px/1.4 system-ui,sans-serif;text-align:center;';
-    banner.textContent = 'Erro de configuração: as credenciais do Firebase não foram carregadas. Verifique as variáveis de ambiente no Vercel e o build (env-config.js). Detalhes no console (F12).';
-    document.body.prepend(banner);
-  });
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+      footer.insertBefore(btn, logoutBtn);
+    } else {
+      footer.appendChild(btn);
+    }
+  }
 
-  const noop = () => {};
-  const brokenAuth = {
-    onAuthStateChanged: (cb) => { try { cb(null); } catch (_) {} return noop; },
-    signInWithPopup: () => Promise.reject(new Error('Firebase não configurado.')),
-    signOut: () => Promise.resolve(),
-    setPersistence: () => Promise.resolve(),
-    currentUser: null
-  };
-  const brokenDb = new Proxy({}, { get: () => () => brokenDb });
+  function exportData() {
+    const app = window.app;
+    if (!app || !app.data) {
+      window.showToast?.('Nada para exportar ainda — seus dados ainda não carregaram.', 'error');
+      return;
+    }
 
-  window.auth = brokenAuth;
-  window.db = brokenDb;
-  window.googleProvider = {};
-} else {
-  firebase.initializeApp(firebaseConfig);
+    try {
+      const payload = {
+        exportadoEm: new Date().toISOString(),
+        origem: 'SLCampus',
+        dados: app.data
+      };
 
-  const auth = firebase.auth();
-  const db   = firebase.firestore();
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const nomeArquivo = `study-life-control-backup-${new Date().toISOString().slice(0, 10)}.json`;
 
-  const googleProvider = new firebase.auth.GoogleAuthProvider();
-  googleProvider.setCustomParameters({ prompt: 'select_account' });
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = nomeArquivo;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
 
-  window.auth           = auth;
-  window.db             = db;
-  window.googleProvider = googleProvider;
+      window.showToast?.('Backup baixado com sucesso!', 'success');
+    } catch (error) {
+      console.error('[export-data] Erro ao exportar:', error);
+      window.showToast?.('Não foi possível exportar os dados. Tente novamente.', 'error');
+    }
+  }
 
-  auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch((error) => {
-    console.warn('Não foi possível ativar persistência local de login:', error);
-  });
-}
+  // O botão "Exportar meus dados" não é mais injetado na barra lateral:
+  // ele duplicava o botão "Exportar todos os dados (JSON)" que já existe em
+  // Configurações > Dados (app.exportarDados()). exportData() fica disponível
+  // aqui só como utilitário interno, sem criar um botão duplicado.
+  window.__exportDataUtil = exportData;
+})();

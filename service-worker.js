@@ -1,205 +1,216 @@
-// service-worker.js — Cache inteligente com estratégias por tipo de recurso
-//
-// IMPORTANTE: esta lista precisa ficar em sincronia com os <script> do
-// index.html. Toda vez que um arquivo .js novo for adicionado ao site,
-// adicione ele aqui também — senão ele só entra no cache dinâmico depois
-// do primeiro acesso online, e falha se o usuário abrir o app offline
-// (ou logo após instalar como PWA) antes disso acontecer.
-const CACHE_VERSION = 'slc-v15';
-const STATIC_CACHE  = `${CACHE_VERSION}-static`;
-const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
+// security.js — Rate limiting, sanitização e proteção de dados sensíveis
+// Carregue antes de app.js no index.html
 
-// Apenas assets locais no cache estático — nunca CDNs externos
-const STATIC_ASSETS = [
-  './',
-  './index.html',
-  './style.css',
-  './launch-polish.css',
-  './manifest.json',
-  './logo.png',
-  './icon-180.png',
-  './icon-192.png',
-  './icon-512.png',
-  './theme-engine.js',
-  './env-config.js',
-  './curriculum-catalog.js',
-  './firebase-config.js',
-  './security.js',
-  './utils.js',
-  './auth.js',
-  './database.js',
-  './daily-log.js',
-  './class-diary.js',
-  './diary-view.js',
-  './review-system.js',
-  './grade-calculator.js',
-  './smart-dashboard.js',
-  './ai-assistant.js',
-  './schedule.js',
-  './views.js',
-  './tutorial.js',
-  './app.js',
-  './semester-finish.js',
-  './setup-wizard.js',
-  './launch-ready.js',
-  './script.js',
-  './dashboard-prioritario.js',
-  './onboarding-simplificado.js',
-  './schedule-ia-import.js',
-  './subjects-curriculum-sync.js',
-  './grade-structure-modal.js',
-  './grade-ia-import.js',
-  './setup-onboarding-enhancer.js',
-  './app-enhancements.js',
-  './xp-widget.js',
-  './calendar-feed.js',
-  './push-notifications.js',
-  './export-data.js',
-  './feedback-widget.js',
-  './launch-polish.js',
-  './improvements.js',
-  './ux-improvements.js'
-];
+(function () {
+  'use strict';
 
-// Origens externas: busca sempre da rede, sem interceptar
-const EXTERNAL_ORIGINS = [
-  'https://www.gstatic.com',
-  'https://apis.google.com',
-  'https://fonts.googleapis.com',
-  'https://fonts.gstatic.com',
-  'https://cdnjs.cloudflare.com',
-  'https://firestore.googleapis.com',
-  'https://identitytoolkit.googleapis.com',
-  'https://securetoken.googleapis.com',
-  'https://lh3.googleusercontent.com',
-];
+  // ─── 1. Rate Limiting para operações de escrita no Firestore ─────────────
+  //
+  // Impede que um bug ou usuário malicioso dispare centenas de writes/segundo,
+  // evitando custo inesperado e esgotamento de cota do Firebase gratuito.
 
-function isExternal(url) {
-  return EXTERNAL_ORIGINS.some(origin => url.startsWith(origin));
-}
-
-function isFirebase(url) {
-  return url.includes('firebaseio.com') ||
-         url.includes('googleapis.com') ||
-         url.includes('firebaseapp.com');
-}
-
-// env-config.js carrega as variáveis de ambiente (inclusive VAPID_PUBLIC_KEY)
-// injetadas NO BUILD. Elas podem mudar entre deploys mesmo quando nenhum
-// arquivo de código muda — e como o service-worker.js não muda de bytes
-// nesses casos, o navegador nunca reinstala o SW e cache-first serviria
-// esse arquivo desatualizado para sempre. Por isso ele é tratado à parte:
-// tenta a rede primeiro, só cai pro cache se estiver offline.
-const NETWORK_FIRST_ASSETS = ['/env-config.js'];
-
-function isNetworkFirst(url) {
-  return NETWORK_FIRST_ASSETS.some(path => url.endsWith(path));
-}
-
-// ── Install: pré-cacheia assets locais ──────────────────────────────────────
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(STATIC_CACHE)
-      .then(cache => cache.addAll(STATIC_ASSETS))
-      .catch(() => null)
-  );
-  self.skipWaiting();
-});
-
-// ── Activate: limpa caches antigos ──────────────────────────────────────────
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
-        keys
-          .filter(k => k !== STATIC_CACHE && k !== DYNAMIC_CACHE)
-          .map(k => caches.delete(k))
-      )
-    )
-  );
-  self.clients.claim();
-});
-
-// ── Fetch: estratégia por tipo de recurso ───────────────────────────────────
-self.addEventListener('fetch', event => {
-  const { request } = event;
-  const url = request.url;
-
-  // Ignora requisições não-GET
-  if (request.method !== 'GET') return;
-
-  // NUNCA intercepta recursos externos — deixa o browser buscar diretamente
-  if (isExternal(url) || isFirebase(url)) return;
-
-  // Ignora URLs de extensões do browser
-  if (url.startsWith('chrome-extension://') || url.startsWith('moz-extension://')) return;
-
-  // env-config.js: rede primeiro (ver comentário acima de NETWORK_FIRST_ASSETS)
-  if (isNetworkFirst(url)) {
-    event.respondWith(
-      fetch(request)
-        .then(response => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(STATIC_CACHE).then(cache => cache.put(request, clone));
-          }
-          return response;
-        })
-        .catch(() => caches.match(request))
-    );
-    return;
-  }
-
-  // Assets locais: Cache First (serve do cache, atualiza em background)
-  event.respondWith(
-    caches.match(request).then(cached => {
-      const fetchPromise = fetch(request).then(response => {
-        if (response && response.status === 200) {
-          const clone = response.clone();
-          caches.open(DYNAMIC_CACHE).then(cache => cache.put(request, clone));
-        }
-        return response;
-      }).catch(() => null);
-
-      return cached || fetchPromise || caches.match('./index.html');
-    })
-  );
-});
-
-// ── Push: recebe o alarme mandado por api/send-reminders.js e mostra a
-// notificação, mesmo com o app fechado ─────────────────────────────────────
-self.addEventListener('push', event => {
-  let payload = {};
-  try {
-    payload = event.data ? event.data.json() : {};
-  } catch (error) {
-    payload = { title: 'SLCampus', body: event.data ? event.data.text() : 'Você tem um lembrete de estudo.' };
-  }
-
-  const title = payload.title || 'SLCampus';
-  const options = {
-    body: payload.body || '',
-    icon: './icon-192.png',
-    badge: './icon-192.png',
-    tag: payload.tag || 'slc-reminder',
-    renotify: !!payload.tag,
-    data: { url: payload.url || './' }
+  const RATE_LIMITS = {
+    saveData:    { max: 60,  windowMs: 60_000  },  // 60 saves por minuto
+    saveAllData: { max: 10,  windowMs: 60_000  },  // 10 saves completos por minuto
+    aiAsk:       { max: 40,  windowMs: 60_000  },  // 40 perguntas à IA por minuto
+    addItem:     { max: 120, windowMs: 60_000  },  // 120 itens adicionados por minuto
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
-});
+  const _rateLimitCounters = {};
 
-// ── Clique na notificação: foca a aba já aberta, ou abre uma nova ──────────
-self.addEventListener('notificationclick', event => {
-  event.notification.close();
-  const targetUrl = event.notification.data?.url || './';
+  function checkRateLimit(operation) {
+    const rule = RATE_LIMITS[operation];
+    if (!rule) return true;
 
-  event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-      for (const client of list) {
-        if ('focus' in client) return client.focus();
+    const now = Date.now();
+    if (!_rateLimitCounters[operation]) {
+      _rateLimitCounters[operation] = { count: 0, windowStart: now };
+    }
+
+    const c = _rateLimitCounters[operation];
+
+    if (now - c.windowStart > rule.windowMs) {
+      c.count = 0;
+      c.windowStart = now;
+    }
+
+    c.count++;
+
+    if (c.count > rule.max) {
+      console.warn(`[SLC Security] Rate limit atingido para "${operation}": ${c.count}/${rule.max} em ${rule.windowMs / 1000}s`);
+      if (window.showToast) {
+        window.showToast('Muitas operações em pouco tempo. Aguarde um momento.', 'warning');
       }
-      if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
-    })
-  );
-});
+      return false;
+    }
+
+    return true;
+  }
+
+  window.checkRateLimit = checkRateLimit;
+
+  // ─── 2. Sanitização de inputs (previne XSS via innerHTML) ────────────────
+
+  function sanitizeString(value) {
+    if (typeof value !== 'string') return value;
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#x27;')
+      .replace(/\//g, '&#x2F;');
+  }
+
+  // Sanitiza recursivamente um objeto antes de salvar no Firestore
+  function sanitizeData(obj) {
+    if (obj === null || obj === undefined) return obj;
+    if (typeof obj === 'string') return sanitizeString(obj);
+    if (Array.isArray(obj)) return obj.map(sanitizeData);
+    if (typeof obj === 'object') {
+      const clean = {};
+      for (const [key, value] of Object.entries(obj)) {
+        clean[key] = sanitizeData(value);
+      }
+      return clean;
+    }
+    return obj;
+  }
+
+  window.sanitizeData   = sanitizeData;
+  window.sanitizeString = sanitizeString;
+
+  // ─── 3. Patch no dbService para aplicar rate limiting automaticamente ────
+  //
+  // Aguarda o dbService ser criado e aplica os patches de forma transparente.
+
+  function patchDbService() {
+    if (!window.dbService) return;
+    if (window.dbService.__securityPatched) return;
+
+    const original = {
+      saveData:    window.dbService.saveData.bind(window.dbService),
+      saveAllData: window.dbService.saveAllData.bind(window.dbService),
+      addItem:     window.dbService.addItem.bind(window.dbService),
+    };
+
+    window.dbService.saveData = function (field, data) {
+      if (!checkRateLimit('saveData')) return Promise.resolve(false);
+      return original.saveData(field, data);
+    };
+
+    window.dbService.saveAllData = function (dataOverride) {
+      if (!checkRateLimit('saveAllData')) return Promise.resolve(false);
+      return original.saveAllData(dataOverride);
+    };
+
+    window.dbService.addItem = function (collection, item) {
+      if (!checkRateLimit('addItem')) return Promise.resolve(false);
+      return original.addItem(collection, item);
+    };
+
+    window.dbService.__securityPatched = true;
+    console.info('[SLC Security] dbService protegido com rate limiting.');
+  }
+
+  // ─── 4. Patch na IA para rate limiting de perguntas ─────────────────────
+
+  function patchAIAssistant() {
+    if (!window.aiAssistant) return;
+    if (window.aiAssistant.__securityPatched) return;
+
+    const originalAsk = window.aiAssistant.ask.bind(window.aiAssistant);
+    const originalAskRich = window.aiAssistant.askRich
+      ? window.aiAssistant.askRich.bind(window.aiAssistant)
+      : null;
+
+    window.aiAssistant.ask = function (pergunta) {
+      if (!checkRateLimit('aiAsk')) {
+        return Promise.resolve('Muitas perguntas em pouco tempo. Aguarde alguns segundos e tente novamente.');
+      }
+      return originalAsk(pergunta);
+    };
+
+    if (originalAskRich) {
+      window.aiAssistant.askRich = function (pergunta) {
+        if (!checkRateLimit('aiAsk')) {
+          return Promise.resolve({
+            text: 'Muitas perguntas em pouco tempo. Aguarde alguns segundos.',
+            actions: [],
+            memory: []
+          });
+        }
+        return originalAskRich(pergunta);
+      };
+    }
+
+    window.aiAssistant.__securityPatched = true;
+    console.info('[SLC Security] aiAssistant protegido com rate limiting.');
+  }
+
+  // ─── 5. Proteção contra clickjacking via JS (complementa o X-Frame-Options) ──
+
+  if (window.top !== window.self) {
+    console.warn('[SLC Security] Tentativa de embed em iframe detectada. Redirecionando.');
+    window.top.location = window.self.location;
+  }
+
+  // ─── 6. Proteção de console em produção ─────────────────────────────────
+  //
+  // Evita que usuários vejam dados sensíveis de outros usuários em erros de console
+  // (ainda imprime warnings de segurança do próprio SLC).
+
+  const isProduction = !['localhost', '127.0.0.1'].includes(location.hostname);
+
+  if (isProduction) {
+    const _warn  = console.warn.bind(console);
+    const _error = console.error.bind(console);
+
+    console.log   = () => {};
+    console.info  = () => {};
+    console.debug = () => {};
+
+    // Mantém warn e error mas remove dados de usuário de mensagens longas
+    console.warn = (...args) => {
+      const msg = args.map(a => (typeof a === 'object' ? '[object]' : a)).join(' ');
+      _warn('[SLC]', msg.slice(0, 200));
+    };
+
+    console.error = (...args) => {
+      const msg = args.map(a => (typeof a === 'object' ? '[object]' : a)).join(' ');
+      _error('[SLC]', msg.slice(0, 200));
+    };
+  }
+
+  // ─── 7. Aplicar patches após carregamento dos módulos ───────────────────
+
+  // Tenta aplicar imediatamente; se os módulos ainda não carregaram,
+  // aguarda o evento DOMContentLoaded e tenta novamente com polling.
+  function tryPatch() {
+    patchDbService();
+    patchAIAssistant();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      tryPatch();
+      // Polling por até 5s para garantir que módulos carregados assincronamente sejam patcheados
+      let attempts = 0;
+      const interval = setInterval(() => {
+        tryPatch();
+        attempts++;
+        if (attempts >= 10) clearInterval(interval);
+      }, 500);
+    });
+  } else {
+    tryPatch();
+    let attempts = 0;
+    const interval = setInterval(() => {
+      tryPatch();
+      attempts++;
+      if (attempts >= 10) clearInterval(interval);
+    }, 500);
+  }
+
+  console.info('[SLC Security] Módulo de segurança carregado.');
+})();

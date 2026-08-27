@@ -1,405 +1,1130 @@
-/**
- * launch-ready.js
- * Resolve tudo que faltava antes do lançamento:
- *  1. Tela de Ajuda (view 'ajuda')
- *  2. Tela de Situação Acadêmica (view 'situacao-academica')
- *  3. Modal de boas-vindas pós-setup
- *  4. Empty states do dashboard para usuário novo
- */
-(function () {
-  'use strict';
-  const esc = v => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SLCampus - Sistema Inteligente para Universitários</title>
+    <meta name="description" content="Organize estudos, tarefas, provas, hábitos e rotina acadêmica em um painel inteligente feito para universitários.">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta property="og:title" content="SLCampus">
+    <meta property="og:description" content="Planejamento acadêmico inteligente para universitários.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://slcampus.vercel.app">
+    <meta property="og:image" content="https://slcampus.vercel.app/og-image.svg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="SLCampus">
+    <meta name="twitter:description" content="Planejamento acadêmico inteligente para universitários.">
+    <meta name="twitter:image" content="https://slcampus.vercel.app/og-image.svg">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon-192.png" type="image/png">
+    <!-- iOS não lê SVG nem o manifest para o ícone de tela inicial — precisa deste PNG -->
+    <link rel="apple-touch-icon" href="icon-180.png">
+    <!-- Preconnect: acelera o popup do Google e o carregamento de fontes/ícones -->
+    <link rel="preconnect" href="https://accounts.google.com">
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-  /* ── Estilos ────────────────────────────────────────────────── */
-  function injectStyles() {
-    if (document.getElementById('lr-styles')) return;
-    const s = document.createElement('style');
-    s.id = 'lr-styles';
-    s.textContent = `
-#lr-welcome-modal{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)}
-.lr-welcome-card{background:var(--bg-secondary);border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:40px 32px;max-width:480px;width:100%;text-align:center;box-shadow:var(--card-shadow);animation:lr-pop .3s cubic-bezier(.34,1.56,.64,1)}
-@keyframes lr-pop{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
-.lr-welcome-emoji{font-size:3rem;margin-bottom:16px;display:block}
-.lr-welcome-card h2{font-size:1.4rem;font-weight:800;color:var(--text-primary);margin-bottom:8px}
-.lr-welcome-card p{color:var(--text-secondary);font-size:.92rem;line-height:1.6;margin-bottom:22px}
-.lr-welcome-steps{display:flex;flex-direction:column;gap:10px;text-align:left;margin-bottom:24px}
-.lr-welcome-step{display:flex;align-items:center;gap:12px;background:var(--bg-tertiary);border-radius:var(--radius-sm);padding:12px 14px;cursor:pointer;border:1.5px solid transparent;transition:border-color .2s}
-.lr-welcome-step:hover{border-color:var(--accent-primary)}
-.lr-welcome-step-icon{font-size:1.3rem;width:36px;height:36px;background:var(--bg-secondary);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.lr-welcome-step-text strong{display:block;color:var(--text-primary);font-size:.88rem}
-.lr-welcome-step-text span{color:var(--text-secondary);font-size:.8rem}
-.lr-welcome-close{width:100%;padding:13px;background:var(--accent-primary);border:none;border-radius:var(--radius-sm);color:#fff;font-weight:800;font-size:1rem;cursor:pointer;transition:opacity .2s}
-.lr-welcome-close:hover{opacity:.85}
-.lr-help-hero{background:linear-gradient(135deg,var(--bg-secondary) 0%,#1a2540 100%);border:1px solid var(--border);border-radius:var(--radius-lg);padding:28px;margin-bottom:24px;display:flex;align-items:center;gap:20px}
-.lr-help-hero-icon{font-size:2.8rem}
-.lr-help-hero h2{font-size:1.3rem;font-weight:800;color:var(--text-primary);margin-bottom:4px}
-.lr-help-hero p{color:var(--text-secondary);font-size:.9rem}
-.lr-section-title{font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent-primary);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
-.lr-shortcut-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:28px}
-.lr-shortcut-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;cursor:pointer;transition:border-color .2s}
-.lr-shortcut-card:hover{border-color:var(--accent-primary)}
-.lr-shortcut-card .icon{font-size:1.3rem;margin-bottom:6px;display:block}
-.lr-shortcut-card strong{display:block;color:var(--text-primary);font-size:.88rem;margin-bottom:2px}
-.lr-shortcut-card span{color:var(--text-secondary);font-size:.78rem}
-.lr-ia-prompts{display:flex;flex-direction:column;gap:8px;margin-bottom:28px}
-.lr-ia-prompt{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;cursor:pointer;font-size:.9rem;color:var(--text-secondary);transition:all .2s;display:flex;align-items:center;gap:10px}
-.lr-ia-prompt:hover{border-color:var(--accent-secondary);color:var(--text-primary)}
-.lr-ia-prompt::before{content:'💬';flex-shrink:0}
-.lr-faq-item{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px;overflow:hidden}
-.lr-faq-q{padding:14px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:.92rem;font-weight:600;color:var(--text-primary);user-select:none;transition:background .2s}
-.lr-faq-q:hover{background:var(--bg-tertiary)}
-.lr-faq-arrow{color:var(--text-tertiary);transition:transform .2s;font-size:.82rem}
-.lr-faq-item.open .lr-faq-arrow{transform:rotate(180deg)}
-.lr-faq-a{display:none;padding:0 16px 14px;color:var(--text-secondary);font-size:.88rem;line-height:1.7;border-top:1px solid var(--border)}
-.lr-faq-item.open .lr-faq-a{display:block}
-.lr-restart-btn{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;background:var(--bg-tertiary);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);font-size:.88rem;font-weight:600;cursor:pointer;transition:all .2s;text-decoration:none}
-.lr-restart-btn:hover{border-color:var(--accent-primary);color:var(--text-primary)}
-.lr-sa-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-bottom:24px}
-.lr-sa-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-md);padding:18px}
-.lr-sa-card-header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
-.lr-sa-card-icon{font-size:1.2rem}
-.lr-sa-card-title{font-weight:700;color:var(--text-primary);font-size:.92rem}
-.lr-sa-stat{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)}
-.lr-sa-stat:last-child{border-bottom:none}
-.lr-sa-stat-label{color:var(--text-secondary);font-size:.85rem}
-.lr-sa-stat-val{font-weight:700;color:var(--text-primary);font-size:.9rem}
-.lr-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:99px;font-size:.76rem;font-weight:700}
-.lr-badge.good{background:rgba(16,185,129,.15);color:var(--accent-success)}
-.lr-badge.warn{background:rgba(245,158,11,.15);color:var(--accent-warning)}
-.lr-badge.bad{background:rgba(239,68,68,.15);color:var(--accent-danger)}
-.lr-risk-bar{height:6px;background:var(--border);border-radius:99px;margin:8px 0}
-.lr-risk-fill{height:100%;border-radius:99px;transition:width .5s}
-.lr-risk-low .lr-risk-fill{background:var(--accent-success)}
-.lr-risk-med .lr-risk-fill{background:var(--accent-warning)}
-.lr-risk-high .lr-risk-fill{background:var(--accent-danger)}
-.lr-empty-hero{text-align:center;padding:48px 24px;background:var(--bg-secondary);border:1.5px dashed var(--border);border-radius:var(--radius-lg);margin-bottom:20px}
-.lr-empty-hero .lr-ei{font-size:3rem;margin-bottom:14px;display:block}
-.lr-empty-hero h3{font-size:1.2rem;font-weight:800;color:var(--text-primary);margin-bottom:8px}
-.lr-empty-hero p{color:var(--text-secondary);font-size:.9rem;margin-bottom:22px;max-width:340px;margin-left:auto;margin-right:auto}
-.lr-empty-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
-.lr-action{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:var(--radius-sm);font-size:.88rem;font-weight:700;cursor:pointer;transition:opacity .2s;border:none;text-decoration:none}
-.lr-action.primary{background:var(--accent-primary);color:#fff}
-.lr-action.secondary{background:var(--bg-tertiary);border:1.5px solid var(--border);color:var(--text-primary)}
-.lr-action:hover{opacity:.85}
-`;
-    document.head.appendChild(s);
-  }
+    <!-- Motor de tema: carrega antes de tudo para evitar flash -->
+    <script src="theme-engine.js"></script>
+    <!-- Credenciais injetadas no build pelo inject-env.js -->
+    <script src="env-config.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="curriculum-catalog.js"></script>
+</head>
+<body>
+    <div id="app">
+        <div id="loading-screen" class="loading-container" style="display: none;">
+            <div class="loading-spinner"></div>
+            <p id="loading-text">Carregando seu painel acadêmico...</p>
+        </div>
 
-  /* ── Navegação ───────────────────────────────────────────────── */
-  function navigateTo(view) {
-    if (window.app?.loadView) {
-      window.app.loadView(view);
-      document.querySelectorAll('.nav-item').forEach(n =>
-        n.classList.toggle('active', n.dataset.view === view));
-    }
-  }
-  function attachGoto(container) {
-    container.querySelectorAll('[data-goto]').forEach(el =>
-      el.addEventListener('click', () => navigateTo(el.dataset.goto)));
-  }
+        <div id="network-banner" class="network-banner" hidden>
+            <i class="fas fa-wifi"></i>
+            <span id="network-banner-text">Você está offline. Algumas ações podem ser salvas localmente.</span>
+        </div>
 
-  /* ── Tela de Ajuda ──────────────────────────────────────────── */
-  function renderHelp() {
-    const faqs = [
-      { q: 'Como adiciono minhas matérias?', a: 'Vá em <strong>Matérias</strong> no menu lateral → clique em "+ Adicionar Matéria" → preencha nome, dificuldade, peso e nota desejada. Cada matéria aparece nas sessões, tarefas e no Mentor IA.' },
-      { q: 'Como importo minha grade curricular?', a: 'Vá em <strong>Grade Curricular</strong> → clique em "Importar Grade". Use o modo IA: copie o prompt, abra o ChatGPT ou Claude, envie com o PDF ou foto da grade da faculdade, cole o JSON gerado de volta no site.' },
-      { q: 'Como registro uma sessão de estudo?', a: 'Vá em <strong>Sessões de Estudo</strong> → "+ Nova Sessão" → selecione matéria, data e duração. As sessões alimentam o Dashboard, o streak e o Mentor IA.' },
-      { q: 'O que é o Modo Foco?', a: 'Um timer Pomodoro integrado. Vá em <strong>Modo Foco</strong>, selecione a matéria, defina o tempo e comece. Ao concluir, a sessão é registrada automaticamente.' },
-      { q: 'O que é o Mapa de Aprendizado?', a: 'Mostra todos os tópicos das suas matérias com status de domínio (não iniciado, estudando, dominado). Atualize conforme revisa os conteúdos — isso melhora as sugestões do Mentor IA.' },
-      { q: 'O Mentor IA usa alguma API paga?', a: 'Não! O Mentor IA é 100% local — ele usa seus dados cadastrados (matérias, sessões, provas, tarefas) para gerar respostas inteligentes sem custo nenhum para você.' },
-      { q: 'Posso usar no celular?', a: 'Sim! É um PWA. No celular, acesse pelo navegador → toque em "Adicionar à tela inicial" para ter um ícone como app instalado, inclusive offline.' },
-      { q: 'Meus dados ficam salvos onde?', a: 'No Firebase, vinculados à sua conta Google. Sincroniza automaticamente entre dispositivos com o mesmo login. Você pode exportar um backup em Configurações.' },
-      { q: 'O site armazena minha senha?', a: 'Nunca. O login é via Google (OAuth) — o site não vê sua senha em nenhum momento.' },
-      { q: 'Encontrei um bug. Como reporto?', a: 'O projeto é open-source no GitHub. Abra uma Issue descrevendo o problema — contribuições são bem-vindas!' },
-    ];
-    const shortcuts = [
-      { icon:'📚', label:'Matérias', desc:'Adicione as disciplinas do semestre', view:'materias' },
-      { icon:'⏱️', label:'Sessões', desc:'Registre horas de estudo', view:'sessoes' },
-      { icon:'✅', label:'Tarefas', desc:'Organize pendências', view:'tarefas' },
-      { icon:'📝', label:'Provas', desc:'Nunca esqueça uma prova', view:'provas' },
-      { icon:'🎯', label:'Modo Foco', desc:'Timer Pomodoro integrado', view:'foco' },
-      { icon:'🧠', label:'Mentor IA', desc:'Pergunte o que estudar', view:'mentor-ia' },
-    ];
-    const prompts = [
-      'O que eu deveria estudar hoje?',
-      'Como estou na matéria mais difícil?',
-      'Tenho alguma prova ou tarefa atrasada?',
-      'Monte um plano de estudo para essa semana',
-      'Quais matérias estão com risco de reprovação?',
-      'Resumo da minha semana acadêmica',
-    ];
-    return `
-<div class="view-header"><h2><i class="fas fa-question-circle"></i> Central de Ajuda</h2></div>
-<div class="lr-help-hero">
-  <div class="lr-help-hero-icon">🎓</div>
-  <div><h2>Como podemos ajudar?</h2><p>Tudo que você precisa para aproveitar ao máximo o SLCampus.</p></div>
-</div>
-<div class="lr-section-title">⚡ Atalhos rápidos</div>
-<div class="lr-shortcut-grid">
-  ${shortcuts.map(s=>`<div class="lr-shortcut-card" data-goto="${esc(s.view)}"><span class="icon">${s.icon}</span><strong>${esc(s.label)}</strong><span>${esc(s.desc)}</span></div>`).join('')}
-</div>
-<div class="lr-section-title">🧠 Perguntas sugeridas para o Mentor IA</div>
-<div class="lr-ia-prompts">
-  ${prompts.map(p=>`<div class="lr-ia-prompt" data-ia-prompt="${esc(p)}">${esc(p)}</div>`).join('')}
-</div>
-<div class="lr-section-title">❓ Perguntas frequentes</div>
-<div id="lr-faq-list">
-  ${faqs.map((f,i)=>`
-  <div class="lr-faq-item" id="lr-faq-${i}">
-    <div class="lr-faq-q" data-faq="${i}">${esc(f.q)}<i class="fas fa-chevron-down lr-faq-arrow"></i></div>
-    <div class="lr-faq-a">${f.a}</div>
-  </div>`).join('')}
-</div>
-<div style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;">
-  <button class="lr-restart-btn" id="lr-restart-tutorial"><i class="fas fa-play-circle"></i> Reiniciar tutorial</button>
-  <a class="lr-restart-btn" href="https://github.com/yur1ofc/study-life-control" target="_blank" rel="noopener"><i class="fab fa-github"></i> GitHub</a>
-</div>`;
-  }
+        <div id="pwa-install-card" class="pwa-install-card" hidden>
+            <div>
+                <strong>Instalar app</strong>
+                <p>Abra o SLCampus como app no celular ou PC.</p>
+            </div>
+            <div class="pwa-install-actions">
+                <button id="pwa-install-btn" class="btn-primary">Instalar</button>
+                <button id="pwa-install-close" class="btn-secondary">Agora não</button>
+            </div>
+        </div>
 
-  function attachHelpEvents(c) {
-    c.querySelectorAll('.lr-faq-q').forEach(btn =>
-      btn.addEventListener('click', () => document.getElementById(`lr-faq-${btn.dataset.faq}`)?.classList.toggle('open')));
-    c.querySelectorAll('.lr-ia-prompt').forEach(el =>
-      el.addEventListener('click', () => {
-        navigateTo('mentor-ia');
-        setTimeout(() => {
-          const inp = document.querySelector('#mentor-input,textarea[placeholder*="pergunt"],.mentor-input');
-          if (inp) { inp.value = el.dataset.iaPrompt || el.textContent.trim(); inp.focus(); }
-        }, 400);
-      }));
-    c.querySelector('#lr-restart-tutorial')?.addEventListener('click', () =>
-      window.startTutorial?.() || window.tutorial?.start?.());
-    attachGoto(c);
-  }
+        <div id="login-screen" class="login-container">
+            <!-- Painel esquerdo: features -->
+            <div class="login-features-panel">
+                <div class="login-brand">
+                    <img src="logo.png" alt="SLCampus" class="brand-logo-img">
+                    <span>SLC</span>
+                </div>
+                <h1 class="login-headline">Organize sua vida<br><span>acadêmica</span> de verdade.</h1>
+                <p class="login-subline">Tudo que um universitário precisa em um painel inteligente.</p>
+                <ul class="login-features-list">
+                    <li><div class="feat-icon">🤖</div><span>Mentor IA que analisa seus dados e sugere o que estudar agora</span></li>
+                    <li><div class="feat-icon">📊</div><span>Dashboard com gráficos de horas, notas e atividade</span></li>
+                    <li><div class="feat-icon">📅</div><span>Grade horária, provas, tarefas e sessões de estudo</span></li>
+                    <li><div class="feat-icon">🎯</div><span>Modo Foco com timer Pomodoro integrado</span></li>
+                    <li><div class="feat-icon">☁️</div><span>Sincronização em tempo real entre dispositivos</span></li>
+                </ul>
+            </div>
+            <!-- Painel direito: login -->
+            <div class="login-right-panel">
+                <div class="login-card">
+                    <div class="login-header">
+                        <img src="logo.png" alt="SLCampus" class="brand-logo-img">
+                        <h1>Bem-vindo de volta</h1>
+                        <p>Entre para acessar seu painel acadêmico</p>
+                    </div>
+                    <div class="login-body">
+                        <button class="btn-google" id="login-google">
+                            <i class="fab fa-google"></i>
+                            Entrar com Google
+                        </button>
+                        <div id="login-error-msg" style="display:none;margin-top:14px;padding:10px 14px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);border-radius:10px;color:#ef4444;font-size:.88rem;text-align:center;"></div>
+                        <p style="margin-top:14px;font-size:.76rem;color:#64748b;text-align:center;display:flex;align-items:center;justify-content:center;gap:6px;"><i class="fas fa-lock" style="font-size:.7rem;"></i> Seus dados ficam só na sua conta — ninguém mais tem acesso a eles.</p>
+                        <p style="margin-top:8px;font-size:.72rem;color:#475569;text-align:center;">Ao entrar, você concorda com o uso dos dados para fins acadêmicos pessoais.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-  /* ── Situação Acadêmica ──────────────────────────────────────── */
-  function renderSituacaoAcademica() {
-    const app = window.app;
-    if (!app) return '<p>Carregando...</p>';
-    const subjects = app.data?.subjects || [];
-    const sessions = app.data?.sessions || [];
-    const tasks    = app.data?.tasks    || [];
-    const exams    = app.data?.exams    || [];
-    const now = new Date();
+        <div id="setup-screen" class="setup-container" style="display: none;">
+            <div class="setup-card">
+                <div class="setup-header">
+                    <i class="fas fa-rocket"></i>
+                    <h1>Configuração Inicial</h1>
+                    <p>Vamos personalizar sua experiência</p>
+                </div>
 
-    if (!subjects.length) return `
-<div class="view-header"><h2><i class="fas fa-heartbeat"></i> Situação Acadêmica</h2></div>
-<div class="lr-empty-hero"><span class="lr-ei">📊</span><h3>Nenhuma matéria cadastrada ainda</h3>
-<p>Adicione suas matérias do semestre para ver sua situação acadêmica completa.</p>
-<div class="lr-empty-actions"><button class="lr-action primary" data-goto="materias"><i class="fas fa-plus"></i> Adicionar Matérias</button></div></div>`;
+                <form id="setup-form" class="setup-form">
+                    <div class="form-section">
+                        <h2><i class="fas fa-user"></i> Informações Básicas</h2>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Nome completo</label>
+                                <input type="text" id="nome" placeholder="Digite seu nome" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Curso</label>
+                                <input type="text" id="curso" placeholder="Ex: Engenharia Civil" required>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Universidade</label>
+                                <input type="text" id="universidade" placeholder="Nome da universidade" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Semestre atual</label>
+                                <select id="semestre" required>
+                                    <option value="">Selecione</option>
+                                    <option value="1">1º Semestre</option>
+                                    <option value="2">2º Semestre</option>
+                                    <option value="3">3º Semestre</option>
+                                    <option value="4">4º Semestre</option>
+                                    <option value="5">5º Semestre</option>
+                                    <option value="6">6º Semestre</option>
+                                    <option value="7">7º Semestre</option>
+                                    <option value="8">8º Semestre</option>
+                                    <option value="9">9º Semestre</option>
+                                    <option value="10">10º Semestre</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
 
-    const horasPorMateria = {};
-    subjects.forEach(s => { horasPorMateria[s.nome] = 0; });
-    sessions.filter(s => s.concluida).forEach(s => {
-      if (s.materia in horasPorMateria) horasPorMateria[s.materia] += (parseInt(s.duracao)||0)/60;
-    });
-    const atrPorMateria = {};
-    tasks.filter(t => !t.concluida && t.dataLimite && new Date(t.dataLimite+'T23:59') < now).forEach(t => {
-      atrPorMateria[t.materia] = (atrPorMateria[t.materia]||0)+1;
-    });
-    const provasPorMateria = {};
-    exams.filter(e => !e.concluida && new Date(e.data) >= now).forEach(e => {
-      provasPorMateria[e.materia] = (provasPorMateria[e.materia]||0)+1;
-    });
+                    <div class="form-section">
+                        <h2><i class="fas fa-clock"></i> Rotina e Disponibilidade</h2>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Turno principal de estudo</label>
+                                <select id="turno-principal" required>
+                                    <option value="manha">Manhã</option>
+                                    <option value="tarde">Tarde</option>
+                                    <option value="noite">Noite</option>
+                                    <option value="madrugada">Madrugada</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Dias preferidos para estudar</label>
+                                <div class="checkbox-group" id="dias-preferidos-container">
+                                    <label><input type="checkbox" value="seg" checked> Seg</label>
+                                    <label><input type="checkbox" value="ter" checked> Ter</label>
+                                    <label><input type="checkbox" value="qua" checked> Qua</label>
+                                    <label><input type="checkbox" value="qui" checked> Qui</label>
+                                    <label><input type="checkbox" value="sex" checked> Sex</label>
+                                    <label><input type="checkbox" value="sab"> Sáb</label>
+                                    <label><input type="checkbox" value="dom"> Dom</label>
+                                </div>
+                            </div>
+                        </div>
 
-    function risk(s) {
-      const h = horasPorMateria[s.nome]||0, a = atrPorMateria[s.nome]||0;
-      return a >= 2 || h < 1 ? 'bad' : a >= 1 || h < 5 ? 'warn' : 'good';
-    }
-    const rLabel = r => r==='bad'?'⚠️ Risco':r==='warn'?'👀 Atenção':'✅ OK';
-    const totalH = Object.values(horasPorMateria).reduce((a,b)=>a+b,0);
-    const atrasadas = tasks.filter(t=>!t.concluida && t.dataLimite && new Date(t.dataLimite+'T23:59')<now).length;
-    const proxProvas = exams.filter(e=>!e.concluida && new Date(e.data)>=now).slice(0,3);
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Horas máximas de estudo por dia</label>
+                                <input type="number" id="horas-maximas" min="1" max="12" value="6">
+                            </div>
+                            <div class="form-group">
+                                <label>Horário de sono aproximado</label>
+                                <input type="text" id="horario-sono" placeholder="Ex: 23:00 - 07:00">
+                            </div>
+                        </div>
 
-    return `
-<div class="view-header"><h2><i class="fas fa-heartbeat"></i> Situação Acadêmica</h2></div>
-<div class="lr-sa-grid">
-  <div class="lr-sa-card">
-    <div class="lr-sa-card-header"><span class="lr-sa-card-icon">📚</span><span class="lr-sa-card-title">Matérias</span></div>
-    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Cursando</span><span class="lr-sa-stat-val">${subjects.length}</span></div>
-    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Em risco</span><span class="lr-sa-stat-val" style="color:var(--accent-danger)">${subjects.filter(s=>risk(s)==='bad').length}</span></div>
-    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Em atenção</span><span class="lr-sa-stat-val" style="color:var(--accent-warning)">${subjects.filter(s=>risk(s)==='warn').length}</span></div>
-    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Em dia</span><span class="lr-sa-stat-val" style="color:var(--accent-success)">${subjects.filter(s=>risk(s)==='good').length}</span></div>
-  </div>
-  <div class="lr-sa-card">
-    <div class="lr-sa-card-header"><span class="lr-sa-card-icon">⏱️</span><span class="lr-sa-card-title">Estudo</span></div>
-    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Total de horas</span><span class="lr-sa-stat-val">${totalH.toFixed(1)}h</span></div>
-    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Sessões concluídas</span><span class="lr-sa-stat-val">${sessions.filter(s=>s.concluida).length}</span></div>
-    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Média por matéria</span><span class="lr-sa-stat-val">${(totalH/subjects.length).toFixed(1)}h</span></div>
-    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Streak</span><span class="lr-sa-stat-val">${app.data?.user?.streak||0} dias 🔥</span></div>
-  </div>
-  <div class="lr-sa-card">
-    <div class="lr-sa-card-header"><span class="lr-sa-card-icon">✅</span><span class="lr-sa-card-title">Tarefas & Provas</span></div>
-    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Tarefas pendentes</span><span class="lr-sa-stat-val">${tasks.filter(t=>!t.concluida).length}</span></div>
-    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Atrasadas</span><span class="lr-sa-stat-val" style="color:var(--accent-danger)">${atrasadas}</span></div>
-    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Tarefas concluídas</span><span class="lr-sa-stat-val" style="color:var(--accent-success)">${tasks.filter(t=>t.concluida).length}</span></div>
-    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Próximas provas</span><span class="lr-sa-stat-val">${exams.filter(e=>!e.concluida&&new Date(e.data)>=now).length}</span></div>
-  </div>
-</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Tempo de deslocamento (minutos)</label>
+                                <input type="number" id="tempo-deslocamento" min="0" max="240" value="30">
+                            </div>
+                            <div class="form-group">
+                                <label>Tipo de rotina</label>
+                                <select id="tipo-rotina" required>
+                                    <option value="so-estuda">Só estuda</option>
+                                    <option value="estuda-trabalha">Estuda e trabalha</option>
+                                    <option value="estuda-estagio">Estuda e faz estágio</option>
+                                    <option value="rotina-pesada">Rotina pesada</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
 
-<div class="lr-section-title">📋 Por matéria</div>
-<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:24px;">
-${subjects.map(s=>{
-  const h=horasPorMateria[s.nome]||0, a=atrPorMateria[s.nome]||0, p=provasPorMateria[s.nome]||0;
-  const r=risk(s), pct=Math.min(100,(h/Math.max(1,s.horasMeta||20))*100);
-  return `<div class="lr-sa-card" style="padding:14px 16px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-      <strong style="color:var(--text-primary)">${esc(s.nome)}</strong>
-      <span class="lr-badge ${r}">${rLabel(r)}</span>
+                    <div class="form-section">
+                        <h2><i class="fas fa-chart-line"></i> Perfil Acadêmico</h2>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Nível de disciplina</label>
+                                <select id="nivel-disciplina" required>
+                                    <option value="baixo">Baixo - Preciso melhorar</option>
+                                    <option value="medio" selected>Médio - Consigo manter</option>
+                                    <option value="alto">Alto - Muito disciplinado</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Maior dificuldade atual</label>
+                                <select id="dificuldade-atual" required>
+                                    <option value="procrastinacao">Procrastinação</option>
+                                    <option value="organizacao">Falta de organização</option>
+                                    <option value="tempo">Pouco tempo</option>
+                                    <option value="materias">Dificuldade nas matérias</option>
+                                    <option value="constancia">Falta de constância</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h2><i class="fas fa-book"></i> Matérias do Semestre</h2>
+                        <div id="materias-container"></div>
+                        <button type="button" id="add-materia" class="btn-secondary">
+                            <i class="fas fa-plus"></i> Adicionar Matéria
+                        </button>
+                    </div>
+
+                    <div class="form-section">
+                        <h2><i class="fas fa-calendar-alt"></i> Grade de Aulas</h2>
+                        <div id="aulas-container"></div>
+                        <button type="button" id="add-aula" class="btn-secondary">
+                            <i class="fas fa-plus"></i> Adicionar Aula
+                        </button>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">
+                            <i class="fas fa-rocket"></i> Iniciar Jornada
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="main-dashboard" style="display: none;">
+            <div class="dashboard-layout">
+                <aside class="sidebar">
+                    <div class="sidebar-header">
+                        <div class="logo">
+                            <img src="logo.png" alt="SLCampus" class="brand-logo-img">
+                            <span>SLC</span>
+                        </div>
+                    </div>
+
+                    <nav class="sidebar-nav" id="sidebar-nav">
+                        <div class="ctrl-k-hint" onclick="document.dispatchEvent(new KeyboardEvent('keydown',{key:'k',ctrlKey:true}))">
+                            <i class="fas fa-search"></i>
+                            <span>Busca rápida</span>
+                            <kbd>Ctrl K</kbd>
+                        </div>
+                        <a href="#" class="nav-item active" data-view="dashboard"><i class="fas fa-chart-pie"></i><span>Dashboard</span></a>
+                        <a href="#" class="nav-item" data-view="diario"><i class="fas fa-book-open"></i><span>Diário</span></a>
+                        <a href="#" class="nav-item" data-view="mentor-ia"><i class="fas fa-robot"></i><span>Mentor IA</span><span class="badge">IA</span></a>
+
+                        <!-- Grupo: Acadêmico -->
+                        <div class="nav-group">
+                            <button class="nav-group-header" data-group="academico">
+                                <span><i class="fas fa-graduation-cap"></i> Acadêmico</span>
+                                <i class="fas fa-chevron-down nav-group-arrow"></i>
+                            </button>
+                            <div class="nav-group-items" id="group-academico">
+                                <a href="#" class="nav-item" data-view="materias"><i class="fas fa-book"></i><span>Matérias</span></a>
+                                <a href="#" class="nav-item" data-view="grade-horaria"><i class="fas fa-calendar-week"></i><span>Grade Horária</span></a>
+                                <a href="#" class="nav-item" data-view="grade-curricular"><i class="fas fa-sitemap"></i><span>Grade Curricular</span></a>
+                                <a href="#" class="nav-item" data-view="cursos-extras"><i class="fas fa-language"></i><span>Cursos Extras</span></a>
+                                <a href="#" class="nav-item" data-view="situacao-academica"><i class="fas fa-heartbeat"></i><span>Situação Acadêmica</span></a>
+                                <a href="#" class="nav-item" data-view="previsao-notas"><i class="fas fa-chart-line"></i><span>Previsão de Notas</span></a>
+                            </div>
+                        </div>
+
+                        <!-- Grupo: Organização -->
+                        <div class="nav-group">
+                            <button class="nav-group-header" data-group="organizacao">
+                                <span><i class="fas fa-tasks"></i> Organização</span>
+                                <i class="fas fa-chevron-down nav-group-arrow"></i>
+                            </button>
+                            <div class="nav-group-items" id="group-organizacao">
+                                <a href="#" class="nav-item" data-view="tarefas"><i class="fas fa-tasks"></i><span>Tarefas</span></a>
+                                <a href="#" class="nav-item" data-view="provas"><i class="fas fa-graduation-cap"></i><span>Provas e Trabalhos</span></a>
+                                <a href="#" class="nav-item" data-view="sessoes"><i class="fas fa-clock"></i><span>Sessões de Estudo</span></a>
+                                <a href="#" class="nav-item" data-view="calendario"><i class="fas fa-calendar-alt"></i><span>Calendário</span></a>
+                                <a href="#" class="nav-item" data-view="habitos"><i class="fas fa-heart"></i><span>Hábitos</span></a>
+                                <a href="#" class="nav-item" data-view="foco"><i class="fas fa-bullseye"></i><span>Modo Foco</span></a>
+                            </div>
+                        </div>
+
+                        <!-- Grupo: Análise -->
+                        <div class="nav-group">
+                            <button class="nav-group-header" data-group="analise">
+                                <span><i class="fas fa-chart-bar"></i> Análise</span>
+                                <i class="fas fa-chevron-down nav-group-arrow"></i>
+                            </button>
+                            <div class="nav-group-items" id="group-analise">
+                                <a href="#" class="nav-item" data-view="mapa-aprendizado"><i class="fas fa-map"></i><span>Mapa de Aprendizado</span></a>
+                                <a href="#" class="nav-item" data-view="materiais"><i class="fas fa-folder"></i><span>Materiais</span></a>
+                                <a href="#" class="nav-item" data-view="estatisticas"><i class="fas fa-chart-bar"></i><span>Estatísticas</span></a>
+                            </div>
+                        </div>
+
+                        <a href="#" class="nav-item" data-view="configuracoes"><i class="fas fa-cog"></i><span>Configurações</span></a>
+                        <a href="#" class="nav-item" data-view="ajuda"><i class="fas fa-question-circle"></i><span>Ajuda</span></a>
+                    </nav>
+
+                    <!-- Modal busca rápida -->
+                    <div id="nav-search-modal" class="nav-search-modal" hidden>
+                        <div class="nav-search-overlay" id="nav-search-overlay"></div>
+                        <div class="nav-search-dialog">
+                            <div class="nav-search-input-wrap">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="nav-search-input" placeholder="Buscar seção..." autocomplete="off">
+                                <kbd>Esc</kbd>
+                            </div>
+                            <div class="nav-search-results" id="nav-search-results"></div>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-footer">
+                        <div class="user-info" id="user-info">
+                            <img src="" alt="" class="user-avatar" id="user-avatar">
+                            <div class="user-details">
+                                <span class="user-name" id="sidebar-user-name">Carregando...</span>
+                                <span class="user-email" id="sidebar-user-email"></span>
+                            </div>
+                        </div>
+                        <div class="streak-info">
+                            <i class="fas fa-fire"></i>
+                            <span id="sidebar-streak">0 dias</span>
+                        </div>
+                        <button class="btn-whats-now" id="whats-now-btn" onclick="app.whatsNow()">
+                            <i class="fas fa-lightbulb"></i> O que estudar agora?
+                        </button>
+                    </div>
+                </aside>
+
+                <main class="main-content">
+                    <div class="content-header">
+                        <button class="btn-icon mobile-nav-toggle" id="mobile-nav-toggle" type="button" aria-label="Abrir menu">
+                            <i class="fas fa-bars"></i>
+                        </button>
+                        <div class="page-title">
+                            <h1 id="page-title">Dashboard</h1>
+                        </div>
+                        <div class="header-actions">
+
+                            <button class="btn-icon" id="daily-log-btn" onclick="window.diaryView?.openModal()" title="Registrar Dia">
+                                <i class="fas fa-clipboard-list"></i>
+                            </button>
+                            <div class="notification-badge" id="notification-badge">
+                                <i class="fas fa-bell"></i>
+                                <span class="badge-count" id="notification-count">0</span>
+                            </div>
+                            <button class="btn-icon" id="refresh-data" title="Sincronizar dados">
+                                <i class="fas fa-sync-alt" id="refresh-data-icon"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="view-container" class="view-container"></div>
+                </main>
+            </div>
+        </div>
     </div>
-    <div class="lr-risk-bar lr-risk-${r==='bad'?'high':r==='warn'?'med':'low'}"><div class="lr-risk-fill" style="width:${pct.toFixed(0)}%"></div></div>
-    <div style="display:flex;gap:14px;margin-top:6px;font-size:.8rem;color:var(--text-secondary);">
-      <span>⏱️ ${h.toFixed(1)}h</span>
-      ${a?`<span style="color:var(--accent-danger)">⚠️ ${a} atrasada${a>1?'s':''}</span>`:''}
-      ${p?`<span style="color:var(--accent-warning)">📝 ${p} prova${p>1?'s':''}</span>`:''}
+
+    <div id="modal-sessao" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-clock"></i> Nova Sessão de Estudo</h2>
+                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+            </div>
+            <form id="form-sessao" class="modal-form" onsubmit="app.handleSessaoSubmit(event)">
+                <div class="form-group">
+                    <label>Matéria</label>
+                    <select id="sessao-materia" required>
+                        <option value="">Selecione uma matéria</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Tipo de estudo</label>
+                        <select id="sessao-tipo" required>
+                            <option value="teoria">Teoria</option>
+                            <option value="exercicios">Exercícios</option>
+                            <option value="revisao">Revisão</option>
+                            <option value="resumo">Resumo</option>
+                            <option value="pratica">Prática</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Duração (min)</label>
+                        <input type="number" id="sessao-duracao" min="15" max="240" value="60" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Data e horário</label>
+                    <input type="datetime-local" id="sessao-data" required>
+                </div>
+                <div class="form-group">
+                    <label>Tópico específico (opcional)</label>
+                    <input type="text" id="sessao-topico" placeholder="Ex: Derivadas">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Agendar Sessão</button>
+                </div>
+            </form>
+        </div>
     </div>
-  </div>`;
-}).join('')}
-</div>
 
-${proxProvas.length?`
-<div class="lr-section-title">📅 Próximas provas</div>
-<div style="display:flex;flex-direction:column;gap:8px;">
-${proxProvas.map(e=>{
-  const dias=Math.ceil((new Date(e.data)-now)/86400000);
-  return `<div class="lr-sa-card" style="padding:12px 16px;display:flex;align-items:center;justify-content:space-between;">
-    <div><strong style="color:var(--text-primary);font-size:.9rem">${esc(e.materia)}</strong>${e.titulo?`<span style="color:var(--text-secondary);font-size:.8rem;display:block">${esc(e.titulo)}</span>`:''}</div>
-    <span class="lr-badge ${dias<=3?'bad':dias<=7?'warn':'good'}">${dias===0?'Hoje':dias===1?'Amanhã':dias+' dias'}</span>
-  </div>`;
-}).join('')}
-</div>`:''}`;
-  }
+    <div id="modal-tarefa" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-tasks"></i> Nova Tarefa</h2>
+                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+            </div>
+            <form id="form-tarefa" class="modal-form" onsubmit="app.handleTarefaSubmit(event)">
+                <div class="form-group">
+                    <label>Título da tarefa</label>
+                    <input type="text" id="tarefa-titulo" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Matéria</label>
+                        <select id="tarefa-materia" required>
+                            <option value="">Selecione</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Prioridade</label>
+                        <select id="tarefa-prioridade" required>
+                            <option value="alta">Alta</option>
+                            <option value="media">Média</option>
+                            <option value="baixa">Baixa</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Data limite</label>
+                        <input type="date" id="tarefa-data" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Estimativa (min)</label>
+                        <input type="number" id="tarefa-estimativa" min="15" value="60">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Adicionar Tarefa</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-  /* ── Empty state do Dashboard ───────────────────────────────── */
-  function buildEmptyDashboard(nome) {
-    return `
-<div class="dashboard-header">
-  <h2>Olá, ${esc(nome||'Estudante')}! 👋</h2>
-  <p>${new Date().toLocaleDateString('pt-BR',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
-</div>
-<div class="lr-empty-hero">
-  <span class="lr-ei">🚀</span>
-  <h3>Tudo pronto! Agora é só começar</h3>
-  <p>Seu painel vai ganhar vida conforme você adiciona matérias, sessões e tarefas.</p>
-  <div class="lr-empty-actions">
-    <button class="lr-action primary" data-goto="materias"><i class="fas fa-book"></i> Adicionar Matérias</button>
-    <button class="lr-action secondary" data-goto="sessoes"><i class="fas fa-clock"></i> Registrar Sessão</button>
-    <button class="lr-action secondary" data-goto="grade-curricular"><i class="fas fa-sitemap"></i> Importar Grade</button>
-  </div>
-</div>
-<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;">
-${[
-  {icon:'📚',title:'Matérias',desc:'Cadastre as disciplinas do semestre. O resto do sistema depende disso.',view:'materias',cta:'Adicionar'},
-  {icon:'⏱️',title:'Sessões de Estudo',desc:'Registre cada hora que estudar. O Dashboard mostra seu progresso automaticamente.',view:'sessoes',cta:'Registrar'},
-  {icon:'✅',title:'Tarefas',desc:'Organize trabalhos, listas e pendências por matéria e data limite.',view:'tarefas',cta:'Criar tarefa'},
-  {icon:'📝',title:'Provas',desc:'Cadastre provas com antecedência e receba alertas automáticos.',view:'provas',cta:'Cadastrar'},
-  {icon:'🧠',title:'Mentor IA',desc:'Pergunte o que estudar hoje, como você está em cada matéria ou peça um plano.',view:'mentor-ia',cta:'Perguntar'},
-  {icon:'🎯',title:'Modo Foco',desc:'Timer Pomodoro integrado — registra a sessão automaticamente ao concluir.',view:'foco',cta:'Iniciar foco'},
-].map(c=>`
-<div class="card" style="cursor:pointer" data-goto="${esc(c.view)}">
-  <div class="card-header"><h3>${c.icon} ${esc(c.title)}</h3></div>
-  <div class="card-body">
-    <p style="font-size:.86rem;color:var(--text-secondary);margin-bottom:12px">${esc(c.desc)}</p>
-    <button class="lr-action primary" data-goto="${esc(c.view)}" style="font-size:.82rem;padding:8px 14px">${esc(c.cta)} →</button>
-  </div>
-</div>`).join('')}
-</div>`;
-  }
+    <div id="modal-prova" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-graduation-cap"></i> Nova Prova/Trabalho</h2>
+                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+            </div>
+            <form id="form-prova" class="modal-form" onsubmit="app.handleProvaSubmit(event)">
+                <div class="form-group">
+                    <label>Título</label>
+                    <input type="text" id="prova-titulo" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Matéria</label>
+                        <select id="prova-materia" required>
+                            <option value="">Selecione</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo</label>
+                        <select id="prova-tipo" required>
+                            <option value="prova">Prova</option>
+                            <option value="trabalho">Trabalho</option>
+                            <option value="lista">Lista de Exercícios</option>
+                            <option value="seminario">Seminário</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Data</label>
+                        <input type="date" id="prova-data" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Peso (%)</label>
+                        <input type="number" id="prova-peso" min="0" max="100" value="100">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Importância</label>
+                    <select id="prova-importancia" required>
+                        <option value="alta">Alta - Decide muito</option>
+                        <option value="media">Média - Importante</option>
+                        <option value="baixa">Baixa - Pouco peso</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Horário <span class="text-secondary">(opcional)</span></label>
+                        <input type="time" id="prova-horario">
+                    </div>
+                    <div class="form-group">
+                        <label>Local/Sala <span class="text-secondary">(opcional)</span></label>
+                        <input type="text" id="prova-local" placeholder="Ex: Sala 12, online...">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>O que cai / observações <span class="text-secondary">(opcional)</span></label>
+                    <textarea id="prova-observacoes" rows="2" placeholder="Ex: capítulos 3 a 5, levar calculadora..."></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-  /* ── Welcome Modal ──────────────────────────────────────────── */
-  function showWelcomeModal(nome) {
-    if (document.getElementById('lr-welcome-modal')) return;
-    const modal = document.createElement('div');
-    modal.id = 'lr-welcome-modal';
-    modal.innerHTML = `<div class="lr-welcome-card">
-  <span class="lr-welcome-emoji">🎉</span>
-  <h2>Bem-vindo(a), ${esc(nome||'Estudante')}!</h2>
-  <p>Configuração concluída! Quanto mais você preencher, mais inteligente o sistema fica.</p>
-  <div class="lr-welcome-steps">
-    <div class="lr-welcome-step" data-goto="materias"><div class="lr-welcome-step-icon">📚</div><div class="lr-welcome-step-text"><strong>Adicionar matérias do semestre</strong><span>Base de tudo — Mentor IA e Dashboard dependem disso</span></div></div>
-    <div class="lr-welcome-step" data-goto="grade-curricular"><div class="lr-welcome-step-icon">🗂️</div><div class="lr-welcome-step-text"><strong>Importar grade curricular</strong><span>Use PDF ou foto da faculdade + ChatGPT para importar tudo de uma vez</span></div></div>
-    <div class="lr-welcome-step" data-goto="mentor-ia"><div class="lr-welcome-step-icon">🧠</div><div class="lr-welcome-step-text"><strong>Falar com o Mentor IA</strong><span>Pergunte "o que estudar hoje?" e veja como ele responde</span></div></div>
-  </div>
-  <button class="lr-welcome-close" id="lr-welcome-close-btn">Explorar o sistema →</button>
-</div>`;
-    document.body.appendChild(modal);
-    document.getElementById('lr-welcome-close-btn')?.addEventListener('click', () => modal.remove());
-    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
-    modal.querySelectorAll('[data-goto]').forEach(el =>
-      el.addEventListener('click', () => { modal.remove(); navigateTo(el.dataset.goto); }));
-  }
+    <div id="modal-aula" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-calendar-week"></i> Nova Aula</h2>
+                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+            </div>
+            <form id="form-aula" class="modal-form" onsubmit="app.handleAulaSubmit(event)">
+                <div class="form-group">
+                    <label>Disciplina</label>
+                    <select id="aula-materia" required>
+                        <option value="">Selecione</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Dia da semana</label>
+                        <select id="aula-dia" required>
+                            <option value="0">Domingo</option>
+                            <option value="1">Segunda-feira</option>
+                            <option value="2">Terça-feira</option>
+                            <option value="3">Quarta-feira</option>
+                            <option value="4">Quinta-feira</option>
+                            <option value="5">Sexta-feira</option>
+                            <option value="6">Sábado</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Horário início</label>
+                        <input type="time" id="aula-inicio" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Horário fim</label>
+                        <input type="time" id="aula-fim" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Sala</label>
+                        <input type="text" id="aula-sala" placeholder="Ex: 101">
+                    </div>
+                    <div class="form-group">
+                        <label>Professor</label>
+                        <input type="text" id="aula-professor" placeholder="Nome do professor">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Bloco/Campus</label>
+                    <input type="text" id="aula-bloco" placeholder="Ex: Bloco A">
+                </div>
+                <div class="form-group">
+                    <label>Cor da disciplina</label>
+                    <input type="color" id="aula-cor" value="#3b82f6">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Salvar Aula</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-  /* ── Patch do App ───────────────────────────────────────────── */
-  function patchApp(app) {
-    if (app.__lrPatched) return;
-    if (!app || typeof app.loadView !== 'function') return; // guard: app ainda não pronto
-    app.__lrPatched = true;
+    <div id="modal-topico" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-map-marker-alt"></i> Novo Tópico</h2>
+                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+            </div>
+            <form id="form-topico" class="modal-form" onsubmit="app.handleTopicoSubmit(event)">
+                <div class="form-group">
+                    <label>Matéria</label>
+                    <select id="topico-materia" required>
+                        <option value="">Selecione</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Nome do tópico</label>
+                    <input type="text" id="topico-nome" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Dificuldade (1-5)</label>
+                        <input type="number" id="topico-dificuldade" min="1" max="5" value="3">
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="topico-status" required>
+                            <option value="nao-comecei">Não comecei</option>
+                            <option value="estudando">Estudando</option>
+                            <option value="revisando">Revisando</option>
+                            <option value="dominado">Dominado</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Confiança (1-5)</label>
+                    <input type="number" id="topico-confianca" min="1" max="5" value="3">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Adicionar Tópico</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-    const _orig = app.loadView.bind(app);
-    app.loadView = function (view, ...rest) {
-      const container = document.getElementById('view-container');
+    <div id="modal-nota" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-star"></i> Registrar Nota</h2>
+                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+            </div>
+            <form id="form-nota" class="modal-form" onsubmit="app.handleNotaSubmit(event)">
+                <div class="form-group">
+                    <label>Matéria</label>
+                    <select id="nota-materia" required>
+                        <option value="">Selecione</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Avaliação</label>
+                    <input type="text" id="nota-avaliacao" placeholder="Ex: Prova 1, Trabalho" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nota obtida</label>
+                        <input type="number" id="nota-valor" min="0" max="10" step="0.1" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Peso (%)</label>
+                        <input type="number" id="nota-peso" min="0" max="100" value="100">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Registrar Nota</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-      if (view === 'ajuda') {
-        this.currentView = 'ajuda';
-        if (container) { container.innerHTML = renderHelp(); attachHelpEvents(container); }
-        document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === 'ajuda'));
-        return;
-      }
-      if (view === 'situacao-academica') {
-        this.currentView = 'situacao-academica';
-        if (container) { container.innerHTML = renderSituacaoAcademica(); attachGoto(container); }
-        document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === 'situacao-academica'));
-        return;
-      }
+    <div id="modal-material" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-folder"></i> Novo Material</h2>
+                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+            </div>
+            <form id="form-material" class="modal-form" onsubmit="app.handleMaterialSubmit(event)">
+                <div class="form-group">
+                    <label>Título</label>
+                    <input type="text" id="material-titulo" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Matéria</label>
+                        <select id="material-materia" required>
+                            <option value="">Selecione</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo</label>
+                        <select id="material-tipo" required>
+                            <option value="link">Link</option>
+                            <option value="pdf">PDF</option>
+                            <option value="video">Vídeo</option>
+                            <option value="anotacao">Anotação</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Conteúdo (URL ou texto)</label>
+                    <textarea id="material-conteudo" rows="3" required></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Salvar Material</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-      _orig(view, ...rest);
 
-      // Empty state para dashboard de usuário novo
-      if (view === 'dashboard') {
-        setTimeout(() => {
-          const s = this.data?.subjects||[], se = this.data?.sessions||[];
-          if (!s.length && !se.length && container) {
-            container.innerHTML = buildEmptyDashboard(this.data?.user?.nome);
-            attachGoto(container);
-          }
-        }, 60);
-      }
-    };
+    <div id="modal-materia" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-book"></i> Matéria</h2>
+                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+            </div>
+            <form id="form-materia" class="modal-form">
+                <div class="form-group">
+                    <label>Nome da matéria</label>
+                    <input type="text" id="materia-nome-modal" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Dificuldade (1 a 5)</label>
+                        <input type="number" id="materia-dificuldade-modal" min="1" max="5" value="3" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Peso / Prioridade (1 a 5) <span style="font-weight:400;font-size:.82rem;color:#94a3b8">— quanto essa matéria exige de você vs as outras</span></label>
+                        <input type="number" id="materia-peso-modal" min="1" max="5" value="3" required>
+                        <small style="color:#64748b;font-size:.8rem">1 = pouco esforço &nbsp;|&nbsp; 3 = médio &nbsp;|&nbsp; 5 = prioridade máxima</small>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nota desejada</label>
+                        <input type="number" id="materia-nota-desejada-modal" min="0" max="10" step="0.1" value="7" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Carga horária da matéria</label>
+                        <input type="number" id="materia-carga-horaria-modal" min="0" placeholder="Ex: 60">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Professor (opcional)</label>
+                    <input type="text" id="materia-professor-modal" placeholder="Nome do professor">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Salvar Matéria</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-    // Patch pós-setup: mostrar welcome
-    const _origPost = app.ensurePostSetupReady.bind(app);
-    app.ensurePostSetupReady = async function (...args) {
-      const isNew = !(this.data?.subjects?.length);
-      await _origPost(...args);
-      if (isNew) {
-        setTimeout(() => showWelcomeModal(this.data?.user?.nome), 900);
-        localStorage.setItem('slc_welcomed', '1');
-      }
-    };
-  }
+    <div id="modal-curriculum" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-sitemap"></i> Componente Curricular</h2>
+                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+            </div>
+            <form id="form-curriculum" class="modal-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nome da disciplina/componente</label>
+                        <input type="text" id="curriculum-nome" required placeholder="Ex: Resistência dos Materiais I">
+                    </div>
+                    <div class="form-group">
+                        <label>Código do componente (opcional)</label>
+                        <input type="text" id="curriculum-codigo" placeholder="Ex: CET0150">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Semestre sugerido</label>
+                        <input type="number" id="curriculum-semestre" min="1" max="20" placeholder="Ex: 3">
+                    </div>
+                    <div class="form-group">
+                        <label>Carga horária</label>
+                        <input type="number" id="curriculum-carga-horaria" min="0" placeholder="Ex: 60" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="curriculum-status" required>
+                            <option value="nao-cursada">Não cursada</option>
+                            <option value="cursando">Cursando</option>
+                            <option value="concluida">Concluída</option>
+                            <option value="reprovada">Reprovada</option>
+                            <option value="trancada">Trancada</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo</label>
+                        <select id="curriculum-tipo" required>
+                            <option value="obrigatoria">Obrigatória</option>
+                            <option value="optativa">Optativa</option>
+                            <option value="extensao">Extensão</option>
+                            <option value="atividade">Atividade complementar</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Carga horária rápida</label>
+                        <div class="ch-preset-buttons">
+                            <button type="button" class="btn-secondary btn-ch-preset" data-value="30">30h</button>
+                            <button type="button" class="btn-secondary btn-ch-preset" data-value="60">60h</button>
+                            <button type="button" class="btn-secondary btn-ch-preset" data-value="90">90h</button>
+                            <button type="button" class="btn-secondary btn-ch-preset" data-value="0">Personalizado</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Créditos (opcional)</label>
+                        <input type="number" id="curriculum-creditos" min="0" step="0.5" placeholder="Só use se realmente precisar">
+                        <small class="form-help">Pode deixar vazio. O sistema funciona normalmente só com carga horária.</small>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Pré-requisitos</label>
+                    <div id="curriculum-ai-suggestions" class="curriculum-ai-suggestions"></div>
+                    <div id="curriculum-prerequisitos-picker" class="prereq-picker">
+                        <div class="prereq-input-row">
+                            <input type="text" id="curriculum-prerequisito-busca" placeholder="Pesquise entre matérias já cadastradas ou digite uma nova">
+                            <button type="button" class="btn-secondary" id="btn-add-custom-prereq">Adicionar texto</button>
+                        </div>
+                        <div id="curriculum-prerequisitos-sugestoes" class="prereq-suggestions"></div>
+                        <div id="curriculum-prerequisitos-tags" class="selected-prereqs"></div>
+                        <input type="hidden" id="curriculum-prerequisitos">
+                        <small class="form-help">Você pode selecionar várias matérias. O sistema converte seus dados antigos para a nova lista automaticamente.</small>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Observações</label>
+                    <textarea id="curriculum-observacoes" rows="4" placeholder="Anotações úteis sobre a disciplina"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Salvar Componente</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-  /* ── Init ───────────────────────────────────────────────────── */
-  function init() {
-    injectStyles();
-    if (window.app) {
-      patchApp(window.app);
-    } else {
-      document.addEventListener('app-ready', () => { if (window.app) patchApp(window.app); });
-      let t = 0;
-      const p = setInterval(() => { if (window.app) { clearInterval(p); patchApp(window.app); } if (++t > 50) clearInterval(p); }, 200);
-    }
+    <div id="modal-extra-course" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-language"></i> Curso Extra</h2>
+                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+            </div>
+            <form id="form-extra-course" class="modal-form">
+                <div class="form-group">
+                    <label>Nome do curso</label>
+                    <input type="text" id="extra-course-nome" required placeholder="Ex: Duolingo - Inglês">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Plataforma</label>
+                        <input type="text" id="extra-course-plataforma" placeholder="Ex: Duolingo, Udemy, YouTube">
+                    </div>
+                    <div class="form-group">
+                        <label>Área</label>
+                        <input type="text" id="extra-course-area" placeholder="Ex: Idiomas, Programação">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Como você quer acompanhar esse curso?</label>
+                        <select id="extra-course-tipo">
+                            <option value="horas">Por carga horária (Duolingo, YouTube, curso avulso)</option>
+                            <option value="modulos">Por módulos/aulas (Udemy, Alura, playlist)</option>
+                            <option value="data">Por período (curso com início e fim, tipo escola)</option>
+                            <option value="manual">Só acompanhar manualmente (%)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="extra-course-status">
+                            <option value="planejado">Planejado</option>
+                            <option value="em-andamento" selected>Em andamento</option>
+                            <option value="concluido">Concluído</option>
+                            <option value="pausado">Pausado</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row" id="extra-course-group-horas">
+                    <div class="form-group">
+                        <label>Meta total (horas)</label>
+                        <input type="number" id="extra-course-meta-horas" min="0" placeholder="Ex: 120">
+                    </div>
+                    <div class="form-group">
+                        <label>Horas já estudadas</label>
+                        <input type="number" id="extra-course-horas-estudadas" min="0" step="0.5" placeholder="Ex: 8">
+                    </div>
+                </div>
+                <div class="form-row" id="extra-course-group-modulos">
+                    <div class="form-group">
+                        <label>Total de módulos/aulas</label>
+                        <input type="number" id="extra-course-total-modulos" min="0" placeholder="Ex: 40">
+                    </div>
+                    <div class="form-group">
+                        <label>Módulos/aulas concluídos</label>
+                        <input type="number" id="extra-course-modulos-concluidos" min="0" placeholder="Ex: 12">
+                    </div>
+                </div>
+                <div class="form-row" id="extra-course-group-data">
+                    <div class="form-group">
+                        <label>Data prevista de término</label>
+                        <input type="date" id="extra-course-data-fim">
+                    </div>
+                    <div class="form-group">
+                        <label>Carga horária total (opcional)</label>
+                        <input type="number" id="extra-course-carga-total" min="0" placeholder="Ex: 200">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Data de início</label>
+                        <input type="date" id="extra-course-data-inicio">
+                    </div>
+                    <div class="form-group">
+                        <label id="extra-course-progresso-label">Percentual concluído (%)</label>
+                        <input type="number" id="extra-course-progresso" min="0" max="100" placeholder="Deixe em branco p/ calcular automático">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Link (opcional)</label>
+                        <input type="url" id="extra-course-link" placeholder="https://...">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Observações</label>
+                    <textarea id="extra-course-observacoes" rows="4" placeholder="Anotações, metas, sequência de estudos..."></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Salvar Curso</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-    // Welcome para usuário que é novo mas já tem conta (recarregou)
-    document.addEventListener('app-ready', () => {
-      const app = window.app; if (!app) return;
-      const isNew = !app.data?.subjects?.length && !app.data?.sessions?.length;
-      if (isNew && !localStorage.getItem('slc_welcomed') && app.data?.user?.nome) {
-        setTimeout(() => showWelcomeModal(app.data.user.nome), 1200);
-        localStorage.setItem('slc_welcomed', '1');
-      }
-    });
-  }
+    <!-- Modal unificado do Diário (substitui os antigos modal-daily-log e
+         modal-class-diary — ver diary-view.js). Data compartilhada no topo,
+         seção "Meu Dia" e um bloco por aula, podendo adicionar quantas
+         quiser. Conteúdo do formulário é montado dinamicamente. -->
+    <div id="modal-diario" class="modal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h2><i class="fas fa-book-open"></i> <span id="modal-diario-titulo">Registro do dia</span></h2>
+                <span class="close-modal" onclick="document.getElementById('modal-diario').style.display='none'">&times;</span>
+            </div>
+            <form id="form-diario" class="modal-form" onsubmit="window.diaryView?.handleSubmit(event)">
+                <div class="form-group">
+                    <label>Data</label>
+                    <input type="date" id="diario-data" required>
+                </div>
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-  else init();
-})();
+                <div class="form-section">
+                    <h3>📚 Meu dia</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Estudo — início</label>
+                            <input type="time" id="diario-estudo-inicio">
+                        </div>
+                        <div class="form-group">
+                            <label>Estudo — fim</label>
+                            <input type="time" id="diario-estudo-fim">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Energia do dia</label>
+                            <input type="hidden" id="diario-energia" value="media">
+                            <div class="diario-pill-group" data-pill-target="diario-energia">
+                                <button type="button" class="diario-pill" data-val="baixa">🔴 Baixa</button>
+                                <button type="button" class="diario-pill active" data-val="media">🟡 Média</button>
+                                <button type="button" class="diario-pill" data-val="alta">🟢 Alta</button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Foco do dia</label>
+                            <input type="hidden" id="diario-foco" value="normal">
+                            <div class="diario-pill-group" data-pill-target="diario-foco">
+                                <button type="button" class="diario-pill" data-val="ruim">🔴 Ruim</button>
+                                <button type="button" class="diario-pill active" data-val="normal">🟡 Normal</button>
+                                <button type="button" class="diario-pill" data-val="bom">🟢 Bom</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="diario-trabalhou"> Trabalhei hoje
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label>Duração do trabalho (min)</label>
+                            <input type="number" id="diario-trabalho-duracao" min="0" value="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Observações do dia</label>
+                        <textarea id="diario-observacoes" rows="2" placeholder="Algo relevante sobre o dia..."></textarea>
+                    </div>
+                </div>
+
+                <div id="diario-aulas-container"></div>
+
+                <button type="button" class="btn-secondary" id="diario-add-aula-btn" style="width:100%; margin-top:4px;">
+                    <i class="fas fa-plus"></i> Adicionar aula do dia
+                </button>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Salvar no Diário</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-aula-detail" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-calendar-week"></i> Detalhes da Aula</h2>
+                <span class="close-modal" onclick="document.getElementById('modal-aula-detail').style.display='none'">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="aula-detail-info">
+                    <p><strong>Matéria:</strong> <span id="aula-detail-materia"></span></p>
+                    <p><strong>Horário:</strong> <span id="aula-detail-horario"></span></p>
+                    <p><strong>Sala:</strong> <span id="aula-detail-sala"></span></p>
+                    <p><strong>Professor:</strong> <span id="aula-detail-professor"></span></p>
+
+                    <div class="aula-detail-presenca" id="aula-detail-presenca"></div>
+
+                    <h4>Último conteúdo registrado</h4>
+                    <div id="aula-detail-ultimo-conteudo" class="aula-detail-conteudo"></div>
+
+                    <button class="btn-primary" onclick="window.diaryView?.openModal(null, document.getElementById('aula-detail-materia').textContent)">
+                        <i class="fas fa-plus"></i> Registrar Diário
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-whats-now" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-lightbulb"></i> O que estudar agora?</h2>
+                <span class="close-modal" onclick="document.getElementById('modal-whats-now').style.display='none'">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="whats-now-content" class="whats-now-content"></div>
+                <button class="btn-primary" onclick="document.getElementById('modal-whats-now').style.display='none'">Entendi!</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-grade-structure" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-chart-pie"></i> Configurar Estrutura de Notas</h2>
+                <span class="close-modal" onclick="document.getElementById('modal-grade-structure').style.display='none'">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="grade-structure-materia" class="grade-structure-materia"></div>
+                <div id="grade-structure-items"></div>
+                <button class="btn-secondary" onclick="app.addGradeStructureItem()">
+                    <i class="fas fa-plus"></i> Adicionar Avaliação
+                </button>
+                <div class="form-actions">
+                    <button class="btn-primary" onclick="app.saveGradeStructure()">Salvar Estrutura</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <script src="firebase-config.js"></script>
+<script src="security.js"></script>
+<script src="utils.js"></script>
+<script src="auth.js"></script>
+<script src="database.js"></script>
+<script src="daily-log.js"></script>
+<script src="class-diary.js"></script>
+<script src="diary-view.js"></script>
+<script src="review-system.js"></script>
+<script src="grade-calculator.js"></script>
+<script src="subject-difficulty.js"></script>
+<script src="smart-dashboard.js"></script>
+<script src="ai-assistant.js"></script>
+<script src="schedule.js"></script>
+<script src="views.js"></script>
+<script src="tutorial.js"></script>
+<script src="app.js"></script>
+<script src="semester-finish.js"></script>
+<script src="semester-archive-viewer.js"></script>
+<script src="universidades-brasil.js"></script>
+<script src="setup-wizard.js"></script>
+<script src="launch-ready.js"></script>
+<script src="script.js"></script>
+<script src="dashboard-prioritario.js"></script>
+<script src="onboarding-simplificado.js"></script>
+<script src="schedule-ia-import.js"></script>
+<script src="subjects-curriculum-sync.js"></script>
+<script src="grade-structure-modal.js"></script>
+<div id="mobile-nav-overlay" class="mobile-nav-overlay" hidden></div>
+    <script src="grade-ia-import.js"></script>
+    <script src="setup-onboarding-enhancer.js"></script>
+    <script src="app-enhancements.js"></script>
+    <script src="xp-widget.js"></script>
+    <script src="calendar-feed.js"></script>
+    <script src="push-notifications.js"></script>
+    <script src="auto-notification-prompt.js"></script>
+    <script src="exam-study-popup.js"></script>
+    <script src="quick-search.js"></script>
+    <script src="export-data.js"></script>
+    <script src="feedback-widget.js"></script>
+    <link rel="stylesheet" href="launch-polish.css">
+    <script src="launch-polish.js"></script>
+    <script src="improvements.js"></script>
+    <script src="ux-improvements.js"></script>
+    <script src="reprovado-ecosystem.js"></script>
+</body>
+</html>

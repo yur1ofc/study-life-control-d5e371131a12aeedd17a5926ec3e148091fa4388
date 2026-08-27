@@ -1,135 +1,196 @@
-// push-notifications.js
-// Alarmes de estudo via notificação push real (funciona mesmo com o app
-// fechado, em Android e desktop; no iPhone só depois de instalar o site
-// como app na tela de início — ver aviso na UI).
+// api/mentor-chat.js — Vercel Function (proxy seguro para o Google Gemini)
+// dedicado ao CHAT do Mentor IA (conversa aberta com contexto do usuário).
 //
-// O botão "Ativar alarmes" pede permissão de notificação, assina esse
-// navegador no Push API do browser (usando a chave VAPID pública) e salva
-// essa assinatura em pushSubscriptions (dentro do documento do usuário).
-// Quem realmente DISPARA a notificação no horário certo é o servidor
-// (api/send-reminders.js), rodando periodicamente — ver esse arquivo pra
-// entender como agendar isso.
+// Por que este arquivo é separado do api/gemini.js?
+//   api/gemini.js já existia para UMA coisa específica: importar grade
+//   horária de PDF/imagem, com limite de 8 chamadas/dia (faz sentido pra
+//   import, que é usado raramente). O Mentor IA agora conversa de verdade
+//   (múltiplas mensagens por sessão de estudo), então precisa do PRÓPRIO
+//   limite diário — bem mais alto — sem disputar cota com a importação de
+//   grade nem ser afetado se o usuário "gastar" o limite de import.
+//
+// Mesmas duas travas de segurança do api/gemini.js:
+//   1) Só aceita chamadas de usuários LOGADOS (valida o Firebase ID token).
+//   2) Limite diário por usuário, contado no Firestore (coleção
+//      "mentor_usage", separada de "ai_usage").
+//
+// Variáveis de ambiente necessárias (as mesmas do api/gemini.js — reaproveita):
+//   GEMINI_API_KEY, FIREBASE_API_KEY, FIREBASE_PROJECT_ID
+// Variável opcional:
+//   MENTOR_DAILY_LIMIT → limite de mensagens de chat por usuário/dia (padrão: 60)
+//
+// Necessário liberar a coleção "mentor_usage" no firestore.rules (já incluído
+// nesta atualização, no mesmo bloco de "ai_usage").
 
-(function () {
-  'use strict';
+const GEMINI_MODELS = ['gemini-flash-latest', 'gemini-3.6-flash', 'gemini-2.5-flash'];
+const DAILY_LIMIT = parseInt(process.env.MENTOR_DAILY_LIMIT || '60', 10);
 
-  function urlBase64ToUint8Array(base64String) {
-    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-    const raw = atob(base64);
-    return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+// Teto de segurança pro tamanho do contexto que o front manda — o mentor
+// monta um "raio-x" grande do usuário (matérias, mapa de aprendizado, diário,
+// provas etc.) e isso vira texto dentro do prompt. Sem isso, um usuário com
+// MUITOS dados cadastrados poderia gerar um payload gigante sem querer.
+const MAX_CONTENTS_CHARS = 60000;
+
+function isOverloadError(status, data) {
+  if (status === 503) return true;
+  const msg = (data?.error?.message || '').toLowerCase();
+  return msg.includes('overload') || msg.includes('high demand') || msg.includes('unavailable');
+}
+
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+async function callGeminiWithFallback(geminiKey, contents, systemInstruction) {
+  let lastError = null;
+  for (let i = 0; i < GEMINI_MODELS.length; i += 1) {
+    const model = GEMINI_MODELS[i];
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
+      const payload = {
+        contents,
+        generationConfig: {
+          temperature: 0.55,
+          maxOutputTokens: 1400,
+          topP: 0.9
+        }
+      };
+      if (systemInstruction) payload.systemInstruction = systemInstruction;
+
+      const geminiRes = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await geminiRes.json().catch(() => ({}));
+
+      if (geminiRes.ok) return { ok: true, data, modelUsed: model };
+
+      lastError = { status: geminiRes.status, data };
+      if (isOverloadError(geminiRes.status, data)) {
+        if (attempt === 0) { await sleep(900); continue; }
+        break;
+      }
+      return { ok: false, status: geminiRes.status, data };
+    }
+  }
+  return { ok: false, status: lastError?.status || 503, data: lastError?.data || {} };
+}
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+async function verifyFirebaseToken(idToken) {
+  const apiKey = process.env.FIREBASE_API_KEY;
+  if (!apiKey) throw new Error('FIREBASE_API_KEY não configurada no servidor.');
+
+  const resp = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken })
+  });
+  const data = await resp.json();
+  const uid = data?.users?.[0]?.localId;
+  if (!resp.ok || !uid) throw new Error('unauthorized');
+  return uid;
+}
+
+// Mesmo padrão do api/gemini.js, mas em coleção própria ("mentor_usage") pra
+// não competir com o limite de importação de grade.
+async function checkAndIncrementUsage(idToken, uid) {
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  if (!projectId) throw new Error('FIREBASE_PROJECT_ID não configurada no servidor.');
+
+  const base = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/mentor_usage/${uid}`;
+  const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` };
+
+  const getResp = await fetch(base, { headers });
+  const today = todayKey();
+  let count = 0;
+
+  if (getResp.status === 200) {
+    const doc = await getResp.json();
+    const fields = doc.fields || {};
+    const storedDate = fields.date?.stringValue;
+    count = storedDate === today ? parseInt(fields.count?.integerValue || '0', 10) : 0;
+  } else if (getResp.status !== 404) {
+    return { blocked: false, count: 0 };
   }
 
-  function isSupported() {
-    return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  if (count >= DAILY_LIMIT) {
+    return { blocked: true, count };
   }
 
-  function vapidPublicKey() {
-    return window.__ENV?.VAPID_PUBLIC_KEY || null;
+  await fetch(`${base}?updateMask.fieldPaths=date&updateMask.fieldPaths=count`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ fields: { date: { stringValue: today }, count: { integerValue: String(count + 1) } } })
+  }).catch(() => {});
+
+  return { blocked: false, count: count + 1, limit: DAILY_LIMIT };
+}
+
+module.exports = async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!geminiKey) {
+    return res.status(503).json({ error: 'GEMINI_API_KEY não configurada no Vercel.' });
   }
 
-  function permissionStatus() {
-    if (!('Notification' in window)) return 'unsupported';
-    return Notification.permission; // 'default' | 'granted' | 'denied'
+  const authHeader = req.headers.authorization || '';
+  const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  if (!idToken) {
+    return res.status(401).json({ error: 'É preciso estar logado no app para conversar com o Mentor IA.' });
   }
 
-  async function getExistingSubscription() {
-    const reg = await navigator.serviceWorker.ready;
-    return reg.pushManager.getSubscription();
+  let uid;
+  try {
+    uid = await verifyFirebaseToken(idToken);
+  } catch {
+    return res.status(401).json({ error: 'Sessão inválida ou expirada. Recarregue a página e faça login novamente.' });
   }
 
-  async function saveSubscription(subscription) {
-    const settings = window.app?.data?.settings;
-    if (!settings) return false;
-
-    const list = Array.isArray(window.app.data.pushSubscriptions) ? window.app.data.pushSubscriptions : [];
-    const json = subscription.toJSON();
-    // Evita duplicar a mesma assinatura (endpoint) se o usuário clicar em
-    // "ativar" mais de uma vez no mesmo navegador.
-    const semDuplicata = list.filter(s => s.endpoint !== json.endpoint);
-    semDuplicata.push({ ...json, savedAt: new Date().toISOString() });
-    // No máximo 10 dispositivos (bate com o limite em firestore.rules).
-    const limitado = semDuplicata.slice(-10);
-
-    settings.studyReminders = { ...settings.studyReminders, enabled: true };
-    const ok1 = await window.dbService.saveData('pushSubscriptions', limitado);
-    const ok2 = await window.dbService.saveData('settings', settings);
-    return ok1 && ok2;
-  }
-
-  async function removeSubscription(endpoint) {
-    const list = Array.isArray(window.app?.data?.pushSubscriptions) ? window.app.data.pushSubscriptions : [];
-    const restante = list.filter(s => s.endpoint !== endpoint);
-    return window.dbService.saveData('pushSubscriptions', restante);
-  }
-
-  // Ativa: pede permissão, cria a assinatura push e salva.
-  async function enable() {
-    if (!isSupported()) throw new Error('Esse navegador não suporta notificações push.');
-    const key = vapidPublicKey();
-    if (!key) throw new Error('Alarmes push não configurados neste site (falta VAPID_PUBLIC_KEY no servidor).');
-
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') throw new Error('Permissão de notificação negada.');
-
-    const reg = await navigator.serviceWorker.ready;
-    let subscription = await reg.pushManager.getSubscription();
-    if (!subscription) {
-      subscription = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(key)
+  let usageInfo = null;
+  try {
+    const usage = await checkAndIncrementUsage(idToken, uid);
+    if (usage.blocked) {
+      return res.status(429).json({
+        error: `Você atingiu o limite de ${DAILY_LIMIT} mensagens do Mentor IA por hoje. Volta amanhã que a cota renova — enquanto isso o mentor ainda responde com as respostas rápidas baseadas nos teus dados.`
       });
     }
-
-    const ok = await saveSubscription(subscription);
-    if (!ok) throw new Error('Não foi possível salvar a assinatura de notificações.');
-    return true;
+    usageInfo = usage;
+  } catch (err) {
+    console.error('[api/mentor-chat] erro ao checar limite de uso:', err.message);
   }
 
-  // Desativa só neste navegador/dispositivo.
-  async function disable() {
-    const settings = window.app?.data?.settings;
-    try {
-      const subscription = await getExistingSubscription();
-      if (subscription) {
-        await removeSubscription(subscription.endpoint);
-        await subscription.unsubscribe();
-      }
-    } catch (error) {
-      console.warn('[push-notifications] erro ao cancelar assinatura:', error);
+  try {
+    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+    if (!body.contents || !Array.isArray(body.contents) || !body.contents.length) {
+      return res.status(400).json({ error: 'Requisição inválida: falta "contents".' });
     }
 
-    if (settings) {
-      settings.studyReminders = { ...settings.studyReminders, enabled: false };
-      await window.dbService.saveData('settings', settings);
+    const approxSize = JSON.stringify(body.contents).length;
+    if (approxSize > MAX_CONTENTS_CHARS) {
+      return res.status(413).json({ error: 'Contexto grande demais para essa mensagem. Tente novamente (o app ajusta automaticamente o tamanho).' });
     }
-    return true;
-  }
 
-  async function saveReminderPrefs(prefs) {
-    const settings = window.app?.data?.settings;
-    if (!settings) return false;
-    settings.studyReminders = { ...settings.studyReminders, ...prefs };
-    return window.dbService.saveData('settings', settings);
-  }
+    const result = await callGeminiWithFallback(geminiKey, body.contents, body.systemInstruction);
 
-  async function isEnabledOnThisDevice() {
-    if (!isSupported()) return false;
-    try {
-      const subscription = await getExistingSubscription();
-      return !!subscription;
-    } catch (_) {
-      return false;
+    if (!result.ok) {
+      const overloaded = isOverloadError(result.status, result.data);
+      const msg = overloaded
+        ? 'O Mentor IA está sobrecarregado no momento (todos os modelos tentados falharam). Tenta de novo em alguns segundos.'
+        : (result.data?.error?.message || `Erro HTTP ${result.status} do Gemini`);
+      return res.status(result.status || 503).json({ error: msg });
     }
-  }
 
-  window.pushNotifications = {
-    isSupported,
-    permissionStatus,
-    vapidPublicKey,
-    enable,
-    disable,
-    saveReminderPrefs,
-    isEnabledOnThisDevice
-  };
-})();
+    return res.status(200).json({ ...result.data, usage: usageInfo });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Erro interno no proxy do Mentor IA' });
+  }
+};

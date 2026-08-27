@@ -1,106 +1,512 @@
-/* Launch polish pack */
-:root{
-  --soft-border: color-mix(in srgb, var(--border) 70%, transparent);
-}
-body{background:var(--bg-primary)}
-.content-header{position:sticky;top:0;z-index:40;backdrop-filter:blur(14px);background:color-mix(in srgb, var(--bg-primary) 80%, transparent);border-bottom:1px solid var(--soft-border)}
-.view-container{padding-bottom:100px}
-.card,.login-card,.setup-card,.modal-content,.pwa-install-card{border:1px solid var(--soft-border);box-shadow:var(--card-shadow)}
-.dashboard-header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px}
-.slc-briefing-line{display:flex;align-items:center;gap:10px;margin:-8px 0 18px;padding:0;font-size:13px;color:var(--text-secondary);line-height:1.5}
-.slc-briefing-line i.fa-robot{color:var(--accent-primary);font-size:13px;flex-shrink:0}
-.slc-briefing-line span{flex:1;min-width:0}
-.slc-briefing-line button{background:none;border:none;color:var(--text-tertiary);cursor:pointer;padding:4px;flex-shrink:0;font-size:12px;transition:color .15s,transform .4s}
-.slc-briefing-line button:hover{color:var(--text-primary);transform:rotate(70deg)}
-.slc-grade-rows{display:flex;flex-direction:column;gap:12px}
-.slc-grade-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(80px,140px) 38px;align-items:center;gap:12px}
-.slc-grade-label{font-size:12px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.slc-grade-track{height:6px;border-radius:999px;background:color-mix(in srgb, var(--border) 60%, transparent);overflow:hidden}
-.slc-grade-fill{height:100%;border-radius:999px;transition:width .3s ease}
-.slc-grade-value{font-size:12px;font-weight:700;text-align:right}
-@media (max-width:560px){
-  .slc-grade-row{grid-template-columns:minmax(0,1fr) 70px 30px;gap:8px}
-}
-.dashboard-header h2{font-size:1.8rem;margin:0}
-.dashboard-header p{color:var(--text-secondary);margin:4px 0 0}
-.dashboard-shell{display:grid;gap:18px}
-.dashboard-top-grid{display:grid;grid-template-columns:1.3fr .9fr;gap:18px}
-.dashboard-main-card,.dashboard-side-card,.dashboard-list-card,.dashboard-hero,.notification-panel,.quick-onboarding-card{background:linear-gradient(180deg, var(--bg-secondary), var(--bg-tertiary));border:1px solid var(--soft-border);border-radius:24px;box-shadow:var(--card-shadow)}
-.dashboard-hero{padding:22px}
-.dashboard-hero-top{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap}
-.dashboard-hero-title h3{font-size:1.35rem;margin:0 0 6px}
-.dashboard-hero-title p{color:var(--text-secondary);margin:0}
-.dashboard-hero-next{margin-top:10px!important;padding-top:10px;border-top:1px dashed var(--soft-border);color:var(--accent-primary)!important;font-size:.9rem;font-weight:600}
-.dashboard-hero-next i{margin-right:6px;font-size:.8em}
-.dashboard-goal{min-width:180px;background:color-mix(in srgb, var(--accent-primary) 10%, transparent);border:1px solid color-mix(in srgb, var(--accent-primary) 28%, transparent);padding:14px 16px;border-radius:18px}
-.dashboard-goal strong{display:block;font-size:1.5rem}
-.dashboard-progress{margin-top:16px}
-.dashboard-progress-meta{display:flex;justify-content:space-between;gap:10px;color:var(--text-secondary);font-size:.95rem;margin-bottom:8px}
-.progress-bar{height:12px;background:color-mix(in srgb, var(--border) 55%, transparent);border-radius:999px;overflow:hidden}
-.progress-fill{height:100%;border-radius:999px;background:linear-gradient(90deg, var(--accent-primary), var(--accent-secondary))}
-.dashboard-kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin-top:18px}
-.dashboard-attention-card{margin-top:0}
-.dashboard-kpi{padding:14px;border-radius:18px;background:var(--bg-tertiary);border:1px solid var(--soft-border)}
-.dashboard-kpi span{display:block;color:var(--text-secondary);font-size:.9rem;margin-bottom:4px}
-.dashboard-kpi strong{font-size:1.25rem}
-.dashboard-side-card,.dashboard-main-card,.dashboard-list-card{padding:20px}
-.dashboard-section-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px}
-.dashboard-section-head h3{margin:0;font-size:1.06rem}
-.quick-actions{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-top:14px}
-.quick-actions .btn-primary,.quick-actions .btn-secondary{width:100%;padding:14px 12px;border-radius:16px}
-.focus-list,.mini-list{display:grid;gap:10px}
-.focus-item,.mini-item,.notification-item,.batch-help-card{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:13px 14px;border-radius:16px;background:var(--bg-tertiary);border:1px solid var(--soft-border)}
-.focus-item-main strong,.mini-item-main strong,.notification-item-main strong{display:block;margin-bottom:3px}
-.focus-item-main small,.mini-item-main small,.notification-item-main small{display:block;color:var(--text-secondary);line-height:1.4}
-.notification-badge{position:relative;cursor:pointer}
-.notification-badge.has-alert{color:var(--accent-primary)}
-.notification-badge.has-alert::after{content:'';position:absolute;inset:-4px;border-radius:14px;border:1px solid color-mix(in srgb, var(--accent-primary) 40%, transparent);pointer-events:none}
-/* .notification-panel removido: era o painel duplicado "Lembretes internos"
-   que abria dentro do popover "Notificações" do script.js. Agora existe só
-   um painel de notificações — ver ensureNotificationPopover em script.js. */
-.notification-item{align-items:center}
-.notification-item[data-level='danger']{border-color:color-mix(in srgb, var(--accent-danger) 40%, transparent);background:color-mix(in srgb, var(--accent-danger) 14%, transparent)}
-.notification-item[data-level='warning']{border-color:color-mix(in srgb, var(--accent-warning) 40%, transparent);background:color-mix(in srgb, var(--accent-warning) 14%, transparent)}
-.notification-item[data-level='info']{border-color:color-mix(in srgb, var(--accent-primary) 40%, transparent);background:color-mix(in srgb, var(--accent-primary) 12%, transparent)}
-.notification-empty{padding:20px;text-align:center;color:var(--text-secondary)}
-.modal-content{max-height:min(88vh,920px);display:flex;flex-direction:column;overflow:hidden}
-.modal-header{position:sticky;top:0;z-index:2;background:linear-gradient(180deg, var(--bg-secondary), var(--bg-tertiary));border-bottom:1px solid var(--soft-border)}
-.modal-form,.modal-body{overflow:auto;padding-bottom:20px}
-.form-actions{position:static;background:transparent;padding:0;margin-top:18px;display:flex;justify-content:flex-end;gap:12px;flex-wrap:wrap;border-top:none}
-.form-actions .btn-primary,.form-actions .btn-secondary,.form-actions .btn-danger{min-width:150px}
-.aula-smart-section{margin-top:16px;padding:16px;border-radius:18px;background:color-mix(in srgb, var(--accent-primary) 8%, transparent);border:1px solid color-mix(in srgb, var(--accent-primary) 22%, transparent)}
-.aula-days-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:10px}
-.aula-day-pill{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:999px;background:var(--bg-tertiary);border:1px solid var(--soft-border);font-weight:600;cursor:pointer}
-.aula-day-pill input{width:auto}
-.aula-batch-text{min-height:118px;resize:vertical}
-.aula-inline-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
-.aula-inline-actions .btn-secondary,.aula-inline-actions .btn-primary{padding:10px 14px;border-radius:12px}
-.aula-detail-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
-/* .mobile-quickbar removida: duplicava #slc-bottom-nav (ux-improvements.js) */
-.quick-onboarding-card{padding:16px;margin-bottom:16px}
-.quick-onboarding-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
-.setup-advanced-hidden{display:none !important}
-.setup-fast-pill{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:color-mix(in srgb, var(--accent-primary) 16%, transparent);color:var(--accent-primary);font-weight:800;font-size:.82rem}
-.setup-card .form-actions{position:sticky;bottom:-4px;background:linear-gradient(180deg, transparent, var(--bg-secondary) 28%);padding-top:12px}
-@media (max-width: 1180px){.dashboard-top-grid{grid-template-columns:1fr}.quick-actions{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media (max-width: 980px){
-  .main-content{padding-bottom:92px}
-  .dashboard-kpi-row{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .quick-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .content-header{padding:14px 16px}
-  .page-title h1{font-size:1.2rem}
-  .aula-days-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
-}
-@media (max-width: 640px){
-  .dashboard-header h2{font-size:1.45rem}
-  .dashboard-hero,.dashboard-main-card,.dashboard-side-card,.dashboard-list-card{padding:16px}
-  .dashboard-kpi-row,.quick-actions{grid-template-columns:1fr 1fr}
-  .modal-content{max-height:92vh;width:min(100vw - 12px,720px);border-radius:20px}
-  .modal-header{padding:14px 16px}
-  .modal-form,.modal-body{padding:16px}
-  .form-row{grid-template-columns:1fr !important}
-  .form-actions{padding-top:12px}
-  .form-actions .btn-primary,.form-actions .btn-secondary,.form-actions .btn-danger{width:100%}
-  .aula-days-grid{grid-template-columns:1fr 1fr}
-  .sidebar{width:min(86vw,320px)}
-}
+// improvements.js — Tema, sidebar colapsável, Ctrl+K, Charts, Export
+(function () {
+  'use strict';
+
+  // ── 1. TEMA — gerenciado por theme-engine.js ────────────────────────────
+
+  // ── 2. SIDEBAR: grupos colapsáveis ───────────────────────────────────────
+  function initSidebarGroups() {
+    const headers = document.querySelectorAll('.nav-group-header');
+    if (!headers.length) return;
+
+    // Restaura estado salvo
+    headers.forEach(btn => {
+      const group = btn.dataset.group;
+      const items = document.getElementById(`group-${group}`);
+      if (!items) return;
+
+      const collapsed = localStorage.getItem(`slc-nav-${group}`) === 'collapsed';
+      if (collapsed) {
+        items.style.display = 'none';
+        btn.classList.add('collapsed');
+      }
+
+      btn.addEventListener('click', () => {
+        const isCollapsed = items.style.display === 'none';
+        items.style.display = isCollapsed ? '' : 'none';
+        btn.classList.toggle('collapsed', !isCollapsed);
+        localStorage.setItem(`slc-nav-${group}`, isCollapsed ? 'open' : 'collapsed');
+      });
+    });
+  }
+
+  // ── 3. BUSCA RÁPIDA Ctrl+K ────────────────────────────────────────────────
+  const NAV_ITEMS = [
+    { label: 'Dashboard',          view: 'dashboard',         icon: 'fa-chart-pie' },
+    { label: 'Mentor IA',          view: 'mentor-ia',         icon: 'fa-robot' },
+    { label: 'Matérias',           view: 'materias',          icon: 'fa-book' },
+    { label: 'Grade Horária',      view: 'grade-horaria',     icon: 'fa-calendar-week' },
+    { label: 'Grade Curricular',   view: 'grade-curricular',  icon: 'fa-sitemap' },
+    { label: 'Cursos Extras',      view: 'cursos-extras',     icon: 'fa-language' },
+    { label: 'Situação Acadêmica', view: 'situacao-academica',icon: 'fa-heartbeat' },
+    { label: 'Previsão de Notas',  view: 'previsao-notas',    icon: 'fa-chart-line' },
+    { label: 'Tarefas',            view: 'tarefas',           icon: 'fa-tasks' },
+    { label: 'Provas e Trabalhos', view: 'provas',            icon: 'fa-graduation-cap' },
+    { label: 'Sessões de Estudo',  view: 'sessoes',           icon: 'fa-clock' },
+    { label: 'Calendário',         view: 'calendario',        icon: 'fa-calendar-alt' },
+    { label: 'Hábitos',            view: 'habitos',           icon: 'fa-heart' },
+    { label: 'Modo Foco',          view: 'foco',              icon: 'fa-bullseye' },
+    { label: 'Mapa de Aprendizado',view: 'mapa-aprendizado',  icon: 'fa-map' },
+    { label: 'Materiais',          view: 'materiais',         icon: 'fa-folder' },
+    { label: 'Estatísticas',       view: 'estatisticas',      icon: 'fa-chart-bar' },
+    { label: 'Configurações',      view: 'configuracoes',     icon: 'fa-cog' },
+    { label: 'Ajuda',              view: 'ajuda',             icon: 'fa-question-circle' },
+  ];
+
+  function initNavSearch() {
+    const modal   = document.getElementById('nav-search-modal');
+    const input   = document.getElementById('nav-search-input');
+    const results = document.getElementById('nav-search-results');
+    const overlay = document.getElementById('nav-search-overlay');
+    if (!modal || !input || !results) return;
+
+    function open() {
+      modal.hidden = false;
+      input.value = '';
+      renderResults('');
+      setTimeout(() => input.focus(), 50);
+    }
+
+    function close() {
+      modal.hidden = true;
+    }
+
+    function renderResults(query) {
+      const q = query.toLowerCase().trim();
+      const filtered = q
+        ? NAV_ITEMS.filter(item => item.label.toLowerCase().includes(q))
+        : NAV_ITEMS;
+
+      results.innerHTML = filtered.map((item, i) => `
+        <button class="nav-search-result${i === 0 ? ' active' : ''}" data-view="${item.view}">
+          <i class="fas ${item.icon}"></i>
+          <span>${item.label}</span>
+        </button>
+      `).join('');
+
+      results.querySelectorAll('.nav-search-result').forEach(btn => {
+        btn.addEventListener('click', () => {
+          close();
+          if (window.app?.loadView) window.app.loadView(btn.dataset.view);
+        });
+      });
+    }
+
+    input.addEventListener('input', e => renderResults(e.target.value));
+
+    input.addEventListener('keydown', e => {
+      const active = results.querySelector('.nav-search-result.active');
+      const all    = [...results.querySelectorAll('.nav-search-result')];
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const idx = all.indexOf(active);
+        const next = all[idx + 1] || all[0];
+        active?.classList.remove('active');
+        next?.classList.add('active');
+        next?.scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const idx = all.indexOf(active);
+        const prev = all[idx - 1] || all[all.length - 1];
+        active?.classList.remove('active');
+        prev?.classList.add('active');
+        prev?.scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const target = active || all[0];
+        if (target) { close(); if (window.app?.loadView) window.app.loadView(target.dataset.view); }
+      } else if (e.key === 'Escape') {
+        close();
+      }
+    });
+
+    overlay?.addEventListener('click', close);
+
+    document.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        modal.hidden ? open() : close();
+      }
+      if (e.key === 'Escape' && !modal.hidden) close();
+    });
+  }
+
+  // ── 4. CHARTS NO DASHBOARD ───────────────────────────────────────────────
+  // Injetado via patch no renderDashboard do ViewRenderer
+  function initDashboardCharts() {
+    if (!window.ViewRenderer) return;
+    const proto = ViewRenderer.prototype;
+    const originalDash = proto.renderDashboard;
+    if (!originalDash || proto.__chartPatched) return;
+
+    proto.renderDashboard = function () {
+      const html = originalDash.call(this);
+      // Injeta container de charts após o retorno
+      setTimeout(() => renderCharts(this.app?.data), 100);
+      return html;
+    };
+    proto.__chartPatched = true;
+  }
+
+  function renderCharts(data) {
+    const container = document.getElementById('view-container');
+    if (!container || !data) return;
+
+    // Evita duplicar
+    if (container.querySelector('#slc-charts-section')) return;
+
+    const sessions = data.sessions || [];
+    const grades   = data.grades   || [];
+
+    // Horas estudadas por dia (últimos 14 dias)
+    const today = new Date();
+    const labels = [], hoursData = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const ds = d.toISOString().slice(0, 10);
+      labels.push(d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }));
+      const mins = sessions
+        .filter(s => (s.data || s.dataHora || '').slice(0, 10) === ds && s.concluida)
+        .reduce((acc, s) => acc + (Number(s.duracao) || 0), 0);
+      hoursData.push(+(mins / 60).toFixed(1));
+    }
+
+    // Média de notas por matéria
+    const subjectGrades = {};
+    grades.forEach(g => {
+      if (!g.materia || !g.valor) return;
+      if (!subjectGrades[g.materia]) subjectGrades[g.materia] = [];
+      subjectGrades[g.materia].push(Number(g.valor));
+    });
+    const gradeLabels = Object.keys(subjectGrades).slice(0, 8);
+    const gradeData   = gradeLabels.map(m => {
+      const arr = subjectGrades[m];
+      return +(arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1);
+    });
+
+    // Heatmap de atividade (últimos 84 dias = 12 semanas)
+    const activityMap = {};
+    sessions.filter(s => s.concluida).forEach(s => {
+      const d = (s.data || s.dataHora || '').slice(0, 10);
+      if (d) activityMap[d] = (activityMap[d] || 0) + 1;
+    });
+
+    const section = document.createElement('div');
+    section.id = 'slc-charts-section';
+    section.style.cssText = 'padding:20px 0 32px;';
+    section.innerHTML = `
+      <div class="card" style="margin-bottom:20px;padding:20px 24px;">
+        <h3 style="margin-bottom:14px;font-size:14px;font-weight:600;color:var(--text-secondary);"><i class="fas fa-clock" style="color:var(--accent-primary);margin-right:8px;"></i>Horas estudadas — últimos 14 dias</h3>
+        <div style="position:relative;height:120px;"><canvas id="chart-hours"></canvas></div>
+      </div>
+      ${gradeLabels.length ? `
+      <div class="card" style="margin-bottom:20px;padding:20px 24px;">
+        <h3 style="margin-bottom:16px;font-size:14px;font-weight:600;color:var(--text-secondary);"><i class="fas fa-star" style="color:var(--accent-warning);margin-right:8px;"></i>Médias por matéria</h3>
+        <div id="slc-grades-list" class="slc-grade-rows"></div>
+      </div>` : ''}
+      <div class="card" style="padding:20px 24px;">
+        <h3 style="margin-bottom:16px;font-size:14px;font-weight:600;color:var(--text-secondary);"><i class="fas fa-fire" style="color:var(--accent-danger);margin-right:8px;"></i>Atividade — últimas 12 semanas</h3>
+        <div id="heatmap-container" style="overflow-x:auto;"></div>
+      </div>
+    `;
+
+    container.appendChild(section);
+    loadChartJS(labels, hoursData, gradeLabels, gradeData, activityMap);
+  }
+
+  function loadChartJS(labels, hoursData, gradeLabels, gradeData, activityMap) {
+    if (window.Chart) {
+      drawCharts(labels, hoursData, gradeLabels, gradeData, activityMap);
+      return;
+    }
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js';
+    s.onload = () => drawCharts(labels, hoursData, gradeLabels, gradeData, activityMap);
+    document.head.appendChild(s);
+  }
+
+  function drawCharts(labels, hoursData, gradeLabels, gradeData, activityMap) {
+    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+    const textColor = isDark ? '#94a3b8' : '#64748b';
+    const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+
+    const baseOpts = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { backgroundColor: isDark ? '#1e293b' : '#fff', titleColor: textColor, bodyColor: textColor, borderColor: gridColor, borderWidth: 1, padding: 8, displayColors: false } },
+      scales: {
+        x: { ticks: { color: textColor, font: { size: 10 } }, grid: { display: false }, border: { display: false } },
+        y: { ticks: { color: textColor, font: { size: 10 }, maxTicksLimit: 4 }, grid: { color: gridColor }, border: { display: false }, beginAtZero: true }
+      }
+    };
+
+    // Horas chart — barra fina, cor suave, sem grade vertical (visual mais limpo)
+    const hoursCtx = document.getElementById('chart-hours');
+    if (hoursCtx) {
+      new Chart(hoursCtx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{ data: hoursData, backgroundColor: 'rgba(96,165,250,0.55)', hoverBackgroundColor: 'rgba(96,165,250,0.85)', borderRadius: 4, borderSkipped: false, maxBarThickness: 18 }]
+        },
+        options: { ...baseOpts }
+      });
+    }
+
+    // Médias por matéria — virou lista de barrinhas horizontais em vez de
+    // gráfico de barras verticais: mais legível com nomes longos de matéria
+    // e visualmente mais leve (sem eixo, sem canvas, sem legenda).
+    const gradesList = document.getElementById('slc-grades-list');
+    if (gradesList && gradeLabels.length) {
+      gradesList.innerHTML = gradeLabels.map((label, i) => {
+        const value = gradeData[i];
+        const pct = Math.max(4, Math.min(100, (value / 10) * 100));
+        const color = value >= 7 ? '#10b981' : value >= 5 ? '#f59e0b' : '#ef4444';
+        return `
+          <div class="slc-grade-row">
+            <span class="slc-grade-label" title="${label}">${label}</span>
+            <div class="slc-grade-track"><div class="slc-grade-fill" style="width:${pct}%;background:${color};"></div></div>
+            <span class="slc-grade-value" style="color:${color};">${value.toFixed(1)}</span>
+          </div>`;
+      }).join('');
+    }
+
+    // Heatmap
+    const heatDiv = document.getElementById('heatmap-container');
+    if (heatDiv) {
+      const today = new Date();
+      let html = '<div style="display:flex;gap:3px;align-items:flex-start;">';
+      for (let w = 11; w >= 0; w--) {
+        html += '<div style="display:flex;flex-direction:column;gap:3px;">';
+        for (let d = 6; d >= 0; d--) {
+          const date = new Date(today);
+          date.setDate(today.getDate() - (w * 7 + d));
+          const ds = date.toISOString().slice(0, 10);
+          const count = activityMap[ds] || 0;
+          const opacity = count === 0 ? 0.08 : count === 1 ? 0.3 : count <= 3 ? 0.6 : 1;
+          html += `<div title="${ds}: ${count} sessão(ões)" style="width:12px;height:12px;border-radius:2px;background:rgba(59,130,246,${opacity});"></div>`;
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+      heatDiv.innerHTML = html;
+    }
+  }
+
+  // ── 5. EXPORT CSV ────────────────────────────────────────────────────────
+  function initExport() {
+    // Adiciona botão de export na view de configurações
+    document.addEventListener('click', e => {
+      if (e.target.closest('#btn-export-csv') || e.target.id === 'btn-export-csv') {
+        exportCSV();
+      }
+      if (e.target.closest('#btn-export-pdf') || e.target.id === 'btn-export-pdf') {
+        exportPDF();
+      }
+    });
+  }
+
+  function exportCSV() {
+    const data = window.app?.data;
+    if (!data) return;
+
+    const sheets = {
+      'sessoes': ['data', 'materia', 'tipo', 'duracao', 'completada'],
+      'tarefas': ['titulo', 'materia', 'dataLimite', 'prioridade', 'concluida'],
+      'provas':  ['titulo', 'materia', 'data', 'tipo', 'nota'],
+      'grades':  ['materia', 'avaliacao', 'nota', 'peso'],
+    };
+
+    let csv = '';
+    Object.entries(sheets).forEach(([key, fields]) => {
+      const rows = data[key] || [];
+      if (!rows.length) return;
+      csv += `\n### ${key.toUpperCase()} ###\n`;
+      csv += fields.join(',') + '\n';
+      rows.forEach(row => {
+        csv += fields.map(f => `"${String(row[f] ?? '').replace(/"/g, '""')}"`).join(',') + '\n';
+      });
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = Object.assign(document.createElement('a'), { href: url, download: 'study-life-control-dados.csv' });
+    a.click();
+    URL.revokeObjectURL(url);
+    if (window.showToast) window.showToast('CSV exportado com sucesso!', 'success');
+  }
+
+  function exportPDF() {
+    const data = window.app?.data;
+    if (!data) return;
+
+    // PDF simples via print — sem dependência externa
+    const user    = data.user || {};
+    const tasks   = (data.tarefas || data.tasks || []).filter(t => !t.concluida).slice(0, 20);
+    const exams   = (data.provas  || data.exams  || []).slice(0, 20);
+    const grades  = data.grades || [];
+
+    const html = `
+      <html><head><title>SLCampus — Relatório</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 32px; color: #1e293b; }
+        h1 { font-size: 22px; margin-bottom: 4px; }
+        h2 { font-size: 16px; margin: 24px 0 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { background: #f1f5f9; text-align: left; padding: 6px 8px; }
+        td { padding: 5px 8px; border-bottom: 1px solid #f1f5f9; }
+        .badge { display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px; }
+        .alta { background:#fee2e2;color:#dc2626; }
+        .media { background:#fef3c7;color:#d97706; }
+        .baixa { background:#dcfce7;color:#16a34a; }
+      </style></head><body>
+      <h1>📚 SLCampus</h1>
+      <p style="color:#64748b;font-size:13px;">Relatório gerado em ${new Date().toLocaleDateString('pt-BR')} • ${user.nome || 'Usuário'}</p>
+      <h2>Tarefas Pendentes</h2>
+      <table><tr><th>Tarefa</th><th>Matéria</th><th>Prazo</th><th>Prioridade</th></tr>
+      ${tasks.map(t => `<tr><td>${t.titulo||''}</td><td>${t.materia||''}</td><td>${t.dataLimite||''}</td><td><span class="badge ${t.prioridade||''}">${t.prioridade||''}</span></td></tr>`).join('')}
+      </table>
+      <h2>Provas e Trabalhos</h2>
+      <table><tr><th>Título</th><th>Matéria</th><th>Data</th><th>Tipo</th></tr>
+      ${exams.map(e => `<tr><td>${e.titulo||''}</td><td>${e.materia||''}</td><td>${e.data||''}</td><td>${e.tipo||''}</td></tr>`).join('')}
+      </table>
+      <h2>Notas Registradas</h2>
+      <table><tr><th>Matéria</th><th>Avaliação</th><th>Nota</th><th>Peso</th></tr>
+      ${grades.map(g => `<tr><td>${g.materia||''}</td><td>${g.avaliacao||''}</td><td>${g.nota||''}</td><td>${g.peso||''}%</td></tr>`).join('')}
+      </table>
+      </body></html>`;
+
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    win.print();
+  }
+
+  // ── 6. Botões de export na tela de configurações ─────────────────────────
+  function injectExportButtons() {
+    if (!window.ViewRenderer) return;
+    const proto = ViewRenderer.prototype;
+    if (proto.__exportPatched) return;
+
+    const originalConfig = proto.renderConfiguracoes;
+    if (!originalConfig) return;
+
+    proto.renderConfiguracoes = function (aba) {
+      const html = originalConfig.call(this, aba);
+      // Só mostra o bloco extra de exportação dentro da própria aba "Dados" —
+      // no menu de categorias e nas outras abas ele não deve aparecer.
+      if (aba !== 'dados') return html;
+      const exportSection = `
+        <div class="card" style="margin-top:20px;padding:20px 24px;">
+          <h3 style="margin-bottom:16px;font-size:15px;font-weight:600;"><i class="fas fa-download" style="color:var(--accent-primary);margin-right:8px;"></i>Exportar Dados</h3>
+          <p style="color:var(--text-secondary);font-size:13px;margin-bottom:16px;">Baixe seus dados acadêmicos para backup ou análise externa.</p>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            <button id="btn-export-csv" class="btn-secondary"><i class="fas fa-file-csv"></i> Exportar CSV</button>
+            <button id="btn-export-pdf" class="btn-secondary"><i class="fas fa-file-pdf"></i> Exportar PDF</button>
+          </div>
+        </div>`;
+      return html + exportSection;
+    };
+    proto.__exportPatched = true;
+  }
+
+  // ── INIT ──────────────────────────────────────────────────────────────────
+  function init() {
+    initSidebarGroups();
+    initNavSearch();
+    initExport();
+
+    // Patches de ViewRenderer (aguarda estar disponível)
+    let attempts = 0;
+    const interval = setInterval(() => {
+      if (window.ViewRenderer) {
+        initDashboardCharts();
+        injectExportButtons();
+        clearInterval(interval);
+      }
+      if (++attempts > 20) clearInterval(interval);
+    }, 300);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+
+// ── BÔNUS: Painel de atalhos de teclado (tecla ?) ──────────────────────────
+(function () {
+  const SHORTCUTS = [
+    { key: 'Ctrl K',   desc: 'Busca rápida' },
+    { key: '?',        desc: 'Mostrar atalhos' },
+    { key: 'Ctrl S',   desc: 'Salvar dados' },
+    { key: 'Esc',      desc: 'Fechar painéis' },
+    { key: 'Alt 1-9',  desc: 'Navegar entre views (na ordem do menu)' },
+    { key: 'Alt D',    desc: 'Ir para o Dashboard' },
+    { key: 'Alt F',    desc: 'Ir para o Modo Foco' },
+    { key: 'Alt T',    desc: 'Ir para Tarefas' },
+    { key: 'Alt P',    desc: 'Ir para Provas' },
+    { key: 'Alt M',    desc: 'Ir para o Mentor IA' },
+  ];
+
+  function showShortcutsModal() {
+    let modal = document.getElementById('shortcuts-modal');
+    if (modal) { modal.hidden = false; return; }
+
+    modal = document.createElement('div');
+    modal.id = 'shortcuts-modal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;';
+    modal.innerHTML = `
+      <div style="position:absolute;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);" id="shortcuts-overlay"></div>
+      <div style="
+        position:relative;background:var(--bg-secondary);border:1px solid var(--border);
+        border-radius:var(--radius-lg);padding:28px;min-width:320px;max-width:420px;width:90%;
+        box-shadow:0 25px 50px rgba(0,0,0,0.4);animation:slideUp 0.18s ease;
+      ">
+        <h3 style="margin:0 0 20px;font-size:16px;display:flex;align-items:center;gap:8px;">
+          <i class="fas fa-keyboard" style="color:var(--accent-primary);"></i> Atalhos de teclado
+        </h3>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          ${SHORTCUTS.map(s => `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-tertiary);border-radius:var(--radius-sm);">
+              <span style="font-size:13px;color:var(--text-secondary);">${s.desc}</span>
+              <kbd style="background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;padding:3px 10px;font-size:12px;font-family:monospace;color:var(--text-primary);">${s.key}</kbd>
+            </div>
+          `).join('')}
+        </div>
+        <p style="margin-top:16px;font-size:12px;color:var(--text-tertiary);text-align:center;">Pressione Esc ou clique fora para fechar</p>
+      </div>`;
+    document.body.appendChild(modal);
+    document.getElementById('shortcuts-overlay').addEventListener('click', () => modal.hidden = true);
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
+      const active = document.activeElement;
+      if (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') return;
+      e.preventDefault();
+      showShortcutsModal();
+    }
+    if (e.key === 'Escape') {
+      const m = document.getElementById('shortcuts-modal');
+      if (m) m.hidden = true;
+    }
+    // Alt+1-9 navegação rápida
+    if (e.altKey && e.key >= '1' && e.key <= '9') {
+      const views = ['dashboard','mentor-ia','materias','tarefas','provas','sessoes','estatisticas','configuracoes','ajuda'];
+      const view = views[parseInt(e.key) - 1];
+      if (view && window.app?.loadView) { e.preventDefault(); window.app.loadView(view); }
+    }
+    // Ctrl+S salva dados
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      const active = document.activeElement;
+      if (active.tagName !== 'INPUT' && active.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        window.dbService?.saveAllData?.();
+        if (window.showToast) window.showToast('Dados salvos!', 'success');
+      }
+    }
+  });
+})();

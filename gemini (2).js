@@ -11,7 +11,8 @@
 //
 // Google Calendar / Apple Calendário / Outlook batem nessa URL sozinhos de
 // tempos em tempos (o app do usuário nem precisa estar aberto) e recebem de
-// volta um arquivo .ics com provas, tarefas, sessões de estudo e aulas —
+// volta um arquivo .ics com provas, tarefas, sessões de estudo, aulas e
+// revisões espaçadas —
 // sempre atualizado, porque calendar-feed.js (front) mantém o documento
 // calendar_feeds/{token} em dia a cada save.
 //
@@ -148,11 +149,11 @@ function buildIcs(feed) {
   const lines = [];
   lines.push('BEGIN:VCALENDAR');
   lines.push('VERSION:2.0');
-  lines.push('PRODID:-//Study Life Control//Feed de Calendario//PT');
+  lines.push('PRODID:-//SLCampus//Feed de Calendario//PT');
   lines.push('CALSCALE:GREGORIAN');
   lines.push('METHOD:PUBLISH');
-  lines.push('X-WR-CALNAME:Study Life Control');
-  lines.push('X-WR-CALDESC:Provas, tarefas, sessões de estudo e aulas');
+  lines.push('X-WR-CALNAME:SLCampus');
+  lines.push('X-WR-CALDESC:Provas, tarefas, sessões de estudo, aulas e revisões');
   // Dica de intervalo de atualização pros clientes que respeitam (a maioria
   // busca de qualquer forma a cada 12–24h, mas não custa declarar).
   lines.push('REFRESH-INTERVAL;VALUE=DURATION:PT12H');
@@ -210,6 +211,23 @@ function buildIcs(feed) {
     lines.push('ACTION:DISPLAY');
     lines.push(foldLine(`DESCRIPTION:${icsEscape(`Sessão de estudo: ${s.materia}`)}`));
     lines.push('TRIGGER:-PT15M');
+    lines.push('END:VALARM');
+    lines.push('END:VEVENT');
+  });
+
+  (feed.reviews || []).forEach(r => {
+    if (!r.data) return;
+    lines.push('BEGIN:VEVENT');
+    lines.push(`UID:review-${r.id}@study-life-control`);
+    lines.push(`DTSTAMP:${utcStamp(feed.updatedAt)}`);
+    lines.push(`DTSTART;VALUE=DATE:${dateOnly(r.data)}`);
+    lines.push(`DTEND;VALUE=DATE:${addDaysToDateOnly(r.data, 1)}`);
+    lines.push(foldLine(`SUMMARY:${icsEscape(`🔁 Revisão: ${r.materia}${r.topico ? ` — ${r.topico}` : ''}`)}`));
+    if (r.tipo) lines.push(foldLine(`DESCRIPTION:${icsEscape(`Tipo: ${r.tipo}`)}`));
+    lines.push('BEGIN:VALARM');
+    lines.push('ACTION:DISPLAY');
+    lines.push(foldLine(`DESCRIPTION:${icsEscape(`Revisão: ${r.materia}`)}`));
+    lines.push('TRIGGER:-P1D');
     lines.push('END:VALARM');
     lines.push('END:VEVENT');
   });

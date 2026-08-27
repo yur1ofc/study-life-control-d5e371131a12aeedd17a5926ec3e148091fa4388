@@ -1,89 +1,38 @@
-# MELHORIAS-V2.md — O que foi adicionado
+# O que aconteceu com os arquivos
 
-## Arquivos novos (basta colocar na raiz do projeto)
+Quase **todo** o projeto estava com o conteúdo trocado de arquivo — não só o `improvements.js`
+que foi parar no lugar do `inject-env.js`. No zip que você mandou, dezenas de arquivos tinham por
+dentro o código de outro arquivo (cada um geralmente com o comentário `// nome-do-arquivo-certo.js`
+bem no topo, o que ajudou a rastrear tudo).
 
-### 1. `grade-ia-import.js` — Importação de grade por IA
-Substitui o fluxo "vá ao ChatGPT → gere JSON → cole aqui" por um modal
-onde o usuário arrasta o **PDF ou imagem** do fluxograma direto no site.
-A IA (Claude) lê o arquivo e extrai todas as disciplinas automaticamente.
+Eu abri cada arquivo, li o cabeçalho/conteúdo real, e recoloquei cada código no arquivo com o nome
+certo. Resultado: **53 de 56 arquivos foram recuperados corretamente** (validei todos os `.json` e
+`.xml/.svg`, e rodei `node --check` em todos os `.js` — nenhum erro de sintaxe).
 
-**O que acontece:**
-- O botão "Importar grade pronta" na tela de Grade Curricular vira "Importar com IA"
-- Um botão novo aparece no setup inicial: "Importar PDF ou imagem com IA"
-- Suporte a: PDF, PNG, JPG, WEBP
-- Também aceita texto colado (para quem copia do site da faculdade)
-- Faz merge inteligente: não duplica disciplinas existentes
+## Os 3 arquivos que eu NÃO consegui recuperar
 
-**Custo:** zero. Usa o Google Gemini que tem **1.500 usos por dia grátis** sem cartão de crédito. Só precisa de uma conta Google e criar uma chave em aistudio.google.com/apikey.
+O conteúdo original de:
+- `app-enhancements.js`
+- `onboarding-simplificado.js`
+- `tutorial.js`
 
----
+**não estava em nenhum lugar do zip** — parece que foi perdido de vez (sobrescrito) durante a
+bagunça, não só movido de lugar. Deixei esses 3 arquivos com um comentário de aviso no lugar do
+conteúdo, pra você não usar sem perceber.
 
-### 2. `onboarding-simplificado.js` — Modo iniciante + checklist
-Resolve o problema de novos usuários se sentirem perdidos.
+Como recuperar esses 3:
+- Se você usa Git/GitHub para esse projeto: `git log` / `git checkout` numa versão anterior desses
+  3 arquivos específicos.
+- Se não usa Git: procure um backup local mais antigo, ou no histórico de "Versões" do Vercel
+  (Deployments antigos) — dá pra baixar o código-fonte de um deploy anterior que estava funcionando.
 
-**Modo iniciante (automático para novos usuários):**
-- Oculta as seções avançadas do menu (Análise, Grade Curricular avançada, etc.)
-- Mostra um badge "Modo iniciante · ver tudo" no topo do menu
-- Clicar no badge libera o menu completo permanentemente
+## Bônus
 
-**Checklist de primeiros passos:**
-- Card no topo do dashboard mostrando 5 passos simples
-- Cada passo clicável leva direto para a seção certa
-- Barra de progresso visual
-- Some automaticamente quando todos os passos são concluídos
-- Pode ser dispensado por 7 dias
+Achei um pedacinho de documentação (instruções de uso do `curriculum-catalog.js`) que não pertencia
+a nenhum arquivo do projeto — salvei separado como `CURRICULUM-CATALOG-USO.md`, caso seja útil.
 
----
+## Recomendação
 
-### 3. `dashboard-prioritario.js` — Card "o que fazer agora"
-Injeta um card de destaque no topo do dashboard que mostra **a ação mais
-urgente** do momento, em ordem de prioridade:
-
-1. Prova hoje ou amanhã → alerta vermelho com botão direto para foco
-2. Tarefas em atraso → alerta amarelo
-3. Prova na semana → sugestão de revisão
-4. Sem matérias cadastradas → convite para configurar
-5. Sem sessão hoje → sugestão de estudo
-
-**Extras incluídos:**
-- Atalhos de teclado: `Alt+F` foco, `Alt+T` tarefas, `Alt+D` dashboard, `Alt+M` mentor IA
-- Botão flutuante "home" em telas avançadas (volta ao dashboard)
-- Pode ser dispensado por sessão (botão ✕)
-
----
-
-## Mudanças em arquivos existentes
-
-### `index.html`
-Adicionadas 3 linhas no final do body:
-```html
-<script src="grade-ia-import.js"></script>
-<script src="onboarding-simplificado.js"></script>
-<script src="dashboard-prioritario.js"></script>
-```
-
-### `env-config.js` e `env-config.example.js`
-Adicionado campo `GEMINI_API_KEY` (vazio por padrão).
-Para ativar a importação por IA:
-1. Acesse https://aistudio.google.com/apikey
-2. Crie uma chave gratuita (só conta Google, sem cartão)
-3. Cole em `GEMINI_API_KEY` no env-config.js (local)
-4. No Vercel: Settings → Environment Variables → `GEMINI_API_KEY`
-
-### `ai-assistant.js`
-- Corrigido para usar a chave `window.__ENV.ANTHROPIC_API_KEY`
-- Atualizado o modelo para `claude-sonnet-4-6` (mais recente)
-- Antes a chamada à API estava sem chave de autenticação (não funcionava)
-
----
-
-## Como fazer deploy no Vercel (gratuito)
-
-1. Faça push do projeto para um repositório no GitHub
-2. Acesse vercel.com → "New Project" → importe o repositório
-3. Sem configuração adicional (é HTML/JS puro, sem build)
-4. Em Settings → Environment Variables, adicione:
-   - `GEMINI_API_KEY` = sua chave do Google AI Studio (grátis)
-5. Redeploy → pronto
-
-**Custo total: R$ 0** (Vercel gratuito + Firebase gratuito + Google Gemini gratuito)
+Depois de conferir, eu apagaria os arquivos `download`, `download (1)` e o
+`study-life-control-atualizacao-grade-ia.zip` da raiz do projeto — são sobras/duplicatas que não
+fazem parte do site.

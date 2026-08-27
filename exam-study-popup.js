@@ -1,143 +1,252 @@
-// exam-study-popup.js
-// Na primeira vez que o site abre no dia, se tiver prova/trabalho perto
-// (próximos DIAS_LIMITE dias) sem sessão de estudo já programada pra ele,
-// pergunta se a pessoa quer programar uma sessão de estudo — já perguntando
-// o dia e os conteúdos — e abre o modal de "Nova Sessão" preenchido.
+// database.js - Gerenciamento do Firestore
 
-(function () {
-  'use strict';
+const DEFAULT_APP_DATA = () => ({
+    user: null,
+    subjects: [],
+    sessions: [],
+    tasks: [],
+    exams: [],
+    materials: [],
+    grades: [],
+    habits: [],
+    learningMap: [],
+    classSchedule: [],
+    dailyLogs: [],
+    classDiaries: [],
+    reviews: [],
+    curriculum: [],
+    extraCourses: [],
+    attendance: {},
+    // Assinaturas de push (uma por navegador/dispositivo onde o usuário
+    // ativou "Ativar alarmes de estudo") e registro do que já foi
+    // notificado, pra api/send-reminders.js não mandar o mesmo lembrete
+    // de novo a cada vez que o cron roda. Ver push-notifications.js.
+    pushSubscriptions: [],
+    sentReminders: [],
+    settings: {
+        heavyMode: false,
+        autoPlan: true,
+        // Token do feed de calendário (.ics) assinável — ver calendar-feed.js.
+        calendarToken: null,
+        // Tema personalizado (cores, tamanho de fonte, arredondamento) —
+        // salvo na conta pra valer em qualquer aparelho logado, não só
+        // neste navegador. Ver theme-engine.js.
+        theme: { preset: 'dark', custom: {} },
+        // Preferências de alarme/lembrete por push — ver push-notifications.js.
+        studyReminders: {
+            enabled: false,
+            examsHoursBefore: 24,
+            tasksHoursBefore: 24,
+            sessionsMinutesBefore: 15,
+            // Revisão espaçada (review-system.js) e aulas da grade horária —
+            // adicionados depois dos 3 originais; ver CALENDARIO-E-LEMBRETES.md.
+            reviewsHoursBefore: 24,
+            classMinutesBefore: 15
+        }
+    }
+});
 
-  const DIAS_LIMITE = 5;
-  const SHOWN_KEY_PREFIX = 'slc-exam-popup-shown-';
+const LOCAL_BACKUP_PREFIX = 'slc-backup:';
 
-  function todayKey() {
-    const d = new Date();
-    return `${SHOWN_KEY_PREFIX}${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
-  }
+function getBackupKey(userId) {
+    return `${LOCAL_BACKUP_PREFIX}${userId}`;
+}
 
-  function alreadyShownToday() {
-    try { return sessionStorage.getItem(todayKey()) === '1'; } catch (_) { return false; }
-  }
+function saveLocalBackup(userId, data) {
+    try {
+        localStorage.setItem(getBackupKey(userId), JSON.stringify({
+            savedAt: new Date().toISOString(),
+            data
+        }));
+    } catch (error) {
+        console.warn('Não foi possível salvar backup local:', error);
+    }
+}
 
-  function markShownToday() {
-    try { sessionStorage.setItem(todayKey(), '1'); } catch (_) { /* ignore */ }
-  }
+function loadLocalBackup(userId) {
+    try {
+        const raw = localStorage.getItem(getBackupKey(userId));
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return parsed?.data || null;
+    } catch (error) {
+        console.warn('Não foi possível ler backup local:', error);
+        return null;
+    }
+}
 
-  function diasAte(dataStr) {
-    const alvo = new Date(dataStr);
-    alvo.setHours(0, 0, 0, 0);
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    return Math.round((alvo - hoje) / 86400000);
-  }
+// Dispara um evento global toda vez que algo é salvo com sucesso.
+// Existia um listener disso no xp-widget.js que nunca era acionado por
+// ninguém — agora ele (e qualquer outra coisa que queira reagir a saves,
+// como o feed de calendário) tem um gancho real pra se pendurar.
+// `fields` é a lista de campos alterados nesse save (ex: ['tasks']) quando
+// souber; em saves genéricos (saveAllData/clearAllData) vai vazio.
+function notifyDataSaved(fields = []) {
+    try {
+        document.dispatchEvent(new CustomEvent('slc-data-saved', { detail: { fields } }));
+    } catch (error) {
+        console.warn('Não foi possível disparar slc-data-saved:', error);
+    }
+}
 
-  function jaTemSessaoParaEvento(app, materia, alvoData) {
-    const sessions = Array.isArray(app.data.sessions) ? app.data.sessions : [];
-    return sessions.some(s => {
-      if (s.materia !== materia) return false;
-      const dias = Math.abs(diasAte(s.data));
-      return dias <= 1 || new Date(s.data) <= new Date(alvoData);
-    });
-  }
+const dbService = {
+    async loadUserData(userId) {
+        try {
+            const userDoc = await db.collection('users').doc(userId).get();
 
-  function encontrarProximoEvento(app) {
-    const exams = Array.isArray(app.data.exams) ? app.data.exams : [];
-    const tasks = Array.isArray(app.data.tasks) ? app.data.tasks : [];
+            let data;
+            if (!userDoc.exists) {
+                data = DEFAULT_APP_DATA();
+            } else {
+                const raw = userDoc.data() || {};
+                data = {
+                    ...DEFAULT_APP_DATA(),
+                    ...raw,
+                    settings: {
+                        ...DEFAULT_APP_DATA().settings,
+                        ...(raw.settings || {})
+                    }
+                };
+            }
 
-    const candidatosProva = exams
-        .filter(e => !e.concluida)
-        .map(e => ({ tipoEvento: 'prova', titulo: e.titulo, materia: e.materia, data: e.data, dias: diasAte(e.data) }));
+            if (window.app) {
+                window.app.data = data;
+            }
 
-    const candidatosTarefa = tasks
-        .filter(t => !t.concluida)
-        .map(t => ({ tipoEvento: 'trabalho', titulo: t.titulo, materia: t.materia, data: t.dataLimite, dias: diasAte(t.dataLimite) }));
+            // Reaplica o tema salvo NA CONTA (pode ser diferente do que
+            // estava em cache neste aparelho) — é isso que faz o tema
+            // valer por conta e não por aparelho.
+            window.themeEngine?.syncFromAccount(data.settings?.theme);
 
-    const todos = [...candidatosProva, ...candidatosTarefa]
-        .filter(c => c.dias >= 0 && c.dias <= DIAS_LIMITE)
-        .filter(c => !jaTemSessaoParaEvento(app, c.materia, c.data))
-        .sort((a, b) => a.dias - b.dias);
+            saveLocalBackup(userId, data);
 
-    return todos[0] || null;
-  }
+            if (window.updateSyncStatus) window.updateSyncStatus(true);
+            return data;
+        } catch (error) {
+            console.error('Erro ao carregar dados:', error);
+            const backup = loadLocalBackup(userId);
+            if (backup) {
+                if (window.updateSyncStatus) window.updateSyncStatus(false);
+                if (window.showToast) window.showToast('Sem conexão com o banco. Carregando último backup local.', 'warning');
+                return {
+                    ...DEFAULT_APP_DATA(),
+                    ...backup,
+                    settings: {
+                        ...DEFAULT_APP_DATA().settings,
+                        ...(backup.settings || {})
+                    }
+                };
+            }
+            if (window.updateSyncStatus) window.updateSyncStatus(false);
+            if (window.showToast) window.showToast('Erro ao sincronizar dados', 'error');
+            throw error;
+        }
+    },
 
-  function fmtRelativo(dias) {
-    if (dias === 0) return 'hoje';
-    if (dias === 1) return 'amanhã';
-    return `em ${dias} dias`;
-  }
+    async saveAllData(dataOverride = null) {
+        const user = auth.currentUser;
+        if (!user) return false;
 
-  function sugerirDataSessao(dataEvento) {
-    const alvo = new Date(dataEvento);
-    alvo.setDate(alvo.getDate() - 1);
-    if (alvo < new Date()) alvo.setTime(Date.now());
-    alvo.setHours(19, 0, 0, 0);
-    alvo.setMinutes(alvo.getMinutes() - alvo.getTimezoneOffset());
-    return alvo.toISOString().slice(0, 16);
-  }
+        try {
+            if (window.showLoading) window.showLoading();
 
-  function buildModal(evento) {
-    const overlay = document.createElement('div');
-    overlay.id = 'exam-popup-overlay';
-    overlay.className = 'exam-popup-overlay';
-    const label = evento.tipoEvento === 'prova' ? 'Prova' : 'Trabalho';
-    overlay.innerHTML = `
-      <div class="exam-popup-card">
-        <div class="exam-popup-icon"><i class="fas fa-graduation-cap"></i></div>
-        <h3>${label} de ${escapeHtml(evento.materia)} ${fmtRelativo(evento.dias)}</h3>
-        <p class="text-secondary">"${escapeHtml(evento.titulo)}" — quer programar uma sessão de estudo pra se preparar?</p>
-        <div class="wiz-field" style="text-align:left">
-          <label>Quando estudar</label>
-          <input type="datetime-local" id="exam-popup-data" value="${sugerirDataSessao(evento.data)}">
-        </div>
-        <div class="wiz-field" style="text-align:left">
-          <label>O que estudar (opcional)</label>
-          <input type="text" id="exam-popup-conteudo" placeholder="Ex: capítulos 3 e 4, exercícios da lista 2">
-        </div>
-        <div class="exam-popup-actions">
-          <button type="button" class="btn-secondary" id="exam-popup-skip">Agora não</button>
-          <button type="button" class="btn-primary" id="exam-popup-confirm">Programar sessão</button>
-        </div>
-      </div>`;
-    return overlay;
-  }
+            const dataToSave = dataOverride || window.app?.data || DEFAULT_APP_DATA();
+            await db.collection('users').doc(user.uid).set(dataToSave, { merge: true });
+            saveLocalBackup(user.uid, dataToSave);
 
-  function escapeHtml(str) {
-    return String(str || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  }
+            if (window.app) {
+                window.app.data = dataToSave;
+            }
 
-  function showPopup(evento) {
-    if (document.getElementById('exam-popup-overlay')) return;
-    const overlay = buildModal(evento);
-    document.body.appendChild(overlay);
-    requestAnimationFrame(() => overlay.classList.add('is-visible'));
+            if (window.updateSyncStatus) window.updateSyncStatus(true);
+            notifyDataSaved(Object.keys(dataToSave));
+            return true;
+        } catch (error) {
+            console.error('Erro ao salvar dados:', error);
+            if (window.updateSyncStatus) window.updateSyncStatus(false);
+            if (window.showToast) window.showToast('Erro ao salvar dados', 'error');
+            return false;
+        } finally {
+            if (window.hideLoading) window.hideLoading();
+        }
+    },
 
-    const close = () => { overlay.classList.remove('is-visible'); setTimeout(() => overlay.remove(), 200); };
+    async saveData(field, data) {
+        const user = auth.currentUser;
+        if (!user) return false;
 
-    document.getElementById('exam-popup-skip')?.addEventListener('click', close);
-    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+        try {
+            await db.collection('users').doc(user.uid).set({
+                [field]: data
+            }, { merge: true });
 
-    document.getElementById('exam-popup-confirm')?.addEventListener('click', () => {
-      const dataEscolhida = document.getElementById('exam-popup-data')?.value;
-      const conteudo = document.getElementById('exam-popup-conteudo')?.value || '';
-      close();
-      window.app?.openModal?.('sessao', {
-        materia: evento.materia,
-        tipo: 'foco',
-        data: dataEscolhida,
-        topico: conteudo || `Preparação para ${evento.tipoEvento === 'prova' ? 'prova' : 'trabalho'}: ${evento.titulo}`
-      });
-    });
-  }
+            if (window.app?.data) {
+                window.app.data[field] = data;
+                saveLocalBackup(user.uid, window.app.data);
+            }
 
-  function maybeShow() {
-    if (alreadyShownToday()) return;
-    const app = window.app;
-    if (!app?.data) return;
-    const evento = encontrarProximoEvento(app);
-    if (!evento) return;
-    markShownToday();
-    setTimeout(() => showPopup(evento), 1800);
-  }
+            if (window.updateSyncStatus) window.updateSyncStatus(true);
+            notifyDataSaved([field]);
+            return true;
+        } catch (error) {
+            console.error(`Erro ao salvar campo "${field}":`, error);
+            if (window.updateSyncStatus) window.updateSyncStatus(false);
+            if (window.showToast) window.showToast('Erro ao salvar', 'error');
+            return false;
+        }
+    },
 
-  document.addEventListener('app-ready', maybeShow);
-})();
+    async addItem(collection, item) {
+        if (!window.app?.data?.[collection]) return false;
+        window.app.data[collection].push(item);
+        return this.saveData(collection, window.app.data[collection]);
+    },
+
+    async updateItem(collection, id, updates) {
+        if (!window.app?.data?.[collection]) return false;
+
+        const index = window.app.data[collection].findIndex(i => i.id === id);
+        if (index === -1) return false;
+
+        window.app.data[collection][index] = {
+            ...window.app.data[collection][index],
+            ...updates
+        };
+
+        return this.saveData(collection, window.app.data[collection]);
+    },
+
+    async removeItem(collection, id) {
+        if (!window.app?.data?.[collection]) return false;
+
+        window.app.data[collection] = window.app.data[collection].filter(i => i.id !== id);
+        return this.saveData(collection, window.app.data[collection]);
+    },
+
+    async clearAllData() {
+        const user = auth.currentUser;
+        if (!user) return false;
+
+        try {
+            if (window.showLoading) window.showLoading();
+
+            const emptyData = DEFAULT_APP_DATA();
+            await db.collection('users').doc(user.uid).set(emptyData);
+            if (window.app) window.app.data = emptyData;
+
+            if (window.updateSyncStatus) window.updateSyncStatus(true);
+            notifyDataSaved(Object.keys(emptyData));
+            return true;
+        } catch (error) {
+            console.error('Erro ao limpar dados:', error);
+            if (window.updateSyncStatus) window.updateSyncStatus(false);
+            if (window.showToast) window.showToast('Erro ao limpar dados', 'error');
+            return false;
+        } finally {
+            if (window.hideLoading) window.hideLoading();
+        }
+    }
+};
+
+window.DEFAULT_APP_DATA = DEFAULT_APP_DATA;
+window.dbService = dbService;

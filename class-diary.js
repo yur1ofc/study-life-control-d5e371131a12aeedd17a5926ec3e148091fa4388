@@ -1,90 +1,90 @@
-// class-diary.js - Registro de Aulas aprimorado
-class ClassDiaryService {
-    constructor() {
-        this.diaries = [];
-    }
+// auto-notification-prompt.js
+// Pede permissão de notificação automaticamente na primeira vez que o site
+// abre em um aparelho/navegador que ainda não decidiu nada (Notification.permission
+// === 'default'). Em vez de chamar Notification.requestPermission() direto no
+// load (o que vários navegadores ignoram/bloqueiam sem gesto do usuário e é uma
+// péssima primeira impressão), mostra uma faixa leve pedindo um clique — esse
+// clique já conta como o gesto que o navegador exige, e a permissão nativa some
+// junto.
+//
+// Reaparece em qualquer navegador/dispositivo novo onde ainda não foi decidido
+// (permitido ou negado). Se a pessoa clicar em "Agora não", não repete no mesmo
+// dia nesse aparelho, mas volta a perguntar no dia seguinte até que ela decida.
 
-    loadDiaries() {
-        this.diaries = window.app?.data?.classDiaries || [];
-    }
+(function () {
+  'use strict';
 
-    // Se diaryData.id vier preenchido, atualiza o diário existente em vez de criar
-    // um novo (usado pela edição na página de Diário).
-    async registrarDiario(diaryData) {
-        this.loadDiaries();
-        const novoDiario = {
-            id: diaryData.id || generateId(),
-            materia: diaryData.materia,
-            data: diaryData.data || new Date().toISOString().split('T')[0],
-            presenca: diaryData.presenca,
-            conteudoExplicado: diaryData.conteudoExplicado || '',
-            exerciciosPassados: diaryData.exerciciosPassados || '',
-            trabalhoAnunciado: diaryData.trabalhoAnunciado || '',
-            dificuldade: diaryData.dificuldade || 3,
-            precisoRevisar: diaryData.precisoRevisar || false,
-            observacoes: diaryData.observacoes || '',
-            entendi: diaryData.entendi || '',
-            naoEntendi: diaryData.naoEntendi || '',
-            duvidaPendente: diaryData.duvidaPendente || '',
-            linksAnexos: diaryData.linksAnexos || ''
-        };
+  const DISMISS_KEY_PREFIX = 'slc-notif-prompt-dismissed-';
 
-        if (diaryData.id) {
-            const success = await dbService.updateItem('classDiaries', diaryData.id, novoDiario);
-            if (success) {
-                this.loadDiaries();
-                showToast('Diário de aula atualizado!');
-            }
-            return success;
-        }
+  function todayKey() {
+    const d = new Date();
+    return `${DISMISS_KEY_PREFIX}${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+  }
 
-        const assinatura = [novoDiario.materia, novoDiario.data, novoDiario.conteudoExplicado, novoDiario.exerciciosPassados].join('|').toLowerCase().trim();
-        const duplicado = this.diaries.find(item => [item.materia, item.data, item.conteudoExplicado, item.exerciciosPassados].join('|').toLowerCase().trim() === assinatura);
-        if (duplicado) {
-            showToast('Esse diário já está salvo.', 'warning');
-            return false;
-        }
+  function wasDismissedToday() {
+    try { return localStorage.getItem(todayKey()) === '1'; } catch (_) { return false; }
+  }
 
-        const success = await dbService.addItem('classDiaries', novoDiario);
-        if (success) {
-            this.loadDiaries();
-            if (window.reviewSystem?.gerarRevisoesFromAula) {
-                await window.reviewSystem.gerarRevisoesFromAula(novoDiario);
-            }
-            showToast(novoDiario.precisoRevisar ? 'Diário salvo e revisões automáticas criadas!' : 'Diário de aula salvo!');
-        }
-        return success;
-    }
+  function dismissForToday() {
+    try { localStorage.setItem(todayKey(), '1'); } catch (_) { /* ignore */ }
+  }
 
-    // Remover uma entrada de diário de aula (usado pelo Diário)
-    async removerDiario(id) {
-        const success = await dbService.removeItem('classDiaries', id);
-        if (success) {
-            this.loadDiaries();
-            showToast('Diário de aula removido.');
-        }
-        return success;
-    }
+  function buildBanner() {
+    const banner = document.createElement('div');
+    banner.id = 'auto-notif-banner';
+    banner.className = 'auto-notif-banner';
+    banner.innerHTML = `
+      <div class="auto-notif-banner-icon"><i class="fas fa-bell"></i></div>
+      <div class="auto-notif-banner-text">
+        <strong>Ativar alarmes de provas e lembretes?</strong>
+        <span>Avisamos antes de provas, trabalhos, sessões, revisões e aulas — mesmo com o app fechado.</span>
+      </div>
+      <div class="auto-notif-banner-actions">
+        <button type="button" class="auto-notif-btn secondary" id="auto-notif-dismiss">Agora não</button>
+        <button type="button" class="auto-notif-btn primary" id="auto-notif-accept">Ativar</button>
+      </div>
+    `;
+    return banner;
+  }
 
-    getDiariosPorMateria(materiaNome) {
-        return this.diaries.filter(d => d.materia === materiaNome)
-            .sort((a, b) => new Date(b.data) - new Date(a.data));
-    }
+  function removeBanner(banner) {
+    banner?.classList.remove('is-visible');
+    setTimeout(() => banner?.remove(), 200);
+  }
 
-    getUltimoDiarioPorMateria(materiaNome) {
-        return this.getDiariosPorMateria(materiaNome)[0];
-    }
+  async function showPrompt() {
+    if (document.getElementById('auto-notif-banner')) return;
+    const banner = buildBanner();
+    document.body.appendChild(banner);
+    requestAnimationFrame(() => banner.classList.add('is-visible'));
 
-    getDiariosParaRevisar() {
-        return this.diaries.filter(d => d.precisoRevisar)
-            .sort((a, b) => new Date(b.data) - new Date(a.data));
-    }
+    document.getElementById('auto-notif-dismiss')?.addEventListener('click', () => {
+      dismissForToday();
+      removeBanner(banner);
+    });
 
-    calcularFrequencia(materiaNome) {
-        const diarios = this.getDiariosPorMateria(materiaNome);
-        if (!diarios.length) return 100;
-        const presencas = diarios.filter(d => d.presenca === 'present').length;
-        return Math.round((presencas / diarios.length) * 100);
-    }
-}
-window.classDiaryService = new ClassDiaryService();
+    document.getElementById('auto-notif-accept')?.addEventListener('click', async () => {
+      const btn = document.getElementById('auto-notif-accept');
+      if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
+      try {
+        await window.pushNotifications.enable();
+        window.showToast?.('Notificações ativadas! Você vai receber os alarmes de estudo.', 'success');
+      } catch (error) {
+        // Se a permissão foi negada, não adianta insistir hoje.
+        dismissForToday();
+        window.showToast?.(error?.message || 'Não foi possível ativar as notificações.', 'error');
+      } finally {
+        removeBanner(banner);
+      }
+    });
+  }
+
+  function maybePrompt() {
+    if (!window.pushNotifications?.isSupported?.()) return;
+    if (window.pushNotifications.permissionStatus() !== 'default') return;
+    if (wasDismissedToday()) return;
+    setTimeout(showPrompt, 1500);
+  }
+
+  document.addEventListener('app-ready', maybePrompt);
+})();
