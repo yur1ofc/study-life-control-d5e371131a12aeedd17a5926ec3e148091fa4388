@@ -650,7 +650,7 @@ button:active,
 .logo {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 6px;
     font-size: 20px;
     font-weight: 700;
 }
@@ -661,7 +661,7 @@ button:active,
 }
 
 .logo .brand-logo-img {
-    height: 30px;
+    height: 44px;
 }
 
 .sidebar-nav {

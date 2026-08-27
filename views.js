@@ -1785,7 +1785,7 @@ class ViewRenderer {
             </button>
             <h2><i class="fas ${abaAtual.icon}"></i> ${abaAtual.label}</h2>
         </div>
-        <div class="config-content">${conteudo}</div>`;
+        ${conteudo ? `<div class="config-content">${conteudo}</div>` : ''}`;
     }
 
     renderMaterias() {
