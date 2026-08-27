@@ -238,7 +238,7 @@ textarea {
 
 .btn-primary {
     background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-    color: white;
+    color: var(--btn-text, white);
     border: none;
     padding: 14px 32px;
     border-radius: 14px;
@@ -538,7 +538,7 @@ button:active,
 
 .setup-header i {
     font-size: 48px;
-    color: white;
+    color: var(--btn-text, white);
     margin-bottom: 20px;
 }
 
@@ -546,7 +546,7 @@ button:active,
     font-size: 32px;
     font-weight: 700;
     margin-bottom: 10px;
-    color: white;
+    color: var(--btn-text, white);
 }
 
 .setup-header p {
@@ -703,7 +703,7 @@ button:active,
 
 .nav-item .badge {
     background: var(--accent-primary);
-    color: white;
+    color: var(--btn-text, white);
     font-size: 10px;
     padding: 2px 6px;
     border-radius: 10px;
@@ -1634,7 +1634,7 @@ button:active,
 .habito-chip.active {
     background: var(--accent-primary);
     border-color: var(--accent-primary);
-    color: #fff;
+    color: var(--btn-text, #fff);
 }
 
 .habito-chip i {
@@ -1785,7 +1785,7 @@ body[data-view="mentor-ia"] .sugestoes-container {
 
 .message.user .message-content {
     background: var(--accent-primary);
-    color: white;
+    color: var(--btn-text, white);
     border-bottom-right-radius: 4px;
 }
 
@@ -5417,7 +5417,7 @@ body.sidebar-open #slc-bottom-nav {
 .diario-pill.active {
     background: var(--accent-primary);
     border-color: var(--accent-primary);
-    color: #fff;
+    color: var(--btn-text, #fff);
 }
 
 .diario-pill.active.presenca-absent {
@@ -5527,7 +5527,7 @@ body.sidebar-open #slc-bottom-nav {
     height: 40px;
     border-radius: 50%;
     background: var(--accent-primary);
-    color: #fff;
+    color: var(--btn-text, #fff);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -5569,7 +5569,7 @@ body.sidebar-open #slc-bottom-nav {
 
 .auto-notif-btn.primary {
     background: var(--accent-primary);
-    color: #fff;
+    color: var(--btn-text, #fff);
 }
 
 .auto-notif-btn.secondary {
@@ -5630,7 +5630,7 @@ body.sidebar-open #slc-bottom-nav {
     height: 52px;
     border-radius: 50%;
     background: var(--accent-primary);
-    color: #fff;
+    color: var(--btn-text, #fff);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -5798,5 +5798,5 @@ body.sidebar-open #slc-bottom-nav {
 
 .qs-action:hover {
     background: var(--accent-primary);
-    color: #fff;
+    color: var(--btn-text, #fff);
 }
