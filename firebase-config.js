@@ -57,6 +57,24 @@ if (missingFirebaseKeys.length) {
   window.db             = db;
   window.googleProvider = googleProvider;
 
+  // Precisa ser chamado AQUI, logo após criar o Firestore e antes de qualquer
+  // outra leitura/escrita — se algo já tiver consultado o Firestore (ex.: o
+  // dashboard carregando dados), enablePersistence() falha de forma síncrona
+  // com "Firestore has already been started...". Fazendo isso o mais cedo
+  // possível evita esse erro.
+  if (db.enablePersistence) {
+    window.__slcOfflineEnabled = true;
+    db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
+      if (err.code === 'failed-precondition') {
+        console.warn('[SLC Offline] Múltiplas abas abertas — persistence só ativa numa aba por vez.');
+      } else if (err.code === 'unimplemented') {
+        console.warn('[SLC Offline] Navegador não suporta offline persistence.');
+      } else {
+        console.warn('[SLC Offline] Erro ao ativar persistence:', err.code || err.message || err);
+      }
+    });
+  }
+
   if (firebaseConfig.measurementId && firebase.analytics) {
     try {
       window.analytics = firebase.analytics();

@@ -549,20 +549,11 @@
   // 6. OFFLINE — Firebase IndexedDB persistence + banner
   // ═══════════════════════════════════════════════════════════════
   function enableOfflinePersistence() {
-    if (window.__slcOfflineEnabled) return;
-    window.__slcOfflineEnabled = true;
-
-    try {
-      if (window.db && window.db.enablePersistence) {
-        window.db.enablePersistence({ synchronizeTabs: true }).catch(err => {
-          if (err.code === 'failed-precondition') {
-            console.warn('[SLC Offline] Múltiplas abas abertas — persistence só ativa numa aba por vez.');
-          } else if (err.code === 'unimplemented') {
-            console.warn('[SLC Offline] Navegador não suporta offline persistence.');
-          }
-        });
-      }
-    } catch (e) { console.warn('[SLC Offline] Erro ao ativar persistence:', e); }
+    // A tentativa de habilitar o enablePersistence do Firestore agora acontece
+    // cedo, em firebase-config.js (precisa rodar antes de qualquer outra
+    // consulta ao Firestore). Aqui só cuidamos do banner de status de conexão.
+    if (window.__slcOfflineBannerSetup) return;
+    window.__slcOfflineBannerSetup = true;
 
     // Banner de status de conexão
     let offlineBanner = null;
