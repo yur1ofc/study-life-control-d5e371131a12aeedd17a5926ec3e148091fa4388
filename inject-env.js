@@ -20,6 +20,8 @@ try {
     'FIREBASE_APP_ID'
   ];
 
+  const optionalKeys = ['FIREBASE_MEASUREMENT_ID'];
+
   const missing = keys.filter(k => !process.env[k]);
 
   if (missing.length) {
@@ -33,6 +35,14 @@ try {
     if (process.env.VAPID_PUBLIC_KEY) {
       envObj.VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
     }
+
+    optionalKeys.forEach(k => {
+      if (process.env[k]) {
+        envObj[k] = process.env[k];
+      } else {
+        console.warn(`[inject-env] ${k} não configurada — recurso opcional relacionado ficará desativado.`);
+      }
+    });
 
     const content = `// Gerado automaticamente no build — NÃO EDITE e NÃO COMMITE este arquivo\nwindow.__ENV = ${JSON.stringify(envObj, null, 2)};\n`;
 
