@@ -5,7 +5,7 @@
 // adicione ele aqui também — senão ele só entra no cache dinâmico depois
 // do primeiro acesso online, e falha se o usuário abrir o app offline
 // (ou logo após instalar como PWA) antes disso acontecer.
-const CACHE_VERSION = 'slc-v19';
+const CACHE_VERSION = 'slc-v20';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 
@@ -65,12 +65,20 @@ const STATIC_ASSETS = [
   './launch-polish.js',
   './improvements.js',
   './ux-improvements.js',
-  './reprovado-ecosystem.js'
+  './reprovado-ecosystem.js',
+  // Firebase SDK agora é hospedado localmente (antes vinha da CDN gstatic.com
+  // e nunca era cacheado pelo SW — se o navegador não tivesse essas 4 URLs no
+  // cache HTTP próprio dele, o app ficava travado pra sempre na tela de
+  // carregamento quando aberto offline). Local = sempre cacheado, igual
+  // qualquer outro arquivo do site.
+  './vendor/firebase/firebase-app-compat.js',
+  './vendor/firebase/firebase-auth-compat.js',
+  './vendor/firebase/firebase-firestore-compat.js',
+  './vendor/firebase/firebase-analytics-compat.js'
 ];
 
 // Origens externas: busca sempre da rede, sem interceptar
 const EXTERNAL_ORIGINS = [
-  'https://www.gstatic.com',
   'https://apis.google.com',
   'https://fonts.googleapis.com',
   'https://fonts.gstatic.com',

@@ -37,10 +37,13 @@
     <script src="theme-engine.js"></script>
     <!-- Credenciais injetadas no build pelo inject-env.js -->
     <script src="env-config.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics-compat.js"></script>
+    <!-- Firebase SDK hospedado localmente (não mais na CDN gstatic.com) —
+         assim o service worker consegue cachear e o app funciona offline
+         mesmo em navegadores/dispositivos que não tinham a CDN em cache. -->
+    <script src="vendor/firebase/firebase-app-compat.js"></script>
+    <script src="vendor/firebase/firebase-auth-compat.js"></script>
+    <script src="vendor/firebase/firebase-firestore-compat.js"></script>
+    <script src="vendor/firebase/firebase-analytics-compat.js"></script>
     <script src="curriculum-catalog.js"></script>
 </head>
 <body>
@@ -49,6 +52,46 @@
             <div class="loading-spinner"></div>
             <p id="loading-text">Carregando seu painel acadêmico...</p>
         </div>
+
+        <!-- Watchdog independente: não depende de nenhum outro arquivo .js.
+             Garante que a tela de carregamento NUNCA fique travada pra
+             sempre — nem se o SDK do Firebase (ou qualquer outro script)
+             falhar ao carregar/executar. Sem isso, um erro bem no início
+             (ex.: script essencial não encontrado no cache offline) deixava
+             o app preso no spinner "Carregando..." indefinidamente, porque
+             o código que trocaria essa tela nunca chegava a rodar. -->
+        <script>
+        (function () {
+            var WATCHDOG_MS = 9000;
+            var recovered = false;
+
+            function showRecoveryUI(reason) {
+                if (recovered) return;
+                recovered = true;
+                var screen = document.getElementById('loading-screen');
+                var text = document.getElementById('loading-text');
+                if (!screen || screen.style.display === 'none') return;
+                if (text) {
+                    text.innerHTML =
+                        'Não foi possível carregar o app' + (reason ? ' (' + reason + ')' : '') + '.<br>' +
+                        'Se estiver offline, abra o app pelo menos uma vez com internet antes — depois disso ele funciona offline normalmente.<br>' +
+                        '<button onclick="location.reload()" style="margin-top:14px;padding:8px 18px;background:#3b82f6;border:none;border-radius:8px;color:#fff;font-weight:700;cursor:pointer;font-size:.9rem;">Tentar novamente</button>';
+                }
+            }
+
+            // Pega falhas de carregamento de <script src="..."> (ex.: SDK do
+            // Firebase ausente do cache) e erros de execução não tratados.
+            window.addEventListener('error', function (e) {
+                if (e && e.target && e.target.tagName === 'SCRIPT') {
+                    showRecoveryUI('falha ao carregar ' + (e.target.src || 'um componente'));
+                }
+            }, true);
+
+            setTimeout(function () {
+                showRecoveryUI(null);
+            }, WATCHDOG_MS);
+        })();
+        </script>
 
         <div id="network-banner" class="network-banner" hidden>
             <i class="fas fa-wifi"></i>
