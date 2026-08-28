@@ -1,45 +1,23 @@
-// scripts/generate-vapid-keys.js
+// ⚠️ ARQUIVO PERDIDO — ai-assistant.js ⚠️
 //
-// Gera um par de chaves VAPID (usadas pra assinar as notificações push dos
-// alarmes de estudo) usando SÓ o módulo nativo "crypto" do Node — não
-// precisa instalar nada pra rodar isso.
+// O conteúdo que estava aqui era, na verdade, uma cópia de
+// scripts/generate-vapid-keys.js (código Node, com require('crypto')) —
+// por isso o chat do Mentor IA quebrava no navegador com
+// "Uncaught ReferenceError: require is not defined".
 //
-// Rode UMA VEZ, no seu computador (nunca em produção):
-//   node scripts/generate-vapid-keys.js
+// Vasculhei TODO o zip que você mandou (incluindo os arquivos duplicados
+// tipo "feed (1).js", "gemini (2).js" etc.) e o código de verdade deste
+// arquivo — o que monta `window.aiAssistant` com os métodos `.ask()`,
+// `.updateContext()` e `.getProactiveGreeting()`, chamado por app.js e
+// por api/mentor-chat.js — NÃO estava em nenhum lugar. Foi perdido de vez,
+// igual aconteceu antes com app-enhancements.js, onboarding-simplificado.js
+// e tutorial.js (ver LEIA-ISSO-RELATORIO-DA-BAGUNCA.md).
 //
-// Depois copie as 3 linhas impressas pra Vercel → Settings → Environment
-// Variables:
-//   VAPID_PUBLIC_KEY   → vai pro front (pode ficar pública, é só isso mesmo)
-//   VAPID_PRIVATE_KEY  → NUNCA exponha no front, fica só no servidor
-//   VAPID_SUBJECT       → um "mailto:seuemail@..." (Google exige isso)
-//
-// Guarde a chave privada em lugar seguro — se perder, precisa gerar um
-// par novo e todo mundo que já tinha ativado os alarmes vai precisar
-// reativar (a assinatura antiga do navegador some).
-
-const crypto = require('crypto');
-
-function base64url(buffer) {
-  return buffer.toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-}
-
-const ecdh = crypto.createECDH('prime256v1');
-ecdh.generateKeys();
-
-let privateKey = ecdh.getPrivateKey();
-if (privateKey.length < 32) {
-  // getPrivateKey() às vezes devolve menos de 32 bytes quando o número
-  // começa com zero — preenche à esquerda pra manter o tamanho fixo.
-  privateKey = Buffer.concat([Buffer.alloc(32 - privateKey.length), privateKey]);
-}
-const publicKey = ecdh.getPublicKey(); // 65 bytes, ponto não-comprimido
-
-console.log('\n✅ Par de chaves VAPID gerado!\n');
-console.log('Copie estas 3 variáveis para Vercel → Settings → Environment Variables:\n');
-console.log(`VAPID_PUBLIC_KEY=${base64url(publicKey)}`);
-console.log(`VAPID_PRIVATE_KEY=${base64url(privateKey)}`);
-console.log('VAPID_SUBJECT=mailto:seuemail@exemplo.com   ← troque pelo seu e-mail\n');
-console.log('Depois de configurar, redeploy o projeto pro build injetar a chave pública no front.\n');
+// NÃO SUBA ESTE ARQUIVO ASSIM PRO GITHUB — ele não faz nada. Antes de subir,
+// recupere o ai-assistant.js de verdade por uma dessas vias:
+//   1) git log --follow -- ai-assistant.js   (se o projeto tem git local)
+//   2) Vercel → Deployments → um deploy antigo (de antes do chat quebrar)
+//      → baixar o "Source" e pegar o ai-assistant.js de lá
+//   3) Repositório no GitHub (github.com/yur1ofc/study-life-control),
+//      olhando o arquivo direto por lá — pode ser que só esta pasta local
+//      esteja com o arquivo trocado, e o GitHub já esteja certo
