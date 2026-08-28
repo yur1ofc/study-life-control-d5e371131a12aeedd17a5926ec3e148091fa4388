@@ -50,30 +50,31 @@ if (missingFirebaseKeys.length) {
   const auth = firebase.auth();
   const db   = firebase.firestore();
 
+  // Precisa ser chamado AQUI, logo após criar o Firestore e antes de qualquer
+  // outra leitura/escrita — se algo já tiver consultado o Firestore (ex.: o
+  // dashboard carregando dados), db.settings() falha de forma síncrona com
+  // "Firestore has already been started...". Fazendo isso o mais cedo
+  // possível evita esse erro.
+  // Usa a API nova de cache (FirestoreSettings.cache) em vez de
+  // enableMultiTabIndexedDbPersistence()/enablePersistence(), que o SDK 10.8
+  // marca como deprecated.
+  try {
+    db.settings({
+      cache: firebase.firestore.persistentLocalCache({
+        tabManager: firebase.firestore.persistentMultipleTabManager()
+      })
+    });
+  } catch (e) {
+    console.warn('[SLC Offline] Não foi possível ativar cache persistente:', e.code || e.message || e);
+  }
+
   const googleProvider = new firebase.auth.GoogleAuthProvider();
   googleProvider.setCustomParameters({ prompt: 'select_account' });
 
   window.auth           = auth;
   window.db             = db;
   window.googleProvider = googleProvider;
-
-  // Precisa ser chamado AQUI, logo após criar o Firestore e antes de qualquer
-  // outra leitura/escrita — se algo já tiver consultado o Firestore (ex.: o
-  // dashboard carregando dados), enablePersistence() falha de forma síncrona
-  // com "Firestore has already been started...". Fazendo isso o mais cedo
-  // possível evita esse erro.
-  if (db.enablePersistence) {
-    window.__slcOfflineEnabled = true;
-    db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
-      if (err.code === 'failed-precondition') {
-        console.warn('[SLC Offline] Múltiplas abas abertas — persistence só ativa numa aba por vez.');
-      } else if (err.code === 'unimplemented') {
-        console.warn('[SLC Offline] Navegador não suporta offline persistence.');
-      } else {
-        console.warn('[SLC Offline] Erro ao ativar persistence:', err.code || err.message || err);
-      }
-    });
-  }
+  window.__slcOfflineEnabled = true;
 
   if (firebaseConfig.measurementId && firebase.analytics) {
     try {
