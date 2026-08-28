@@ -5,7 +5,7 @@
 // adicione ele aqui também — senão ele só entra no cache dinâmico depois
 // do primeiro acesso online, e falha se o usuário abrir o app offline
 // (ou logo após instalar como PWA) antes disso acontecer.
-const CACHE_VERSION = 'slc-v20';
+const CACHE_VERSION = 'slc-v21';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 
@@ -65,16 +65,20 @@ const STATIC_ASSETS = [
   './launch-polish.js',
   './improvements.js',
   './ux-improvements.js',
-  './reprovado-ecosystem.js',
-  // Firebase SDK agora é hospedado localmente (antes vinha da CDN gstatic.com
-  // e nunca era cacheado pelo SW — se o navegador não tivesse essas 4 URLs no
-  // cache HTTP próprio dele, o app ficava travado pra sempre na tela de
-  // carregamento quando aberto offline). Local = sempre cacheado, igual
-  // qualquer outro arquivo do site.
-  './vendor/firebase/firebase-app-compat.js',
-  './vendor/firebase/firebase-auth-compat.js',
-  './vendor/firebase/firebase-firestore-compat.js',
-  './vendor/firebase/firebase-analytics-compat.js'
+  './reprovado-ecosystem.js'
+];
+
+// Firebase SDK vem da CDN (gstatic.com) — não existe cópia local no repo.
+// Como esses arquivos são carregados via <script src> cross-origin, o
+// navegador os pede em modo "no-cors", então a resposta chega "opaque"
+// (não dá pra checar o status). O SW cacheia essa resposta mesmo assim na
+// primeira visita online, e passa a servir do cache quando offline —
+// sem precisar de nenhum arquivo baixado manualmente.
+const FIREBASE_CDN_ASSETS = [
+  'https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js',
+  'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js',
+  'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js',
+  'https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics-compat.js'
 ];
 
 // Origens externas: busca sempre da rede, sem interceptar
@@ -114,9 +118,23 @@ function isNetworkFirst(url) {
 // ── Install: pré-cacheia assets locais ──────────────────────────────────────
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(STATIC_CACHE)
-      .then(cache => cache.addAll(STATIC_ASSETS))
-      .catch(() => null)
+    Promise.all([
+      caches.open(STATIC_CACHE)
+        .then(cache => cache.addAll(STATIC_ASSETS))
+        .catch(() => null),
+      // Cada URL da CDN é buscada/cacheada separadamente: se uma falhar
+      // (ex.: sem internet na primeira instalação), as outras continuam
+      // sendo cacheadas normalmente.
+      caches.open(STATIC_CACHE).then(cache =>
+        Promise.all(
+          FIREBASE_CDN_ASSETS.map(url =>
+            fetch(url, { mode: 'no-cors' })
+              .then(response => cache.put(url, response))
+              .catch(() => null)
+          )
+        )
+      )
+    ])
   );
   self.skipWaiting();
 });
@@ -143,7 +161,26 @@ self.addEventListener('fetch', event => {
   // Ignora requisições não-GET
   if (request.method !== 'GET') return;
 
-  // NUNCA intercepta recursos externos — deixa o browser buscar diretamente
+  // SDK do Firebase (CDN gstatic.com): cache first, com atualização em
+  // segundo plano. Garante que abrir o app offline (ou logo após instalar
+  // como PWA, antes de qualquer visita online) não trave esperando um
+  // arquivo que nunca vai chegar.
+  if (FIREBASE_CDN_ASSETS.includes(url)) {
+    event.respondWith(
+      caches.match(url).then(cached => {
+        const fetchPromise = fetch(request, { mode: 'no-cors' })
+          .then(response => {
+            caches.open(STATIC_CACHE).then(cache => cache.put(url, response.clone()));
+            return response;
+          })
+          .catch(() => null);
+        return cached || fetchPromise;
+      })
+    );
+    return;
+  }
+
+  // NUNCA intercepta outros recursos externos — deixa o browser buscar diretamente
   if (isExternal(url) || isFirebase(url)) return;
 
   // Ignora URLs de extensões do browser
