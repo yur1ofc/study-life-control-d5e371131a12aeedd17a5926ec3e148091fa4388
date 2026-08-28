@@ -191,6 +191,36 @@
       .achievement-steam-card.silver.unlocked{border-color:rgba(148,163,184,.3);}
       .achievement-steam-card.gold.unlocked{border-color:rgba(250,204,21,.3);}
       .achievement-steam-icon{width:52px;height:52px;border-radius:16px;display:flex;align-items:center;justify-content:center;background:rgba(37,99,235,.14);font-size:1.2rem;flex:0 0 auto;}
+      /* Selo hexagonal por tier — bronze/prata/ouro usam a mesma cor da
+         borda do card (ver .achievement-steam-card.<tier>.unlocked acima),
+         só que aplicada ao selo do ícone. Sem glow difuso: o contraste do
+         próprio hexágono contra o card já dá o destaque. */
+      .achievement-steam-card.unlocked .achievement-steam-icon{
+        clip-path: polygon(50% 0%, 95% 25%, 95% 75%, 50% 100%, 5% 75%, 5% 25%);
+        border-radius: 0;
+      }
+      .achievement-steam-card.bronze.unlocked .achievement-steam-icon{
+        background: linear-gradient(155deg, rgba(245,158,11,.32), rgba(245,158,11,.1));
+        color: #fbbf24;
+        box-shadow: inset 0 0 0 1px rgba(245,158,11,.35);
+      }
+      .achievement-steam-card.silver.unlocked .achievement-steam-icon{
+        background: linear-gradient(155deg, rgba(148,163,184,.32), rgba(148,163,184,.1));
+        color: #e2e8f0;
+        box-shadow: inset 0 0 0 1px rgba(148,163,184,.4);
+      }
+      .achievement-steam-card.gold.unlocked .achievement-steam-icon{
+        background: linear-gradient(155deg, rgba(250,204,21,.36), rgba(250,204,21,.1));
+        color: #facc15;
+        box-shadow: inset 0 0 0 1px rgba(250,204,21,.4);
+      }
+      .achievement-steam-card.locked .achievement-steam-icon{
+        clip-path: polygon(50% 0%, 95% 25%, 95% 75%, 50% 100%, 5% 75%, 5% 25%);
+        border-radius: 0;
+        background: rgba(148,163,184,.1);
+        color: #64748b;
+        box-shadow: inset 0 0 0 1px rgba(148,163,184,.2);
+      }
       .achievement-steam-body{display:grid;gap:4px;min-width:0;}
       .achievement-steam-body small{opacity:.82;}
       .xp-burst-fx{position:absolute;transform:translate(-50%,0) scale(.88);opacity:0;pointer-events:none;z-index:120;background:rgba(34,197,94,.16);color:#86efac;border:1px solid rgba(34,197,94,.24);padding:8px 12px;border-radius:999px;font-weight:800;box-shadow:0 12px 24px rgba(2,6,23,.22);transition:transform .8s cubic-bezier(.2,.7,.2,1), opacity .8s ease;}
@@ -797,7 +827,7 @@
     const badgeFor = (item, locked = false) => `<span class="achievement-status ${locked ? 'locked' : 'unlocked'}">${locked ? 'bloqueada' : 'desbloqueada'}</span>`;
     const cardFor = (item, locked = false) => `
       <div class="achievement-steam-card ${locked ? 'locked' : 'unlocked'} ${item.tier || 'bronze'}">
-        <div class="achievement-steam-icon"><i class="fas ${view.esc(item.icon || 'fa-trophy')}"></i></div>
+        <div class="achievement-steam-icon"><i class="fas ${view.esc(locked ? 'fa-lock' : (item.icon || 'fa-trophy'))}"></i></div>
         <div class="achievement-steam-body">
           <strong>${view.esc(item.title)}</strong>
           <small>${view.esc(item.text)}</small>
