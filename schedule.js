@@ -267,7 +267,7 @@ class ScheduleManager {
             const [h, m] = String(horario).split(':').map(Number);
             return Math.max(0, ((h - earliest) * 60 + (m || 0)) / 60 * alturaHora);
         };
-        const altura = (inicio, fim) => Math.max(20, calcularDuracaoMinutos(inicio, fim) / 60 * alturaHora);
+        const altura = (inicio, fim) => Math.max(28, calcularDuracaoMinutos(inicio, fim) / 60 * alturaHora);
 
         let horasHtml = '';
         // No celular a coluna de horas é bem estreita, então usa um rótulo
