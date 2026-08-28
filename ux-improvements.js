@@ -759,4 +759,13 @@
     }
   });
 
+  // Clicar em qualquer parte de um campo de data/hora abre o seletor nativo
+  // direto, sem precisar acertar o ícone pequeno (nem digitar manualmente).
+  document.addEventListener('click', e => {
+    const input = e.target.closest('input[type="datetime-local"], input[type="date"], input[type="time"]');
+    if (input && typeof input.showPicker === 'function') {
+      try { input.showPicker(); } catch (_) { /* precisa de gesto do usuário; já estamos num click, então ok */ }
+    }
+  });
+
 })();

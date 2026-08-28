@@ -89,6 +89,7 @@ html {
 }
 
 body {
+    color-scheme: dark;
     font-family: 'Plus Jakarta Sans', sans-serif;
     background-color: var(--bg-primary);
     color: var(--text-primary);
@@ -5793,4 +5794,29 @@ body.sidebar-open #slc-bottom-nav {
 .qs-action:hover {
     background: var(--accent-primary);
     color: var(--btn-text, #fff);
+}
+
+/* Inputs nativos de data/hora (datetime-local, date, time): garante que o
+   ícone do seletor do navegador fique visível e evidente no tema escuro
+   (color-scheme: dark no body já resolve a cor, isto aqui deixa o ícone
+   maior e com um leve destaque ao passar o mouse, pra ficar claro que dá
+   pra clicar em vez de digitar). */
+input[type="datetime-local"],
+input[type="date"],
+input[type="time"] {
+    cursor: pointer;
+}
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    padding: 6px;
+    margin-right: 2px;
+    border-radius: 6px;
+    transition: var(--transition);
+}
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
+    background-color: var(--bg-tertiary);
 }
