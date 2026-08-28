@@ -177,15 +177,45 @@ function findDueReminders(data, now) {
   });
 
   const sessionsMinutesBefore = Number(prefs.sessionsMinutesBefore ?? 15);
+  // Além dos X minutos configurados, dá uma folga extra pra trás na janela.
+  // Sem isso, a janela de disparo tem exatamente X minutos de largura — e
+  // se o cron rodar de tempos em tempos maiores que isso (ex: só 1x por dia
+  // no plano Hobby da Vercel sem cron externo configurado), a chance da
+  // execução cair bem dentro desses X minutos é baixíssima, e o aviso nunca
+  // sai. Provas/tarefas não sofrem disso porque a janela delas já é de 24h.
+  const FOLGA_JANELA_CURTA_MS = 20 * 60000;
   (data.sessions || []).forEach(s => {
     if (s.concluida) return;
     const key = `session:${s.id}`;
     if (already.has(key)) return;
     const sessionMs = localDateTimeToMs(s.data);
     if (sessionMs == null) return;
-    const triggerMs = sessionMs - sessionsMinutesBefore * 60000;
+    const triggerMs = sessionMs - sessionsMinutesBefore * 60000 - FOLGA_JANELA_CURTA_MS;
     if (now >= triggerMs && now < sessionMs) {
       due.push({ key, title: '📚 Sessão de estudo já já', body: `${s.materia}${s.topico ? ` — ${s.topico}` : ''}` });
+    }
+  });
+
+  // Aulas da grade horária (classSchedule): recorrentes por dia da semana,
+  // então o dedupe precisa incluir a DATA de hoje (não só o id da aula),
+  // senão a mesma aula de toda terça, por exemplo, só avisaria na primeira
+  // terça e nunca mais. Isso nunca tinha sido implementado aqui — só
+  // existia a preferência salva em Configurações, sem nada no cron pra
+  // realmente usá-la.
+  const classMinutesBefore = Number(prefs.classMinutesBefore ?? 15);
+  const bAgoraAulas = agoraBrasilia(now);
+  const hojeBrAulas = bAgoraAulas.toISOString().slice(0, 10);
+  const diaSemanaHoje = bAgoraAulas.getUTCDay();
+  (data.classSchedule || []).forEach(a => {
+    if (a.dia == null || !a.inicio) return;
+    if (parseInt(a.dia, 10) !== diaSemanaHoje) return;
+    const key = `aula:${a.id}:${hojeBrAulas}`;
+    if (already.has(key)) return;
+    const aulaMs = localDateTimeToMs(`${hojeBrAulas}T${a.inicio}`);
+    if (aulaMs == null) return;
+    const triggerMs = aulaMs - classMinutesBefore * 60000 - FOLGA_JANELA_CURTA_MS;
+    if (now >= triggerMs && now < aulaMs) {
+      due.push({ key, title: '🎓 Aula já já', body: `${a.materia}${a.local ? ` — ${a.local}` : ''}` });
     }
   });
 
