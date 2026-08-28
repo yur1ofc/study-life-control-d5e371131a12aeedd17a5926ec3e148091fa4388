@@ -431,10 +431,11 @@
   background: var(--bg-secondary);
   border-top: 1px solid var(--border);
   padding: 14px 24px;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom));
   display: flex;
   justify-content: space-between;
   align-items: center;
-  z-index: 100;
+  z-index: 300;
 }
 .wiz-footer-info { font-size: .88rem; color: var(--text-secondary); }
 .wiz-footer-btns { display: flex; gap: 10px; }

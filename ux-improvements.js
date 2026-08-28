@@ -39,6 +39,16 @@
     else document.getElementById('slc-feedback-nudge')?.remove();
   }
 
+  function syncBottomNavVisibility() {
+    const nav = document.getElementById('slc-bottom-nav');
+    const shouldShow = isDashboardVisible() && window.innerWidth <= 768;
+    if (!nav) {
+      if (shouldShow) injectBottomNav();
+      return;
+    }
+    nav.style.display = shouldShow ? 'flex' : 'none';
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // 1. CONFIRMAÇÃO DE DELETE BONITA (substitui window.confirm feio)
   // ═══════════════════════════════════════════════════════════════
@@ -589,6 +599,10 @@
   function injectBottomNav() {
     if (document.getElementById('slc-bottom-nav')) return;
     if (window.innerWidth > 768) return;
+    // Não injeta enquanto o usuário ainda está na tela de login/setup —
+    // senão essa barra fixa cobre o rodapé (botão "Continuar") do wizard
+    // de cadastro no celular. Ver syncBottomNavVisibility().
+    if (!isDashboardVisible()) return;
 
     const nav = document.createElement('nav');
     nav.id = 'slc-bottom-nav';
@@ -725,6 +739,7 @@
       onDashboardReady();
       syncQuickAddVisibility();
       syncFeedbackVisibility();
+      syncBottomNavVisibility();
       if ((window.app && window.ViewRenderer && window.StudyLifeControl) || ++attempts > 20) {
         clearInterval(interval);
       }
@@ -733,12 +748,12 @@
     // Observa as 3 telas e liga/desliga o botão + junto com elas
     ['login-screen', 'setup-screen', 'main-dashboard'].forEach(id => {
       const node = document.getElementById(id);
-      if (node) new MutationObserver(() => { syncQuickAddVisibility(); syncFeedbackVisibility(); }).observe(node, { attributes: true, attributeFilter: ['style', 'class'] });
+      if (node) new MutationObserver(() => { syncQuickAddVisibility(); syncFeedbackVisibility(); syncBottomNavVisibility(); }).observe(node, { attributes: true, attributeFilter: ['style', 'class'] });
     });
   });
 
   // Reexecuta quando app emite eventos
-  document.addEventListener('app-ready', () => { tryInit(); onDashboardReady(); syncQuickAddVisibility(); syncFeedbackVisibility(); });
+  document.addEventListener('app-ready', () => { tryInit(); onDashboardReady(); syncQuickAddVisibility(); syncFeedbackVisibility(); syncBottomNavVisibility(); });
   document.addEventListener('view-loaded', () => {
     if (window.app?.currentView === 'dashboard') setTimeout(injectBriefingCard, 200);
     if (window.innerWidth <= 768 && !document.getElementById('slc-bottom-nav')) injectBottomNav();
