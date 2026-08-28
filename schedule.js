@@ -270,8 +270,12 @@ class ScheduleManager {
         const altura = (inicio, fim) => Math.max(20, calcularDuracaoMinutos(inicio, fim) / 60 * alturaHora);
 
         let horasHtml = '';
+        // No celular a coluna de horas é bem estreita, então usa um rótulo
+        // curto ("7h") em vez de "07:00" pra caber sem cortar.
+        const horaCompacta = window.innerWidth <= 640;
         for (let h = earliest; h <= latest; h++) {
-            horasHtml += `<div class="wgrid-hour-label" style="height:${alturaHora}px">${String(h).padStart(2, '0')}:00</div>`;
+            const rotulo = horaCompacta ? `${h}h` : `${String(h).padStart(2, '0')}:00`;
+            horasHtml += `<div class="wgrid-hour-label" style="height:${alturaHora}px">${rotulo}</div>`;
         }
 
         let colsHtml = '';
@@ -317,17 +321,19 @@ class ScheduleManager {
             });
         });
 
-        // No celular a grade rola na horizontal (ver CSS) — já abre
+        // Em telas onde a grade ainda rola na horizontal (ver CSS), abre
         // posicionada no dia de hoje em vez de sempre começar no Domingo.
-        if (window.innerWidth <= 640) {
-            const wrap = container.querySelector('.wgrid-wrap');
+        // Abaixo de 640px a semana toda já cabe sem rolar, então isso não
+        // faz nada nesse caso (scrollWidth == clientWidth).
+        const wrapCheck = container.querySelector('.wgrid-wrap');
+        if (wrapCheck && wrapCheck.scrollWidth > wrapCheck.clientWidth) {
             const todayCol = container.querySelector('.wgrid-day-col.is-today');
             const hoursCol = container.querySelector('.wgrid-hours-col');
-            if (wrap && todayCol) {
-                const wrapRect = wrap.getBoundingClientRect();
+            if (todayCol) {
+                const wrapRect = wrapCheck.getBoundingClientRect();
                 const colRect = todayCol.getBoundingClientRect();
                 const hoursW = hoursCol ? hoursCol.offsetWidth : 0;
-                wrap.scrollLeft = Math.max(0, (colRect.left - wrapRect.left) - hoursW - 6);
+                wrapCheck.scrollLeft = Math.max(0, (colRect.left - wrapRect.left) - hoursW - 6);
             }
         }
     }

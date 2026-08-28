@@ -115,6 +115,18 @@
           <p class="text-secondary" style="margin-top:12px;">Ao clicar, a pergunta abre na aba do Mentor IA para você testar direto.</p>
         </div>
       </div>
+      <div class="card">
+        <div class="card-header">
+          <h3><i class="fas fa-envelope"></i> Fale com a gente</h3>
+        </div>
+        <div class="card-body">
+          <p class="text-secondary" style="margin:0 0 8px;">Sugestão, bug ou qualquer outra coisa: manda pra gente direto.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;">
+            <a href="mailto:slcampusoficial@gmail.com" class="btn-secondary" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;"><i class="fas fa-envelope"></i> slcampusoficial@gmail.com</a>
+            <a href="https://www.instagram.com/slcampus/" target="_blank" rel="noopener" class="btn-secondary" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;"><i class="fab fa-instagram"></i> @slcampus</a>
+          </div>
+        </div>
+      </div>
     `;
   }
 

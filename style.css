@@ -2518,39 +2518,29 @@ input:checked + .toggle-slider:before {
     .wgrid-event strong { font-size: 9px; }
 }
 
-/* Celular: espremer 7 colunas na largura da tela deixa o texto ilegível
-   (nome da matéria cortado tipo "FÍS..."). Em vez disso, cada dia ocupa
-   quase a tela toda (um dia "por vez"), e a semana toda rola na
-   horizontal com o dedo — igual o app de Calendário do Google/Apple no
-   celular. Snap "mandatory" trava exatamente num dia de cada vez (antes
-   era "proximity", que deixava 2-3 dias cortados visíveis ao mesmo
-   tempo). A coluna de horas fica fixa (sticky) enquanto os dias rolam,
-   e o JS já centraliza no dia de hoje ao abrir. */
+/* Celular: em vez de rolar na horizontal (a versão antiga), a semana
+   inteira fica visível de uma vez, igual no PC — só que bem mais
+   compacta: coluna de horas fininha, cabeçalho com o dia abreviado, e
+   texto do evento reduzido (a duração some, fica só matéria + cor; o
+   nome completo e horário aparecem ao tocar no evento, que abre o
+   modal da aula). O dia de hoje continua destacado pelo fundo azulado. */
 @media (max-width: 640px) {
-    .wgrid-wrap {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        scroll-snap-type: x mandatory;
-    }
-    .wgrid-hours-col {
-        position: sticky;
-        left: 0;
-        z-index: 4;
-    }
-    .wgrid-days {
-        display: grid;
-        grid-template-columns: repeat(7, minmax(min(86vw, 360px), 1fr));
-        flex-shrink: 0;
-    }
-    .wgrid-day-col {
-        scroll-snap-align: start;
-        scroll-snap-stop: always;
-    }
-    .wgrid-day-header { font-size: 13px; height: 40px; }
-    .wgrid-hour-corner { height: 40px; }
-    .wgrid-event { font-size: 12.5px; padding: 5px 8px; }
-    .wgrid-event strong { font-size: 13px; }
-    .wgrid-event span { font-size: 11px; display: block; }
+    .wgrid-hours-col { width: 22px; }
+    .wgrid-hour-label { font-size: 7.5px; padding: 1px 1px 0; transform: translateY(-5px); }
+    .wgrid-day-header { font-size: 10px; height: 30px; padding: 0 1px; }
+    .wgrid-hour-corner { height: 30px; }
+    .wgrid-event { font-size: 8px; padding: 1px 3px; border-left-width: 2px; gap: 0; }
+    .wgrid-event strong { font-size: 8px; }
+    .wgrid-event span { display: none; }
+}
+
+/* Celular bem estreito (<380px): aperta mais um pouco ainda. */
+@media (max-width: 380px) {
+    .wgrid-hours-col { width: 18px; }
+    .wgrid-hour-label { font-size: 6.5px; }
+    .wgrid-day-header { font-size: 9px; }
+    .wgrid-event { font-size: 7px; padding: 1px 2px; }
+    .wgrid-event strong { font-size: 7px; }
 }
 
 /* Telas grandes / TV: aumenta um pouco a fonte pra ficar legível de longe */

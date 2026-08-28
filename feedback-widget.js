@@ -42,6 +42,7 @@
           ${TYPES.map(t => `<button type="button" class="fb-type-btn" data-type="${t.id}" style="flex:1;padding:.5rem;border-radius:8px;border:1.5px solid ${t.id === selectedType ? t.color : 'var(--border,#e2e8f0)'};background:${t.id === selectedType ? t.color + '22' : 'transparent'};color:var(--text-primary,#1e293b);cursor:pointer;font-size:.8rem;">${t.label}</button>`).join('')}
         </div>
         <textarea id="fb-text" rows="4" placeholder="Conte com detalhes..." style="width:100%;box-sizing:border-box;border:1px solid var(--border,#e2e8f0);border-radius:8px;padding:.65rem;font-size:.85rem;font-family:inherit;resize:vertical;outline:none;background:var(--bg-primary,#f8fafc);color:inherit;"></textarea>
+        <p style="margin:8px 0 0;font-size:.72rem;color:var(--text-tertiary,#64748b);">Prefere falar direto? <a href="mailto:slcampusoficial@gmail.com" style="color:inherit;text-decoration:underline;">slcampusoficial@gmail.com</a> · <a href="https://www.instagram.com/slcampus/" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">@slcampus</a></p>
         <div id="fb-status" style="display:none;margin-top:10px;font-size:.8rem;"></div>
         <div style="display:flex;gap:8px;margin-top:14px;">
           <button id="fb-cancel" style="flex:1;padding:.6rem;border-radius:8px;border:1px solid var(--border,#e2e8f0);background:transparent;color:inherit;cursor:pointer;">Cancelar</button>
