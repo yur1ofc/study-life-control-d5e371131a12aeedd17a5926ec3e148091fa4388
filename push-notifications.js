@@ -123,6 +123,67 @@
     }
   }
 
+  // ─── Recuperação automática de assinatura ──────────────────────────────
+  // Cobre os dois jeitos que fazem as notificações "pararem do nada":
+  //   1) O navegador dispara pushsubscriptionchange (ver service-worker.js)
+  //      enquanto nenhuma aba estava aberta pra receber o postMessage — a
+  //      nova assinatura fica esperando no Cache Storage até agora.
+  //   2) A assinatura simplesmente sumiu (ex.: dado do site limpo, app
+  //      reinstalado) sem nenhum evento avisando — mas a permissão do
+  //      navegador ainda está concedida, então dá pra recriar sozinho, sem
+  //      precisar pedir de novo pro usuário.
+  // Roda toda vez que o app abre (ver chamada em app.js), silenciosamente.
+  async function syncSubscription() {
+    if (!isSupported()) return;
+    const settings = window.app?.data?.settings;
+    const remindersEnabled = !!settings?.studyReminders?.enabled;
+
+    // 1) Existe uma assinatura renovada esperando pra ser sincronizada?
+    try {
+      const cache = await caches.open('slc-pending-push-subscription');
+      const cached = await cache.match('./__pending-subscription');
+      if (cached) {
+        const json = await cached.json();
+        await saveSubscription({ toJSON: () => json });
+        await cache.delete('./__pending-subscription');
+      }
+    } catch (_) { /* Cache Storage indisponível — segue pro próximo passo */ }
+
+    if (!remindersEnabled) return; // usuário não tinha ativado — nada a recuperar
+
+    // 2) Reminders marcados como ativos, mas sem assinatura válida agora?
+    // Só tenta recriar sozinho se a permissão ainda estiver concedida —
+    // sem isso o navegador bloqueia silenciosamente (e teria que ser um
+    // clique do usuário mesmo).
+    try {
+      if (Notification.permission !== 'granted') return;
+      const existing = await getExistingSubscription();
+      if (existing) return; // já tem assinatura válida, nada a fazer
+
+      const key = vapidPublicKey();
+      if (!key) return;
+      const reg = await navigator.serviceWorker.ready;
+      const subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(key)
+      });
+      await saveSubscription(subscription);
+    } catch (error) {
+      console.warn('[push-notifications] não foi possível recuperar a assinatura automaticamente:', error);
+    }
+  }
+
+  // Escuta a notificação "rápida" do service worker (aba já aberta no
+  // momento em que a assinatura foi renovada) — sem precisar esperar o
+  // próximo carregamento da página pra sincronizar com o servidor.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', event => {
+      if (event.data?.type === 'slc-push-subscription-renewed' && event.data.subscription) {
+        saveSubscription({ toJSON: () => event.data.subscription }).catch(() => null);
+      }
+    });
+  }
+
   window.pushNotifications = {
     isSupported,
     permissionStatus,
@@ -130,6 +191,7 @@
     enable,
     disable,
     saveReminderPrefs,
-    isEnabledOnThisDevice
+    isEnabledOnThisDevice,
+    syncSubscription
   };
 })();

@@ -5,7 +5,7 @@
 // adicione ele aqui também — senão ele só entra no cache dinâmico depois
 // do primeiro acesso online, e falha se o usuário abrir o app offline
 // (ou logo após instalar como PWA) antes disso acontecer.
-const CACHE_VERSION = 'slc-v22';
+const CACHE_VERSION = 'slc-v23';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 
@@ -253,5 +253,46 @@ self.addEventListener('notificationclick', event => {
       }
       if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
     })
+  );
+});
+
+// ── pushsubscriptionchange: o navegador pode invalidar/trocar a assinatura
+// push sozinho (rotação periódica de segurança do Chrome/Android, expirar
+// por inatividade, etc.), sem que o usuário faça nada. Esse evento existe
+// exatamente pra avisar disso — só que, até agora, nada aqui escutava ele.
+// Sem esse listener, a assinatura antiga (guardada em pushSubscriptions no
+// Firestore) simplesmente parava de funcionar, o servidor continuava
+// mandando push pra ela sem saber que estava morta, e o usuário via as
+// notificações pararem "do nada", sem nenhum jeito automático de voltar a
+// funcionar (só clicando de novo em "Ativar alarmes" manualmente).
+// Aqui a gente resolve gerando uma nova assinatura na hora (usando a MESMA
+// chave VAPID da assinatura antiga, disponível em event.oldSubscription) e
+// guarda ela pra sincronizar com o servidor assim que o app abrir de novo
+// — tanto via postMessage (se alguma aba já estiver aberta) quanto via
+// Cache Storage (funciona mesmo com o app fechado, sem depender de nenhuma
+// aba escutando naquele momento).
+self.addEventListener('pushsubscriptionchange', event => {
+  const oldKey = event.oldSubscription?.options?.applicationServerKey;
+  if (!oldKey) return; // sem a chave antiga não dá pra resubscrever igual
+
+  event.waitUntil(
+    self.registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: oldKey
+    }).then(async newSubscription => {
+      const json = newSubscription.toJSON();
+
+      // Fallback que sobrevive mesmo sem nenhuma aba aberta: guarda a nova
+      // assinatura numa "resposta" dentro do Cache Storage. O app lê isso
+      // na próxima vez que abrir (ver push-notifications.js: syncSubscription).
+      try {
+        const cache = await caches.open('slc-pending-push-subscription');
+        await cache.put('./__pending-subscription', new Response(JSON.stringify(json)));
+      } catch (_) { /* Cache Storage indisponível — segue só pelo postMessage */ }
+
+      // Caminho rápido: se alguma aba já estiver aberta agora, avisa direto.
+      const clientsList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      clientsList.forEach(client => client.postMessage({ type: 'slc-push-subscription-renewed', subscription: json }));
+    }).catch(() => null)
   );
 });

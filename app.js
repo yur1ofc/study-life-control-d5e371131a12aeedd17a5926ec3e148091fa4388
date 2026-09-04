@@ -61,6 +61,11 @@ class StudyLifeControl {
 
         document.dispatchEvent(new Event('app-ready'));
 
+        // Recupera sozinho a assinatura de notificações push se ela tiver
+        // sido invalidada/renovada pelo navegador (ver push-notifications.js
+        // → syncSubscription). Silencioso e não bloqueia o resto do init.
+        window.pushNotifications?.syncSubscription?.().catch(() => null);
+
         window.scheduleManager?.loadAulas();
         window.reviewSystem?.loadReviews();
         window.dailyLogService?.loadLogs();
