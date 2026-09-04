@@ -2,6 +2,11 @@
   "buildCommand": "node inject-env.js",
   "outputDirectory": ".",
   "cleanUrls": true,
+  "functions": {
+    "api/gemini.js": {
+      "maxDuration": 60
+    }
+  },
   "rewrites": [
     {
       "source": "/(.*)",

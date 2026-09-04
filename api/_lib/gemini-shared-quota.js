@@ -64,11 +64,13 @@ async function readSharedCount(idToken, projectId) {
 }
 
 // Incrementa o contador de hoje em +1. Best-effort: nunca derruba a
-// requisição principal por causa de falha aqui.
-async function incrementSharedCount(idToken, projectId, currentCount) {
+// requisição principal por causa de falha aqui — por isso NÃO é `await`ado
+// por quem chama; disparamos e seguimos direto pro Gemini, em vez de gastar
+// mais um round-trip ao Firestore no caminho crítico de latência.
+function incrementSharedCount(idToken, projectId, currentCount) {
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` };
   const today = todayKey();
-  await fetch(`${docUrl(projectId)}?updateMask.fieldPaths=date&updateMask.fieldPaths=count`, {
+  return fetch(`${docUrl(projectId)}?updateMask.fieldPaths=date&updateMask.fieldPaths=count`, {
     method: 'PATCH',
     headers,
     body: JSON.stringify({ fields: { date: { stringValue: today }, count: { integerValue: String(currentCount + 1) } } })

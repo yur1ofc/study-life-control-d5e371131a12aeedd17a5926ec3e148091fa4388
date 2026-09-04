@@ -40,34 +40,39 @@ function isOverloadError(status, data) {
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
+// Antes tentava até 2x no MESMO modelo antes de trocar (até 6 chamadas no
+// total: 3 modelos x 2 tentativas, com sleep de 900ms entre elas). Em
+// arquivos maiores (foto/PDF do fluxograma), cada chamada ao Gemini já pode
+// levar vários segundos sozinha — somado ao sleep, isso estourava com
+// facilidade o tempo máximo de execução da function na Vercel, derrubando a
+// importação bem no meio (e é isso que aparecia pro usuário como "trava" ou
+// "não funciona", tanto pra foto quanto pra texto colado). Agora tentamos
+// cada modelo só 1 vez antes de já passar pro próximo — a redundância entre
+// os 3 modelos da lista já cobre bem os casos de sobrecarga momentânea, sem
+// gastar tempo extra em espera.
 async function callGeminiWithFallback(geminiKey, contents) {
   let lastError = null;
   for (let i = 0; i < GEMINI_MODELS.length; i += 1) {
     const model = GEMINI_MODELS[i];
-    // Uma pequena espera + nova tentativa no MESMO modelo antes de trocar de
-    // modelo — picos de demanda costumam durar poucos segundos.
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
-      const geminiRes = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents,
-          generationConfig: { temperature: 0.1, responseMimeType: 'application/json' }
-        })
-      });
-      const data = await geminiRes.json().catch(() => ({}));
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
+    const geminiRes = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents,
+        generationConfig: { temperature: 0.1, responseMimeType: 'application/json' }
+      })
+    });
+    const data = await geminiRes.json().catch(() => ({}));
 
-      if (geminiRes.ok) return { ok: true, data, modelUsed: model };
+    if (geminiRes.ok) return { ok: true, data, modelUsed: model };
 
-      lastError = { status: geminiRes.status, data };
-      if (isOverloadError(geminiRes.status, data)) {
-        if (attempt === 0) { await sleep(900); continue; } // tenta de novo no mesmo modelo
-        break; // desiste desse modelo, tenta o próximo da lista
-      }
-      // Erro que não é de sobrecarga (ex: chave inválida, request malformado) — não adianta trocar de modelo
-      return { ok: false, status: geminiRes.status, data };
+    lastError = { status: geminiRes.status, data };
+    if (isOverloadError(geminiRes.status, data)) {
+      continue; // tenta o próximo modelo da lista, sem espera
     }
+    // Erro que não é de sobrecarga (ex: chave inválida, request malformado) — não adianta trocar de modelo
+    return { ok: false, status: geminiRes.status, data };
   }
   return { ok: false, status: lastError?.status || 503, data: lastError?.data || {} };
 }
@@ -121,11 +126,15 @@ async function checkAndIncrementUsage(idToken, uid) {
     return { blocked: true, count };
   }
 
-  await fetch(`${base}?updateMask.fieldPaths=date&updateMask.fieldPaths=count`, {
+  // A gravação do contador é "best-effort" (nunca derruba a importação por
+  // causa dela) — então não precisa ser esperada antes de seguir pro Gemini.
+  // Antes isso era `await`ado, adicionando mais um round-trip inteiro ao
+  // Firestore na frente de cada importação, mesmo sendo um dado descartável.
+  fetch(`${base}?updateMask.fieldPaths=date&updateMask.fieldPaths=count`, {
     method: 'PATCH',
     headers,
     body: JSON.stringify({ fields: { date: { stringValue: today }, count: { integerValue: String(count + 1) } } })
-  }).catch(() => {}); // contagem é best-effort, nunca derruba a importação por causa disso
+  }).catch(() => {});
 
   return { blocked: false, count: count + 1 };
 }
@@ -156,13 +165,26 @@ module.exports = async function handler(req, res) {
     return res.status(401).json({ error: 'Sessão inválida ou expirada. Recarregue a página e faça login novamente.' });
   }
 
-  try {
-    const usage = await checkAndIncrementUsage(idToken, uid);
-    if (usage.blocked) {
-      return res.status(429).json({ error: `Limite de ${DAILY_LIMIT} importações por dia atingido. Tente novamente amanhã.` });
-    }
-  } catch (err) {
-    console.error('[api/gemini] erro ao checar limite de uso:', err.message);
+  // As duas checagens de cota (por usuário e global do site) leem documentos
+  // diferentes no Firestore e não dependem uma da outra — antes rodavam uma
+  // depois da outra (cada uma com sua própria leitura+gravação), somando
+  // vários round-trips sequenciais ao Firestore ANTES de sequer começar a
+  // chamar o Gemini. Isso sozinho já podia consumir uma fatia grande do
+  // tempo máximo de execução da function, contribuindo pra lentidão (e,
+  // em arquivos maiores como foto/PDF, pra estourar o tempo e falhar).
+  // Rodando as leituras em paralelo, e sem esperar as gravações (que já são
+  // "best-effort" internamente), esse trecho fica bem mais rápido.
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const [usageResult, sharedCountResult] = await Promise.allSettled([
+    checkAndIncrementUsage(idToken, uid),
+    sharedQuota.readSharedCount(idToken, projectId)
+  ]);
+
+  if (usageResult.status === 'fulfilled' && usageResult.value.blocked) {
+    return res.status(429).json({ error: `Limite de ${DAILY_LIMIT} importações por dia atingido. Tente novamente amanhã.` });
+  }
+  if (usageResult.status === 'rejected') {
+    console.error('[api/gemini] erro ao checar limite de uso:', usageResult.reason?.message);
     // segue mesmo assim — não deixa um erro de contagem bloquear o usuário
   }
 
@@ -170,19 +192,15 @@ module.exports = async function handler(req, res) {
   // prioridade: só é barrado no teto ABSOLUTO do site (nunca pela fatia
   // reservada pra ele — essa é sempre sua). Isso praticamente nunca deve
   // disparar na prática; é só o limite de segurança de última instância.
-  try {
-    const projectId = process.env.FIREBASE_PROJECT_ID;
-    const sharedCount = await sharedQuota.readSharedCount(idToken, projectId);
-    if (sharedCount !== null) {
-      if (sharedCount >= sharedQuota.TOTAL_DAILY_LIMIT) {
-        console.warn(`[api/gemini] teto global absoluto do dia atingido (${sharedCount}/${sharedQuota.TOTAL_DAILY_LIMIT}).`);
-        return res.status(503).json({ error: 'O site atingiu o limite de uso de IA por hoje (alta demanda). Tente novamente mais tarde ou cadastre a grade manualmente por enquanto.' });
-      }
-      await sharedQuota.incrementSharedCount(idToken, projectId, sharedCount);
+  if (sharedCountResult.status === 'fulfilled' && sharedCountResult.value !== null) {
+    const sharedCount = sharedCountResult.value;
+    if (sharedCount >= sharedQuota.TOTAL_DAILY_LIMIT) {
+      console.warn(`[api/gemini] teto global absoluto do dia atingido (${sharedCount}/${sharedQuota.TOTAL_DAILY_LIMIT}).`);
+      return res.status(503).json({ error: 'O site atingiu o limite de uso de IA por hoje (alta demanda). Tente novamente mais tarde ou cadastre a grade manualmente por enquanto.' });
     }
-  } catch (err) {
-    console.error('[api/gemini] erro ao checar cota global:', err.message);
-    // não bloqueia a importação por causa disso — prioridade é não travar o onboarding
+    sharedQuota.incrementSharedCount(idToken, projectId, sharedCount); // fire-and-forget
+  } else if (sharedCountResult.status === 'rejected') {
+    console.error('[api/gemini] erro ao checar cota global:', sharedCountResult.reason?.message);
   }
 
   try {

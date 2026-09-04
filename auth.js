@@ -24,10 +24,21 @@ async function handleSignedInUser(user) {
   const hasUserProfile = !!(data && data.user && (data.user.nome || data.user.curso || data.user.universidade));
 
   if (!hasUserProfile) {
+    // O Firebase Auth pode disparar onAuthStateChanged mais de uma vez na
+    // mesma sessão (refresh de token, reconexão após ficar offline, aba
+    // voltando a ficar visível, etc.) — não só no login inicial. Se isso
+    // acontecer enquanto a pessoa já está no meio do wizard de cadastro
+    // (ex.: preenchendo as matérias no passo 4), chamar renderSetupForm()
+    // de novo recria a tela do zero e descarta o progresso que ainda não
+    // tinha sido salvo no rascunho, dando a impressão de que o site "pediu
+    // de novo" pra cadastrar as matérias. Por isso só (re)renderizamos o
+    // formulário de setup na PRIMEIRA vez que a tela aparece nesta sessão.
+    const setupJaVisivel = getEl('setup-screen')?.style.display !== 'none';
+
     setDisplay('setup-screen', 'flex');
     setDisplay('main-dashboard', 'none');
 
-    if (typeof window.app.renderSetupForm === 'function') {
+    if (!setupJaVisivel && typeof window.app.renderSetupForm === 'function') {
       window.app.renderSetupForm();
     }
     document.dispatchEvent(new Event('app-ready'));

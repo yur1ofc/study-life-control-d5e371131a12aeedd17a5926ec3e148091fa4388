@@ -821,8 +821,8 @@ Regras:
     </div>
 
     <div class="wiz-field">
-      <label>Maior dificuldade agora</label>
-      <div class="wiz-radio-group" id="wiz-dificuldade-group">
+      <label>Maior dificuldade agora <span style="font-weight:400;color:var(--text-tertiary);">(pode escolher mais de uma)</span></label>
+      <div class="wiz-radio-group wiz-radio-group-multi" id="wiz-dificuldade-group">
         <div class="wiz-radio-card" data-val="procrastinacao">😴 Procrastinação</div>
         <div class="wiz-radio-card" data-val="organizacao">📂 Organização</div>
         <div class="wiz-radio-card active" data-val="tempo">⏳ Pouco tempo</div>
@@ -938,9 +938,15 @@ Regras:
         });
       }
       if (wizardState.dificuldade) {
-        q('#wiz-dificuldade').value = wizardState.dificuldade;
+        // Aceita tanto o formato novo (array, múltipla escolha) quanto o
+        // antigo (string única) — rascunhos salvos antes dessa mudança
+        // continuam funcionando.
+        const selecionados = Array.isArray(wizardState.dificuldade)
+          ? wizardState.dificuldade
+          : [wizardState.dificuldade];
+        q('#wiz-dificuldade').value = selecionados.join(',');
         document.querySelectorAll('#wiz-dificuldade-group .wiz-radio-card').forEach(c => {
-          c.classList.toggle('active', c.dataset.val === wizardState.dificuldade);
+          c.classList.toggle('active', selecionados.includes(c.dataset.val));
         });
       }
     }
@@ -1035,8 +1041,8 @@ Regras:
   }
 
   function attachEvents(step) {
-    // Radio cards genérico
-    document.querySelectorAll('.wiz-radio-group').forEach(group => {
+    // Radio cards genérico (seleção única)
+    document.querySelectorAll('.wiz-radio-group:not(.wiz-radio-group-multi)').forEach(group => {
       group.querySelectorAll('.wiz-radio-card').forEach(card => {
         card.addEventListener('click', () => {
           group.querySelectorAll('.wiz-radio-card').forEach(c => c.classList.remove('active'));
@@ -1049,6 +1055,25 @@ Regras:
             wizardState.semestre = card.dataset.val;
             q('#wiz-semestre').value = card.dataset.val;
           }
+        });
+      });
+    });
+
+    // Cards de múltipla escolha (ex.: "maior dificuldade agora") — cada
+    // clique só alterna (toggle) o próprio card, sem desmarcar os outros,
+    // e sempre mantém pelo menos um selecionado.
+    document.querySelectorAll('.wiz-radio-group-multi').forEach(group => {
+      group.querySelectorAll('.wiz-radio-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const isOnly = card.classList.contains('active') &&
+            group.querySelectorAll('.wiz-radio-card.active').length === 1;
+          if (isOnly) return; // não deixa desmarcar o último selecionado
+          card.classList.toggle('active');
+
+          const selecionados = Array.from(group.querySelectorAll('.wiz-radio-card.active')).map(c => c.dataset.val);
+          const hiddenId = group.id.replace('-group', '');
+          const hidden = document.getElementById(`wiz-${hiddenId.split('-').pop()}`);
+          if (hidden) hidden.value = selecionados.join(',');
         });
       });
     });
@@ -1095,10 +1120,21 @@ Regras:
     const body = document.querySelector('.wiz-body');
     if (body && !body.dataset.touchListenerBound) {
       body.dataset.touchListenerBound = '1';
+      let _draftSaveTimer = null;
       ['input', 'change', 'click'].forEach(evt => {
         body.addEventListener(evt, () => {
           wizardState.touched = wizardState.touched || {};
           wizardState.touched[wizardState.step] = true;
+          // Mantém o rascunho no localStorage próximo do estado real em
+          // memória (debounced pra não gravar a cada tecla), pra reduzir
+          // a chance de qualquer reinicialização perder progresso não
+          // salvo — mesmo com a trava em loadDraft(), é uma segunda rede
+          // de segurança barata.
+          clearTimeout(_draftSaveTimer);
+          _draftSaveTimer = setTimeout(() => {
+            saveCurrentStep();
+            saveDraft();
+          }, 600);
         }, true);
       });
     }
@@ -1221,7 +1257,19 @@ Regras:
     } catch (_) { /* localStorage indisponível — ignora silenciosamente */ }
   }
 
+  // Só é seguro recarregar o rascunho do localStorage ANTES do wizard
+  // existir na memória desta aba. Se o wizard já foi inicializado (o
+  // usuário já está preenchendo alguma etapa), o `wizardState` em memória
+  // é sempre mais atual que o rascunho salvo — o rascunho só é persistido
+  // ao trocar de etapa (goNext/goBack/finishSetup), então digitação em
+  // andamento (ex.: nome de matéria) ainda não está no localStorage.
+  // Sem essa trava, uma reinicialização acidental do wizard (ver
+  // comentário em waitForSetup/renderSetupForm mais abaixo) sobrescreveria
+  // o progresso real com uma versão desatualizada.
+  let _wizardBootedInSession = false;
+
   function loadDraft() {
+    if (_wizardBootedInSession) return wizardState.step > 1;
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
       if (!raw) return false;
@@ -1380,7 +1428,8 @@ Regras:
     }
     if (step === 4) {
       wizardState.disciplina  = q('#wiz-disciplina')?.value || 'medio';
-      wizardState.dificuldade = q('#wiz-dificuldade')?.value || 'tempo';
+      const dificuldadeRaw = q('#wiz-dificuldade')?.value || 'tempo';
+      wizardState.dificuldade = dificuldadeRaw.split(',').map(v => v.trim()).filter(Boolean);
       // Coletar matérias
       wizardState.subjects = [];
       document.querySelectorAll('#wiz-subjects-list .wiz-subject-item').forEach(row => {
@@ -1450,7 +1499,10 @@ Regras:
         tempoDeslocamento:wizardState.deslocamento || 20,
         tipoRotina:       wizardState.rotina || 'so-estuda',
         nivelDisciplina:  wizardState.disciplina || 'medio',
-        dificuldadeAtual: wizardState.dificuldade || 'tempo',
+        // Array para suportar múltiplas dificuldades selecionadas.
+        dificuldadeAtual: (Array.isArray(wizardState.dificuldade) && wizardState.dificuldade.length)
+          ? wizardState.dificuldade
+          : ['tempo'],
         createdAt:        new Date().toISOString(),
         streak:           0,
         lastStudyDate:    null
@@ -1503,7 +1555,10 @@ Regras:
     set('tempo-deslocamento', userData.tempoDeslocamento);
     set('tipo-rotina', userData.tipoRotina);
     set('nivel-disciplina', userData.nivelDisciplina);
-    set('dificuldade-atual', userData.dificuldadeAtual);
+    // Campo legado é um <select> de opção única — usamos a primeira
+    // dificuldade escolhida só para manter esse campo de compatibilidade
+    // preenchido; o valor completo (array) vai em userData.dificuldadeAtual.
+    set('dificuldade-atual', Array.isArray(userData.dificuldadeAtual) ? userData.dificuldadeAtual[0] : userData.dificuldadeAtual);
   }
 
   /* ─── Utilitário de feedback ─────────────────────────────── */
@@ -1520,6 +1575,7 @@ Regras:
     injectStyles();
     const restored = loadDraft();
     renderWizard();
+    _wizardBootedInSession = true;
     if (restored && window.showToast) {
       window.showToast('Continuando de onde você parou 👍', 'success');
     }
