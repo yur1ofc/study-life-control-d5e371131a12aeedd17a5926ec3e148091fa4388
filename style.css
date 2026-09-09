@@ -4788,6 +4788,57 @@ body.sidebar-open #slc-bottom-nav {
     .login-features-panel { display: none !important; }
 }
 
+/* Teaser leve pro mobile: substitui o painel de features (escondido acima)
+   por uma versão só-texto, sem imagens/pesos extras. Some no desktop porque
+   lá o painel grande já mostra tudo isso. */
+.login-mobile-teaser { display: none; }
+@media (max-width: 768px) {
+    .login-mobile-teaser {
+        display: block;
+        text-align: left;
+        margin: 4px 0 22px;
+        padding: 14px 16px;
+        background: rgba(59,130,246,0.08);
+        border: 1px solid rgba(59,130,246,0.18);
+        border-radius: 14px;
+    }
+    .login-mobile-headline {
+        margin: 0 0 10px;
+        font-size: .92rem;
+        font-weight: 700;
+        line-height: 1.35;
+        color: #f8fafc;
+    }
+    .login-mobile-bullets {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .login-mobile-bullets li {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        font-size: .78rem;
+        line-height: 1.4;
+        color: rgba(248,250,252,.75);
+    }
+    .login-mobile-bullets li::before {
+        content: '✓';
+        flex-shrink: 0;
+        color: #3b82f6;
+        font-weight: 700;
+    }
+}
+.login-cta-hint {
+    margin-top: 8px;
+    font-size: .72rem;
+    color: #64748b;
+    text-align: center;
+}
+
 .login-features-panel {
     background: linear-gradient(135deg, #1e3a5f 0%, #0f1f3d 60%, #1a1040 100%);
     display: flex;

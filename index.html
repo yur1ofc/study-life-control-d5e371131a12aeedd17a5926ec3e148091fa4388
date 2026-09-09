@@ -40,11 +40,11 @@
     <!-- Firebase SDK hospedado localmente (não mais na CDN gstatic.com) —
          assim o service worker consegue cachear e o app funciona offline
          mesmo em navegadores/dispositivos que não tinham a CDN em cache. -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics-compat.js"></script>
-    <script src="curriculum-catalog.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics-compat.js"></script>
+    <script defer src="curriculum-catalog.js"></script>
 </head>
 <body>
     <div id="app">
@@ -134,11 +134,24 @@
                         <h1>Bem-vindo de volta</h1>
                         <p>Entre para acessar seu painel acadêmico</p>
                     </div>
+                    <!-- Teaser leve, só texto (sem imagem/script novo) — visível apenas no
+                         mobile, onde o painel de features grande fica escondido pelo CSS.
+                         Objetivo: comunicar valor concreto antes do botão de login, sem
+                         pesar o carregamento. -->
+                    <div class="login-mobile-teaser">
+                        <p class="login-mobile-headline">📸 Tira uma foto da sua grade — o site monta tudo sozinho.</p>
+                        <ul class="login-mobile-bullets">
+                            <li>Avisa antes de você esquecer uma prova ou entrega</li>
+                            <li>Mostra exatamente o que estudar hoje</li>
+                            <li>Acompanha sua frequência automaticamente</li>
+                        </ul>
+                    </div>
                     <div class="login-body">
                         <button class="btn-google" id="login-google">
                             <i class="fab fa-google"></i>
                             Entrar com Google
                         </button>
+                        <p class="login-cta-hint">Leva 10 segundos — sem formulário pra preencher.</p>
                         <div id="login-error-msg" style="display:none;margin-top:14px;padding:10px 14px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);border-radius:10px;color:#ef4444;font-size:.88rem;text-align:center;"></div>
                         <p style="margin-top:14px;font-size:.76rem;color:#64748b;text-align:center;display:flex;align-items:center;justify-content:center;gap:6px;"><i class="fas fa-lock" style="font-size:.7rem;"></i> Seus dados ficam só na sua conta — ninguém mais tem acesso a eles.</p>
                         <p style="margin-top:8px;font-size:.72rem;color:#475569;text-align:center;">Ao entrar, você concorda com o uso dos dados para fins acadêmicos pessoais.</p>
@@ -1127,50 +1140,50 @@
 
     <div id="toast-container"></div>
 
-    <script src="firebase-config.js"></script>
-<script src="security.js"></script>
-<script src="utils.js"></script>
-<script src="auth.js"></script>
-<script src="database.js"></script>
-<script src="daily-log.js"></script>
-<script src="class-diary.js"></script>
-<script src="diary-view.js"></script>
-<script src="review-system.js"></script>
-<script src="grade-calculator.js"></script>
-<script src="subject-difficulty.js"></script>
-<script src="smart-dashboard.js"></script>
-<script src="ai-assistant.js"></script>
-<script src="schedule.js"></script>
-<script src="views.js"></script>
-<script src="tutorial.js"></script>
-<script src="app.js"></script>
-<script src="semester-finish.js"></script>
-<script src="semester-archive-viewer.js"></script>
-<script src="universidades-brasil.js"></script>
-<script src="setup-wizard.js"></script>
-<script src="launch-ready.js"></script>
-<script src="script.js"></script>
-<script src="dashboard-prioritario.js"></script>
-<script src="onboarding-simplificado.js"></script>
-<script src="schedule-ia-import.js"></script>
-<script src="subjects-curriculum-sync.js"></script>
-<script src="grade-structure-modal.js"></script>
+    <script defer src="firebase-config.js"></script>
+<script defer src="security.js"></script>
+<script defer src="utils.js"></script>
+<script defer src="auth.js"></script>
+<script defer src="database.js"></script>
+<script defer src="daily-log.js"></script>
+<script defer src="class-diary.js"></script>
+<script defer src="diary-view.js"></script>
+<script defer src="review-system.js"></script>
+<script defer src="grade-calculator.js"></script>
+<script defer src="subject-difficulty.js"></script>
+<script defer src="smart-dashboard.js"></script>
+<script defer src="ai-assistant.js"></script>
+<script defer src="schedule.js"></script>
+<script defer src="views.js"></script>
+<script defer src="tutorial.js"></script>
+<script defer src="app.js"></script>
+<script defer src="semester-finish.js"></script>
+<script defer src="semester-archive-viewer.js"></script>
+<script defer src="universidades-brasil.js"></script>
+<script defer src="setup-wizard.js"></script>
+<script defer src="launch-ready.js"></script>
+<script defer src="script.js"></script>
+<script defer src="dashboard-prioritario.js"></script>
+<script defer src="onboarding-simplificado.js"></script>
+<script defer src="schedule-ia-import.js"></script>
+<script defer src="subjects-curriculum-sync.js"></script>
+<script defer src="grade-structure-modal.js"></script>
 <div id="mobile-nav-overlay" class="mobile-nav-overlay" hidden></div>
-    <script src="grade-ia-import.js"></script>
-    <script src="setup-onboarding-enhancer.js"></script>
-    <script src="app-enhancements.js"></script>
-    <script src="xp-widget.js"></script>
-    <script src="calendar-feed.js"></script>
-    <script src="push-notifications.js"></script>
-    <script src="auto-notification-prompt.js"></script>
-    <script src="exam-study-popup.js"></script>
-    <script src="quick-search.js"></script>
-    <script src="export-data.js"></script>
-    <script src="feedback-widget.js"></script>
+    <script defer src="grade-ia-import.js"></script>
+    <script defer src="setup-onboarding-enhancer.js"></script>
+    <script defer src="app-enhancements.js"></script>
+    <script defer src="xp-widget.js"></script>
+    <script defer src="calendar-feed.js"></script>
+    <script defer src="push-notifications.js"></script>
+    <script defer src="auto-notification-prompt.js"></script>
+    <script defer src="exam-study-popup.js"></script>
+    <script defer src="quick-search.js"></script>
+    <script defer src="export-data.js"></script>
+    <script defer src="feedback-widget.js"></script>
     <link rel="stylesheet" href="launch-polish.css">
-    <script src="launch-polish.js"></script>
-    <script src="improvements.js"></script>
-    <script src="ux-improvements.js"></script>
-    <script src="reprovado-ecosystem.js"></script>
+    <script defer src="launch-polish.js"></script>
+    <script defer src="improvements.js"></script>
+    <script defer src="ux-improvements.js"></script>
+    <script defer src="reprovado-ecosystem.js"></script>
 </body>
 </html>
