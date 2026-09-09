@@ -72,7 +72,12 @@
     }
   };
 
+  // Delega para a versão única de utils.js (window.escapeHtml) sempre que
+  // já estiver disponível; mantém este fallback idêntico só para o caso
+  // raro de rodar antes de utils.js carregar (unifica a lógica em um só
+  // lugar, sem quebrar quem depende desta função local).
   function escapeHtml(value) {
+    if (window.escapeHtml) return window.escapeHtml(value);
     return String(value ?? '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')

@@ -161,13 +161,17 @@ service cloud.firestore {
     match /calendar_feeds/{token} {
       allow read: if true;
 
+      // reviews (revisão espaçada) foi adicionado depois dos demais campos
+      // e ficou de fora dessa validação por um tempo — limite de 1000 casa
+      // com o corte que calendar-feed.js já aplica no buildSnapshot().
       allow create: if isSignedIn()
         && token.size() >= 24 && token.size() <= 64
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.exams is list && request.resource.data.exams.size() <= 500
         && request.resource.data.tasks is list && request.resource.data.tasks.size() <= 2000
         && request.resource.data.sessions is list && request.resource.data.sessions.size() <= 500
-        && request.resource.data.classSchedule is list && request.resource.data.classSchedule.size() <= 200;
+        && request.resource.data.classSchedule is list && request.resource.data.classSchedule.size() <= 200
+        && request.resource.data.reviews is list && request.resource.data.reviews.size() <= 1000;
 
       allow update: if isSignedIn()
         && resource.data.uid == request.auth.uid
@@ -175,7 +179,8 @@ service cloud.firestore {
         && request.resource.data.exams is list && request.resource.data.exams.size() <= 500
         && request.resource.data.tasks is list && request.resource.data.tasks.size() <= 2000
         && request.resource.data.sessions is list && request.resource.data.sessions.size() <= 500
-        && request.resource.data.classSchedule is list && request.resource.data.classSchedule.size() <= 200;
+        && request.resource.data.classSchedule is list && request.resource.data.classSchedule.size() <= 200
+        && request.resource.data.reviews is list && request.resource.data.reviews.size() <= 1000;
 
       // Apagar o token revoga a URL antiga (usado ao "gerar novo link").
       allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;

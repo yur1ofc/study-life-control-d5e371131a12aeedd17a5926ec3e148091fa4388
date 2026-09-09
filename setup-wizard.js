@@ -998,7 +998,10 @@ Regras:
       fechar();
     }
 
+    // Delega para window.escapeHtml (utils.js) quando disponível; fallback
+    // idêntico mantido só por segurança de ordem de carregamento.
     function escapeHtml(s) {
+      if (window.escapeHtml) return window.escapeHtml(s);
       return (s || '').replace(/[&<>"']/g, c => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
       }[c]));

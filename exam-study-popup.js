@@ -101,7 +101,10 @@
     return overlay;
   }
 
+  // Delega para window.escapeHtml (utils.js) quando disponível; fallback
+  // idêntico mantido só por segurança de ordem de carregamento.
   function escapeHtml(str) {
+    if (window.escapeHtml) return window.escapeHtml(str);
     return String(str || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
