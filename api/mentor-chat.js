@@ -191,8 +191,26 @@ async function checkGlobalUsage(idToken) {
   return { blocked, degraded: !blocked && ratio >= DEGRADE_RATIO, count, ratio };
 }
 
+// CORS travado no domínio do site (+ localhost em dev), em vez de '*'.
+// Mesmo raciocínio de api/gemini.js: a rota já exige Firebase ID token
+// válido, mas travar a origem fecha o vetor de outro site chamar em nome
+// de um usuário com token vazado por outro motivo.
+const ALLOWED_ORIGINS = [
+  'https://slcampus.vercel.app',
+  'https://study-life-control.vercel.app'
+];
+function resolveAllowedOrigin(req) {
+  const origin = req.headers.origin || '';
+  if (ALLOWED_ORIGINS.includes(origin)) return origin;
+  if (/^https:\/\/study-life-control(-[a-z0-9-]+)?\.vercel\.app$/.test(origin)) return origin;
+  if (/^https:\/\/slcampus(-[a-z0-9-]+)?\.vercel\.app$/.test(origin)) return origin;
+  if (/^http:\/\/localhost(:\d+)?$/.test(origin) || /^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return origin;
+  return ALLOWED_ORIGINS[0];
+}
+
 module.exports = async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Origin', resolveAllowedOrigin(req));
+  res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
