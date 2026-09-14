@@ -13,20 +13,45 @@
   'use strict';
 
   /* ─── Constantes ─────────────────────────────────────────── */
-  const TOTAL_STEPS = 4;
-  const STEP_LABELS = [
-    'Quem é você',
-    'Grade Curricular',
-    'Sua Rotina',
-    'Matérias & Perfil'
-  ];
   const DRAFT_KEY = 'slc_wizard_draft_v1';
+
+  // Cada perfil tem um fluxo de passos diferente. 'quem' é a etapa que
+  // muda mais (universidade/curso, ou escola/série, ou concurso, ou
+  // objetivo pessoal); 'grade' (importar grade curricular via PDF/IA) só
+  // faz sentido pra quem está na faculdade; 'rotina' e 'materias' são
+  // genéricas e servem pra todo mundo.
+  const FLOWS = {
+    faculdade: {
+      steps: ['quem', 'grade', 'rotina', 'materias'],
+      labels: ['Quem é você', 'Grade Curricular', 'Sua Rotina', 'Matérias & Perfil']
+    },
+    concurso: {
+      steps: ['quem', 'rotina', 'materias'],
+      labels: ['Seu Concurso', 'Sua Rotina', 'Matérias & Perfil']
+    },
+    ensino_medio: {
+      steps: ['quem', 'rotina', 'materias'],
+      labels: ['Sua Escola', 'Sua Rotina', 'Matérias & Perfil']
+    },
+    geral: {
+      steps: ['quem', 'rotina', 'materias'],
+      labels: ['Seus Objetivos', 'Sua Rotina', 'Áreas & Perfil']
+    }
+  };
+
+  function getFlow() {
+    return FLOWS[wizardState.perfil] || FLOWS.faculdade;
+  }
+  function getTotalSteps() { return getFlow().steps.length; }
+  function getStepLabels() { return getFlow().labels; }
+  function kindOfStep(n) { return getFlow().steps[n - 1]; }
 
   /* ─── Estado do wizard ───────────────────────────────────── */
   let wizardState = {
-    step: 1,
-    importedCurriculum: [],  // disciplinas importadas da grade
-    subjects: [],            // matérias do semestre atual
+    step: 0,                 // 0 = seleção de perfil (antes de tudo)
+    perfil: null,             // 'faculdade' | 'concurso' | 'ensino_medio' | 'geral'
+    importedCurriculum: [],  // disciplinas importadas da grade (só faculdade)
+    subjects: [],            // matérias/áreas do momento atual
     semestre: ''
   };
 
@@ -424,6 +449,35 @@
   background: rgba(59,130,246,.08);
 }
 
+/* ── Cards de perfil (passo 0) ── */
+.wiz-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  margin-top: 8px;
+}
+@media (max-width: 560px) {
+  .wiz-profile-grid { grid-template-columns: 1fr; }
+}
+.wiz-profile-card {
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 20px 16px;
+  cursor: pointer;
+  text-align: center;
+  background: var(--bg-tertiary);
+  transition: all .2s;
+  user-select: none;
+}
+.wiz-profile-card:hover {
+  border-color: var(--accent-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0,0,0,.08);
+}
+.wiz-profile-card .wiz-profile-icon { font-size: 1.8rem; margin-bottom: 8px; }
+.wiz-profile-card .wiz-profile-title { font-size: .95rem; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+.wiz-profile-card .wiz-profile-desc { font-size: .78rem; color: var(--text-tertiary); line-height: 1.4; }
+
 /* ── Footer sticky ── */
 .wiz-footer {
   position: fixed;
@@ -547,7 +601,69 @@ Regras:
 
   /* ─── Render de cada etapa ────────────────────────────────── */
 
-  function renderStep1() {
+  /* ─── Passo 0: seleção de perfil ──────────────────────────── */
+  const PROFILES = [
+    { valor: 'faculdade',    icon: '🎓', title: 'Faculdade / Universidade', desc: 'Curso superior, com grade curricular e semestres.' },
+    { valor: 'concurso',     icon: '📋', title: 'Concurso Público',         desc: 'Estudando pra um edital específico.' },
+    { valor: 'ensino_medio', icon: '🏫', title: 'Ensino Médio / Escola',    desc: '1º, 2º ou 3º ano, técnico ou EJA.' },
+    { valor: 'geral',        icon: '📚', title: 'Estudo Geral / Pessoal',   desc: 'Idiomas, certificações, empreendedorismo ou o que quiser.' }
+  ];
+
+  function renderProfileStep() {
+    const html = `
+<div id="slc-wizard">
+  <div class="wiz-topbar">
+    <div class="wiz-logo"><img src="logo.png" alt="SLCampus" class="brand-logo-img"> SLC</div>
+    <div class="wiz-step-label">Bem-vindo(a)!</div>
+  </div>
+  <div class="wiz-body">
+    <div class="wiz-card" id="wiz-step-0">
+      <div class="wiz-card-title">👋 Pra que você quer usar o site?</div>
+      <div class="wiz-card-sub">Isso ajusta as perguntas seguintes e o app inteiro pro seu tipo de estudo</div>
+      <div class="wiz-profile-grid">
+        ${PROFILES.map(p => `
+          <div class="wiz-profile-card" data-perfil="${p.valor}">
+            <div class="wiz-profile-icon">${p.icon}</div>
+            <div class="wiz-profile-title">${esc(p.title)}</div>
+            <div class="wiz-profile-desc">${esc(p.desc)}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  </div>
+</div>`;
+
+    const setupCard = document.querySelector('.setup-card') || document.querySelector('.setup-container');
+    if (setupCard) {
+      setupCard.innerHTML = html;
+    } else {
+      const screen = document.getElementById('setup-screen');
+      if (screen) screen.innerHTML = `<div class="setup-card">${html}</div>`;
+    }
+
+    document.querySelectorAll('.wiz-profile-card').forEach(card => {
+      card.addEventListener('click', () => {
+        wizardState.perfil = card.dataset.perfil;
+        wizardState.step = 1;
+        saveDraft();
+        renderWizard();
+        window.scrollTo(0, 0);
+      });
+    });
+  }
+
+  /* ─── Passo "quem" (varia por perfil) ─────────────────────── */
+  function renderStepQuem() {
+    switch (wizardState.perfil) {
+      case 'concurso':     return renderStep1Concurso();
+      case 'ensino_medio':  return renderStep1EnsinoMedio();
+      case 'geral':         return renderStep1Geral();
+      case 'faculdade':
+      default:               return renderStep1Faculdade();
+    }
+  }
+
+  function renderStep1Faculdade() {
     return `
 <div class="wiz-card" id="wiz-step-1">
   <div class="wiz-card-title">👋 Olá! Vamos começar</div>
@@ -576,6 +692,83 @@ Regras:
       ${[1,2,3,4,5,6,7,8,9,10].map(n => `<div class="wiz-radio-card" data-val="${n}">${n}º</div>`).join('')}
     </div>
     <input type="hidden" id="wiz-semestre" value="">
+  </div>
+</div>`;
+  }
+
+  function renderStep1Concurso() {
+    return `
+<div class="wiz-card" id="wiz-step-1">
+  <div class="wiz-card-title">📋 Seu Concurso</div>
+  <div class="wiz-card-sub">Escolha um concurso da lista ou digite o seu, se não estiver lá</div>
+
+  <div class="wiz-field">
+    <label>Seu nome</label>
+    <input type="text" id="wiz-nome" placeholder="Como quer ser chamado?" autocomplete="given-name">
+  </div>
+
+  <div class="wiz-field wiz-autocomplete-wrap">
+    <label>Qual concurso você está estudando?</label>
+    <input type="text" id="wiz-concurso" placeholder="Digite para buscar: PRF, TJ, Banco do Brasil, ENEM..." autocomplete="off">
+    <div class="wiz-autocomplete-list" id="wiz-concurso-list" role="listbox"></div>
+  </div>
+  <p style="font-size:11.5px;color:var(--text-tertiary);margin:-8px 0 0;">
+    Não achou o seu na lista? Sem problema — pode digitar o nome dele mesmo assim e você monta as matérias na próxima etapa.
+  </p>
+  <input type="hidden" id="wiz-concurso-materias" value="">
+</div>`;
+  }
+
+  function renderStep1EnsinoMedio() {
+    const tipos = (window.SLC_EnsinoMedio && window.SLC_EnsinoMedio.TIPOS_ESCOLA) || [
+      { valor: 'regular', label: 'Ensino Médio Regular' },
+      { valor: 'tecnico', label: 'Ensino Médio Técnico/Integrado' },
+      { valor: 'eja', label: 'EJA (Educação de Jovens e Adultos)' }
+    ];
+    return `
+<div class="wiz-card" id="wiz-step-1">
+  <div class="wiz-card-title">🏫 Sua Escola</div>
+  <div class="wiz-card-sub">Vamos pré-preencher suas matérias com base na sua série</div>
+
+  <div class="wiz-field">
+    <label>Seu nome</label>
+    <input type="text" id="wiz-nome" placeholder="Como quer ser chamado?" autocomplete="given-name">
+  </div>
+
+  <div class="wiz-field">
+    <label>Que série você está cursando?</label>
+    <div class="wiz-radio-group" id="wiz-serie-group">
+      <div class="wiz-radio-card" data-val="1">1º ano</div>
+      <div class="wiz-radio-card" data-val="2">2º ano</div>
+      <div class="wiz-radio-card" data-val="3">3º ano</div>
+    </div>
+    <input type="hidden" id="wiz-serie" value="">
+  </div>
+
+  <div class="wiz-field">
+    <label>Tipo de escola</label>
+    <div class="wiz-radio-group" id="wiz-tipo-escola-group">
+      ${tipos.map((t, i) => `<div class="wiz-radio-card ${i===0?'active':''}" data-val="${t.valor}">${esc(t.label)}</div>`).join('')}
+    </div>
+    <input type="hidden" id="wiz-tipo-escola" value="${tipos[0]?.valor || 'regular'}">
+  </div>
+</div>`;
+  }
+
+  function renderStep1Geral() {
+    return `
+<div class="wiz-card" id="wiz-step-1">
+  <div class="wiz-card-title">📚 Seus Objetivos</div>
+  <div class="wiz-card-sub">Conte rapidamente o que você quer estudar ou organizar</div>
+
+  <div class="wiz-field">
+    <label>Seu nome</label>
+    <input type="text" id="wiz-nome" placeholder="Como quer ser chamado?" autocomplete="given-name">
+  </div>
+
+  <div class="wiz-field">
+    <label>Qual é o seu objetivo principal?</label>
+    <input type="text" id="wiz-objetivo" placeholder="Ex: idiomas, empreender, certificações, organizar a rotina...">
   </div>
 </div>`;
   }
@@ -764,31 +957,54 @@ Regras:
 </div>`;
   }
 
-  function renderStep4() {
+  function renderStepMaterias() {
+    const perfil = wizardState.perfil || 'faculdade';
     const semestre = wizardState.semestre || q('#wiz-semestre')?.value || '';
-    const autoSubjects = wizardState.importedCurriculum
-      .filter(d => String(d.semestre) === String(semestre))
-      .slice(0, 10);
+    let autoCount = 0;
 
-    // Pre-populate se tiver dados da grade importada
-    if (autoSubjects.length && !wizardState.subjects.length) {
-      wizardState.subjects = autoSubjects.map(d => ({
-        nome: d.nome,
-        dificuldade: 3,
-        peso: 3,
-        notaDesejada: 7
-      }));
+    if (perfil === 'faculdade') {
+      const autoSubjects = wizardState.importedCurriculum
+        .filter(d => String(d.semestre) === String(semestre))
+        .slice(0, 10);
+      // Pre-populate se tiver dados da grade importada
+      if (autoSubjects.length && !wizardState.subjects.length) {
+        wizardState.subjects = autoSubjects.map(d => ({ nome: d.nome, dificuldade: 3, peso: 3, notaDesejada: 7 }));
+      }
+      autoCount = autoSubjects.length;
+    } else if (perfil === 'concurso' && !wizardState.subjects.length && wizardState.concursoMaterias?.length) {
+      wizardState.subjects = wizardState.concursoMaterias.map(nome => ({ nome, dificuldade: 3, peso: 3, notaDesejada: 7 }));
+      autoCount = wizardState.subjects.length;
+    } else if (perfil === 'ensino_medio' && !wizardState.subjects.length) {
+      const materias = window.SLC_EnsinoMedio ? window.SLC_EnsinoMedio.getMateriasPorSerie(wizardState.serie) : [];
+      if (materias.length) {
+        wizardState.subjects = materias.map(nome => ({ nome, dificuldade: 3, peso: 3, notaDesejada: 7 }));
+        autoCount = materias.length;
+      }
     }
 
     const subjects = wizardState.subjects.length ? wizardState.subjects : [{ nome:'', dificuldade:3, peso:3, notaDesejada:7 }];
 
+    const titulo = perfil === 'geral' ? '🎯 Perfil & Áreas de Estudo' : '🎯 Perfil & Matérias';
+    let subtitulo;
+    if (perfil === 'faculdade') {
+      subtitulo = `Matérias do <strong>${semestre ? semestre+'º' : 'seu'} semestre</strong>` +
+        (autoCount ? ` — <span style="color:var(--accent-success)">${autoCount} pré-preenchidas da grade importada ✓</span>` : ' — adicione as que você está cursando agora');
+    } else if (perfil === 'concurso') {
+      subtitulo = autoCount
+        ? `<span style="color:var(--accent-success)">${autoCount} matérias pré-preenchidas do edital básico ✓</span> — ajuste como quiser`
+        : 'Adicione as matérias do seu edital';
+    } else if (perfil === 'ensino_medio') {
+      subtitulo = autoCount
+        ? `<span style="color:var(--accent-success)">${autoCount} matérias pré-preenchidas da sua série ✓</span> — ajuste como quiser`
+        : 'Adicione as matérias que você está cursando';
+    } else {
+      subtitulo = 'Adicione as áreas ou assuntos que você quer estudar';
+    }
+
     return `
 <div class="wiz-card" id="wiz-step-4">
-  <div class="wiz-card-title">🎯 Perfil & Matérias</div>
-  <div class="wiz-card-sub">
-    Matérias do <strong>${semestre ? semestre+'º' : 'seu'} semestre</strong>
-    ${autoSubjects.length ? `— <span style="color:var(--accent-success)">${autoSubjects.length} pré-preenchidas da grade importada ✓</span>` : '— adicione as que você está cursando agora'}
-  </div>
+  <div class="wiz-card-title">${titulo}</div>
+  <div class="wiz-card-sub">${subtitulo}</div>
 
   <button id="wiz-step4-ia-import" type="button" style="
     width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
@@ -849,34 +1065,44 @@ Regras:
   /* ─── Render do wizard completo ───────────────────────────── */
   function renderWizard() {
     const step = wizardState.step;
+
+    if (step === 0 || !wizardState.perfil) {
+      renderProfileStep();
+      return;
+    }
+
+    const totalSteps = getTotalSteps();
+    const labels = getStepLabels();
+    const kind = kindOfStep(step);
+
     let bodyContent = '';
-    if (step === 1) bodyContent = renderStep1();
-    else if (step === 2) bodyContent = renderStep2();
-    else if (step === 3) bodyContent = renderStep3();
-    else if (step === 4) bodyContent = renderStep4();
+    if (kind === 'quem') bodyContent = renderStepQuem();
+    else if (kind === 'grade') bodyContent = renderStep2();
+    else if (kind === 'rotina') bodyContent = renderStep3();
+    else if (kind === 'materias') bodyContent = renderStepMaterias();
 
     const html = `
 <div id="slc-wizard">
   <div class="wiz-topbar">
     <div class="wiz-logo"><img src="logo.png" alt="SLCampus" class="brand-logo-img"> SLC</div>
     <div class="wiz-steps">
-      ${[1,2,3,4].map(n => {
+      ${Array.from({ length: totalSteps }, (_, i) => i + 1).map(n => {
         let cls = '';
         if (n < step) cls = 'done';
         else if (n === step) cls = 'active';
         return `<div class="wiz-step-dot ${cls}"></div>`;
       }).join('')}
     </div>
-    <div class="wiz-step-label">Passo ${step} de ${TOTAL_STEPS} — ${STEP_LABELS[step-1]}</div>
+    <div class="wiz-step-label">Passo ${step} de ${totalSteps} — ${labels[step-1]}</div>
   </div>
   <div class="wiz-body">${bodyContent}</div>
   <div class="wiz-footer">
     <div class="wiz-footer-info">
-      ${step > 1 ? `<button class="wiz-btn-back" id="wiz-btn-back">← Voltar</button>` : ''}
-      ${step === 2 ? `<span class="wiz-skip" id="wiz-skip-step">Pular esta etapa</span>` : ''}
+      <button class="wiz-btn-back" id="wiz-btn-back">← Voltar</button>
+      ${kind === 'grade' ? `<span class="wiz-skip" id="wiz-skip-step">Pular esta etapa</span>` : ''}
     </div>
     <div class="wiz-footer-btns">
-      ${step < TOTAL_STEPS
+      ${step < totalSteps
         ? `<button class="wiz-btn-next" id="wiz-btn-next">Continuar <i class="fas fa-arrow-right"></i></button>`
         : `<button class="wiz-btn-next wiz-btn-finish" id="wiz-btn-finish"><i class="fas fa-rocket"></i> Iniciar Jornada</button>`
       }
@@ -898,7 +1124,8 @@ Regras:
 
   /* ─── Restaurar valores ao voltar ────────────────────────── */
   function restoreValues(step) {
-    if (step === 1) {
+    const kind = kindOfStep(step);
+    if (kind === 'quem' && wizardState.perfil === 'faculdade') {
       if (wizardState.nome)         { const el = q('#wiz-nome'); if(el) el.value = wizardState.nome; }
       if (wizardState.universidade) { const el = q('#wiz-universidade'); if(el) el.value = wizardState.universidade; }
       if (wizardState.curso)        { const el = q('#wiz-curso'); if(el) el.value = wizardState.curso; }
@@ -909,7 +1136,30 @@ Regras:
         });
       }
     }
-    if (step === 3) {
+    if (kind === 'quem' && wizardState.perfil === 'concurso') {
+      if (wizardState.nome)     { const el = q('#wiz-nome'); if(el) el.value = wizardState.nome; }
+      if (wizardState.concurso) { const el = q('#wiz-concurso'); if(el) el.value = wizardState.concurso; }
+    }
+    if (kind === 'quem' && wizardState.perfil === 'ensino_medio') {
+      if (wizardState.nome) { const el = q('#wiz-nome'); if(el) el.value = wizardState.nome; }
+      if (wizardState.serie) {
+        document.querySelectorAll('#wiz-serie-group .wiz-radio-card').forEach(c => {
+          c.classList.toggle('active', c.dataset.val === String(wizardState.serie));
+        });
+        const el = q('#wiz-serie'); if (el) el.value = wizardState.serie;
+      }
+      if (wizardState.tipoEscola) {
+        document.querySelectorAll('#wiz-tipo-escola-group .wiz-radio-card').forEach(c => {
+          c.classList.toggle('active', c.dataset.val === wizardState.tipoEscola);
+        });
+        const el = q('#wiz-tipo-escola'); if (el) el.value = wizardState.tipoEscola;
+      }
+    }
+    if (kind === 'quem' && wizardState.perfil === 'geral') {
+      if (wizardState.nome)     { const el = q('#wiz-nome'); if(el) el.value = wizardState.nome; }
+      if (wizardState.objetivo) { const el = q('#wiz-objetivo'); if(el) el.value = wizardState.objetivo; }
+    }
+    if (kind === 'rotina') {
       if (wizardState.turno) {
         q('#wiz-turno').value = wizardState.turno;
         document.querySelectorAll('#wiz-turno-group .wiz-radio-card').forEach(c => {
@@ -930,7 +1180,7 @@ Regras:
         });
       }
     }
-    if (step === 4) {
+    if (kind === 'materias') {
       if (wizardState.disciplina) {
         q('#wiz-disciplina').value = wizardState.disciplina;
         document.querySelectorAll('#wiz-disciplina-group .wiz-radio-card').forEach(c => {
@@ -1043,6 +1293,102 @@ Regras:
     input.addEventListener('focus', () => { if (input.value.trim().length >= 2) render(input.value); });
   }
 
+  /* ─── Autocomplete de concurso ────────────────────────────── */
+  function setupConcursoAutocomplete() {
+    const input = q('#wiz-concurso');
+    const list  = q('#wiz-concurso-list');
+    if (!input || !list || !window.SLC_Concursos) return;
+
+    let items = [];
+    let activeIndex = -1;
+
+    function escapeHtml(s) {
+      if (window.escapeHtml) return window.escapeHtml(s);
+      return (s || '').replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]));
+    }
+
+    function fechar() {
+      list.innerHTML = '';
+      list.classList.remove('open');
+      items = [];
+      activeIndex = -1;
+    }
+
+    function render(termo) {
+      items = window.SLC_Concursos.buscarConcursos(termo, 8);
+      if (!items.length) { fechar(); return; }
+
+      list.innerHTML = items.map((it, i) => `
+        <div class="wiz-ac-item" data-idx="${i}" role="option">
+          <span class="wiz-ac-nome">${escapeHtml(it.nome)}</span>
+          <span class="wiz-ac-meta">${escapeHtml(it.categoria || '')}</span>
+        </div>
+      `).join('');
+      list.classList.add('open');
+      activeIndex = -1;
+
+      list.querySelectorAll('.wiz-ac-item').forEach(el => {
+        el.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          escolher(parseInt(el.dataset.idx, 10));
+        });
+      });
+    }
+
+    function escolher(idx) {
+      const item = items[idx];
+      if (!item) return;
+      input.value = item.nome;
+      wizardState.concurso = item.nome;
+      wizardState.concursoMaterias = item.materias || [];
+      fechar();
+    }
+
+    let debounceT;
+    input.addEventListener('input', () => {
+      clearTimeout(debounceT);
+      const val = input.value;
+      // Se a pessoa editar o texto depois de já ter escolhido um item da
+      // lista, considera que passou a ser um concurso digitado à mão —
+      // não usa mais as matérias pré-definidas daquele item.
+      if (wizardState.concurso && val !== wizardState.concurso) {
+        wizardState.concurso = val;
+        wizardState.concursoMaterias = [];
+      }
+      debounceT = setTimeout(() => render(val), 120);
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (!items.length) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        activeIndex = Math.min(activeIndex + 1, items.length - 1);
+        updateActive();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        activeIndex = Math.max(activeIndex - 1, 0);
+        updateActive();
+      } else if (e.key === 'Enter') {
+        if (activeIndex >= 0) { e.preventDefault(); escolher(activeIndex); }
+      } else if (e.key === 'Escape') {
+        fechar();
+      }
+    });
+
+    function updateActive() {
+      list.querySelectorAll('.wiz-ac-item').forEach((el, i) => {
+        el.classList.toggle('active', i === activeIndex);
+      });
+      const activeEl = list.querySelector('.wiz-ac-item.active');
+      if (activeEl) activeEl.scrollIntoView({ block: 'nearest' });
+    }
+
+    input.addEventListener('blur', () => setTimeout(fechar, 100));
+    input.addEventListener('focus', () => { if (input.value.trim().length >= 2) render(input.value); });
+  }
+
   function attachEvents(step) {
     // Radio cards genérico (seleção única)
     document.querySelectorAll('.wiz-radio-group:not(.wiz-radio-group-multi)').forEach(group => {
@@ -1057,6 +1403,16 @@ Regras:
           if (group.id === 'wiz-semestre-group') {
             wizardState.semestre = card.dataset.val;
             q('#wiz-semestre').value = card.dataset.val;
+          }
+          // Para série e tipo de escola (nomes compostos — o cálculo
+          // genérico de id acima não cobre bem hífen duplo)
+          if (group.id === 'wiz-serie-group') {
+            wizardState.serie = card.dataset.val;
+            q('#wiz-serie').value = card.dataset.val;
+          }
+          if (group.id === 'wiz-tipo-escola-group') {
+            wizardState.tipoEscola = card.dataset.val;
+            q('#wiz-tipo-escola').value = card.dataset.val;
           }
         });
       });
@@ -1086,8 +1442,12 @@ Regras:
       btn.addEventListener('click', () => btn.classList.toggle('active'));
     });
 
-    // Autocomplete de universidade (passo 1)
-    if (step === 1) setupUniversidadeAutocomplete();
+    // Autocomplete do passo "quem" (varia por perfil)
+    const kindNow = kindOfStep(step);
+    if (kindNow === 'quem') {
+      if (wizardState.perfil === 'faculdade') setupUniversidadeAutocomplete();
+      else if (wizardState.perfil === 'concurso') setupConcursoAutocomplete();
+    }
 
     // Navegação
     q('#wiz-btn-next')?.addEventListener('click', () => goNext());
@@ -1102,13 +1462,13 @@ Regras:
       renderWizard();
     });
 
-    // Etapa 2: importação automática por IA
-    if (step === 2) {
+    // Etapa "grade": importação automática por IA (só faculdade)
+    if (kindNow === 'grade') {
       q('#wiz-auto-ia-import')?.addEventListener('click', () => openAutoGradeImport());
     }
 
-    // Etapa 4: subjects
-    if (step === 4) {
+    // Etapa "materias": subjects/áreas
+    if (kindNow === 'materias') {
       q('#wiz-add-subject-btn')?.addEventListener('click', () => {
         wizardState.subjects.push({ nome: '', dificuldade: 3, peso: 3, notaDesejada: 7 });
         refreshSubjectsList();
@@ -1272,14 +1632,14 @@ Regras:
   let _wizardBootedInSession = false;
 
   function loadDraft() {
-    if (_wizardBootedInSession) return wizardState.step > 1;
+    if (_wizardBootedInSession) return wizardState.step > 0;
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
       if (!raw) return false;
       const saved = JSON.parse(raw);
       if (saved && typeof saved === 'object') {
         Object.assign(wizardState, saved);
-        return wizardState.step > 1;
+        return wizardState.step > 0;
       }
     } catch (_) { /* rascunho corrompido — ignora e começa do zero */ }
     return false;
@@ -1319,13 +1679,14 @@ Regras:
   }
 
   function stepNeedsConfirmation(step) {
-    if (step === 2) {
+    const kind = kindOfStep(step);
+    if (kind === 'grade') {
       return !wizardState.importedCurriculum.length;
     }
-    if (step === 3) {
-      return !(wizardState.touched && wizardState.touched[3]);
+    if (kind === 'rotina') {
+      return !(wizardState.touched && wizardState.touched[step]);
     }
-    if (step === 4) {
+    if (kind === 'materias') {
       const hasSubjects = document.querySelectorAll('#wiz-subjects-list .wiz-subject-item .wiz-subject-nome')
         && Array.from(document.querySelectorAll('#wiz-subjects-list .wiz-subject-nome')).some(i => i.value.trim());
       return !hasSubjects;
@@ -1334,21 +1695,22 @@ Regras:
   }
 
   function confirmationContentFor(step) {
-    if (step === 2) {
+    const kind = kindOfStep(step);
+    if (kind === 'grade') {
       return {
         title: 'Seguir sem importar a grade?',
         body: `<p>Sem a grade curricular, o site não sabe quais matérias você ainda vai cursar nem os pré-requisitos delas.</p>
                <p>Isso deixa mais fraco: o planejamento de semestres futuros, o mapa de progresso do curso e os alertas de pré-requisito. Você pode importar a qualquer momento depois em <strong>Grade Curricular</strong>.</p>`
       };
     }
-    if (step === 3) {
+    if (kind === 'rotina') {
       return {
         title: 'Seguir com a rotina padrão?',
         body: `<p>Você não ajustou nada nesta etapa — o site vai usar valores padrão (turno tarde, dias de seg a sex, 4h por dia) em vez da sua rotina real.</p>
                <p>Isso afeta diretamente o <strong>Mentor IA</strong> e o plano de estudos: os horários sugeridos podem não bater com quando você realmente pode estudar. Vale a pena ajustar agora — leva menos de 1 minuto.</p>`
       };
     }
-    if (step === 4) {
+    if (kind === 'materias') {
       return {
         title: 'Iniciar sem cadastrar nenhuma matéria?',
         body: `<p>Sem matérias cadastradas, o Dashboard, o Mentor IA e o plano de estudos ficam praticamente vazios — não há o que planejar ainda.</p>
@@ -1360,7 +1722,7 @@ Regras:
 
   /* ─── Navegação ──────────────────────────────────────────── */
   async function goNext() {
-    if (wizardState.step === 1 && !validateStep1()) return;
+    if (kindOfStep(wizardState.step) === 'quem' && !validateStepQuem()) return;
     saveCurrentStep();
 
     if (stepNeedsConfirmation(wizardState.step)) {
@@ -1376,7 +1738,7 @@ Regras:
   }
 
   function goBack() {
-    if (wizardState.step <= 1) return;
+    if (wizardState.step <= 0) return;
     saveCurrentStep();
     wizardState.step--;
     saveDraft();
@@ -1384,25 +1746,47 @@ Regras:
     window.scrollTo(0, 0);
   }
 
-  function validateStep1() {
+  function validateStepQuem() {
     const nome = q('#wiz-nome')?.value?.trim();
-    const curso = q('#wiz-curso')?.value?.trim();
-    const semestre = q('#wiz-semestre')?.value;
     if (!nome) { alert('Por favor, informe seu nome.'); q('#wiz-nome')?.focus(); return false; }
-    if (!curso) { alert('Por favor, informe seu curso.'); q('#wiz-curso')?.focus(); return false; }
-    if (!semestre) { alert('Selecione o semestre atual.'); return false; }
+
+    if (wizardState.perfil === 'faculdade') {
+      const curso = q('#wiz-curso')?.value?.trim();
+      const semestre = q('#wiz-semestre')?.value;
+      if (!curso) { alert('Por favor, informe seu curso.'); q('#wiz-curso')?.focus(); return false; }
+      if (!semestre) { alert('Selecione o semestre atual.'); return false; }
+    } else if (wizardState.perfil === 'concurso') {
+      const concurso = q('#wiz-concurso')?.value?.trim();
+      if (!concurso) { alert('Por favor, informe qual concurso você está estudando.'); q('#wiz-concurso')?.focus(); return false; }
+    } else if (wizardState.perfil === 'ensino_medio') {
+      const serie = q('#wiz-serie')?.value;
+      if (!serie) { alert('Selecione sua série.'); return false; }
+    }
+    // perfil 'geral': só o nome é obrigatório
     return true;
   }
 
   function saveCurrentStep() {
     const step = wizardState.step;
-    if (step === 1) {
-      wizardState.nome         = q('#wiz-nome')?.value?.trim() || '';
-      wizardState.universidade = q('#wiz-universidade')?.value?.trim() || '';
-      wizardState.curso        = q('#wiz-curso')?.value?.trim() || '';
-      wizardState.semestre     = q('#wiz-semestre')?.value || '';
+    const kind = kindOfStep(step);
+
+    if (kind === 'quem') {
+      wizardState.nome = q('#wiz-nome')?.value?.trim() || '';
+      if (wizardState.perfil === 'faculdade') {
+        wizardState.universidade = q('#wiz-universidade')?.value?.trim() || '';
+        wizardState.curso        = q('#wiz-curso')?.value?.trim() || '';
+        wizardState.semestre     = q('#wiz-semestre')?.value || '';
+      } else if (wizardState.perfil === 'concurso') {
+        wizardState.concurso = q('#wiz-concurso')?.value?.trim() || '';
+      } else if (wizardState.perfil === 'ensino_medio') {
+        wizardState.serie      = q('#wiz-serie')?.value || '';
+        wizardState.tipoEscola = q('#wiz-tipo-escola')?.value || 'regular';
+      } else if (wizardState.perfil === 'geral') {
+        wizardState.objetivo = q('#wiz-objetivo')?.value?.trim() || '';
+      }
     }
-    if (step === 2) {
+
+    if (kind === 'grade') {
       // Coletar manual items
       const manualItems = [];
       document.querySelectorAll('#wiz-manual-items .wiz-subject-item').forEach(row => {
@@ -1420,7 +1804,8 @@ Regras:
         wizardState.importedCurriculum = [...wizardState.importedCurriculum, ...manualItems];
       }
     }
-    if (step === 3) {
+
+    if (kind === 'rotina') {
       wizardState.turno        = q('#wiz-turno')?.value || 'tarde';
       wizardState.horas        = parseInt(q('#wiz-horas')?.value || '4');
       wizardState.rotina       = q('#wiz-rotina')?.value || 'so-estuda';
@@ -1429,7 +1814,8 @@ Regras:
       wizardState.dias         = Array.from(document.querySelectorAll('#wiz-days-group .wiz-day-btn.active'))
                                       .map(b => b.dataset.val);
     }
-    if (step === 4) {
+
+    if (kind === 'materias') {
       wizardState.disciplina  = q('#wiz-disciplina')?.value || 'medio';
       const dificuldadeRaw = q('#wiz-dificuldade')?.value || 'tempo';
       wizardState.dificuldade = dificuldadeRaw.split(',').map(v => v.trim()).filter(Boolean);
@@ -1453,8 +1839,9 @@ Regras:
 
   /* ─── Finalizar setup ─────────────────────────────────────── */
   async function finishSetup() {
-    if (stepNeedsConfirmation(4)) {
-      const { title, body } = confirmationContentFor(4);
+    const lastStep = getTotalSteps();
+    if (stepNeedsConfirmation(lastStep)) {
+      const { title, body } = confirmationContentFor(lastStep);
       const proceed = await confirmProceed(title, body, 'Iniciar mesmo assim');
       if (!proceed) return;
     }
@@ -1490,11 +1877,34 @@ Regras:
         observacoes: ''
       }));
 
+      // Preenche curso/universidade com um equivalente por perfil, pra que
+      // as telas existentes (que hoje mostram "curso"/"universidade") ainda
+      // façam sentido pra quem não é da faculdade, sem precisar reescrever
+      // cada tela agora.
+      let cursoEquivalente = wizardState.curso || '';
+      let instituicaoEquivalente = wizardState.universidade || '';
+      if (wizardState.perfil === 'concurso') {
+        cursoEquivalente = wizardState.concurso || 'Concurso Público';
+        instituicaoEquivalente = 'Concurso';
+      } else if (wizardState.perfil === 'ensino_medio') {
+        const tipoLabel = (window.SLC_EnsinoMedio?.TIPOS_ESCOLA || []).find(t => t.valor === wizardState.tipoEscola)?.label || 'Ensino Médio';
+        cursoEquivalente = `${wizardState.serie || ''}º ano — ${tipoLabel}`.replace(/^º ano — /, tipoLabel);
+        instituicaoEquivalente = tipoLabel;
+      } else if (wizardState.perfil === 'geral') {
+        cursoEquivalente = wizardState.objetivo || 'Estudo Geral';
+        instituicaoEquivalente = 'Estudo Pessoal';
+      }
+
       const userData = {
         nome:             wizardState.nome || '',
-        curso:            wizardState.curso || '',
-        universidade:     wizardState.universidade || '',
+        perfil:           wizardState.perfil || 'faculdade',
+        curso:            cursoEquivalente,
+        universidade:     instituicaoEquivalente,
         semestre:         wizardState.semestre || '',
+        concurso:         wizardState.concurso || '',
+        serie:            wizardState.serie || '',
+        tipoEscola:       wizardState.tipoEscola || '',
+        objetivo:         wizardState.objetivo || '',
         turnoPrincipal:   wizardState.turno || 'tarde',
         diasPreferidos:   wizardState.dias || ['seg','ter','qua','qui','sex'],
         horasMaximas:     wizardState.horas || 4,

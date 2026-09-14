@@ -1472,23 +1472,35 @@ class ViewRenderer {
         }
 
         if (aba === 'perfil') {
+            const perfil = user.perfil || 'faculdade';
+            const labelPrincipal = perfil === 'concurso' ? 'Concurso'
+                : perfil === 'ensino_medio' ? 'Série / Tipo de escola'
+                : perfil === 'geral' ? 'Objetivo'
+                : 'Curso';
+            const placeholderPrincipal = perfil === 'concurso' ? 'Ex: PRF, TJ, Banco do Brasil'
+                : perfil === 'ensino_medio' ? 'Ex: 2º ano — Ensino Médio Regular'
+                : perfil === 'geral' ? 'Ex: idiomas, certificações, empreender'
+                : 'Ex: Engenharia Civil';
+
             conteudo = `
             <div class="config-section-title">👤 Informações do perfil</div>
             <div class="config-item" style="flex-direction:column;align-items:flex-start;gap:10px;">
                 <div class="wiz-field" style="width:100%"><label>Nome</label>
                     <input type="text" id="config-nome" value="${this.esc(user.nome || '')}" placeholder="Seu nome">
                 </div>
+                ${perfil === 'faculdade' ? `
                 <div class="wiz-field" style="width:100%"><label>Universidade</label>
                     <input type="text" id="config-universidade" value="${this.esc(user.universidade || '')}" placeholder="Ex: UFOB">
+                </div>` : ''}
+                <div class="wiz-field" style="width:100%"><label>${labelPrincipal}</label>
+                    <input type="text" id="config-curso" value="${this.esc(user.curso || '')}" placeholder="${placeholderPrincipal}">
                 </div>
-                <div class="wiz-field" style="width:100%"><label>Curso</label>
-                    <input type="text" id="config-curso" value="${this.esc(user.curso || '')}" placeholder="Ex: Engenharia Civil">
-                </div>
+                ${perfil === 'faculdade' ? `
                 <div class="wiz-field" style="width:100%"><label>Semestre atual</label>
                     <select id="config-semestre">
                         ${[1,2,3,4,5,6,7,8,9,10].map(n => `<option value="${n}" ${parseInt(user.semestre) === n ? 'selected' : ''}>${n}º semestre</option>`).join('')}
                     </select>
-                </div>
+                </div>` : ''}
                 <button class="btn-primary" id="btn-salvar-perfil" style="margin-top:8px;">
                     <i class="fas fa-save"></i> Salvar alterações
                 </button>
