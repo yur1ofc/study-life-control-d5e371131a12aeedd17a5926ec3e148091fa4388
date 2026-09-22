@@ -5969,3 +5969,7 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 /* Previsão de notas: indicador determinístico, sem falsa probabilidade */
 .grade-goal-progress .grade-progress-note{display:block;margin-top:7px;color:var(--text-tertiary);font-size:.68rem;line-height:1.35;}
 .risk-sem-dados{background:rgba(148,163,184,.12);color:var(--text-secondary,#94a3b8);}
+
+/* Inteligência acadêmica central */
+.subject-history-intel{margin-top:9px;padding:8px 10px;border-radius:10px;background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.12);font-size:.78rem;line-height:1.4;opacity:.92}
+.subject-history-intel i{margin-right:5px}

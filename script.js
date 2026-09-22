@@ -469,6 +469,7 @@
             <div class="subject-metric"><span>Nota ideal na próxima</span><strong>${item.nextRequiredGrade}</strong></div>
           </div>
           <div class="progress-bar"><div class="progress-fill" style="width:${attendanceWidth}%"></div></div>
+          ${item.historicalAttempts ? `<div class="subject-history-intel"><i class="fas fa-clock-rotate-left"></i> Histórico: ${item.historicalAttempts} tentativa(s)${item.historicalFailures ? ` · ${item.historicalFailures} reprovação(ões)` : ''}${item.previousAttempt?.grade != null ? ` · última nota ${Number(item.previousAttempt.grade).toFixed(1)}` : ''}${item.historicalBestGrade != null ? ` · melhor ${Number(item.historicalBestGrade).toFixed(1)}` : ''}</div>` : ''}
           <small>Risco atual: ${view.esc(item.riskReason)}</small>
           ${(!item.hasSessions || !item.hasDiaries || !item.hasGrades) ? `<div class="subject-missing-data-note"><i class="fas fa-circle-info"></i> ${[!item.hasSessions ? 'sem sessão de estudo' : null, !item.hasDiaries ? 'sem diário de aula' : null, !item.hasGrades ? 'sem nota lançada' : null].filter(Boolean).join(' · ')} — registre pra essa análise ficar mais precisa.</div>` : ''}
         </div>`;
