@@ -6,6 +6,8 @@
 //      Firebase Auth que o próprio app já gera — não precisa de infra extra).
 //   2) Cada usuário tem um limite diário (padrão: 8 importações/dia), contado
 //      no Firestore que você já usa. Passar do limite retorna erro 429.
+//      Para testes, GEMINI_TEST_EMAIL ou GEMINI_TEST_UID pode isentar UMA conta.
+//      Remova essas variáveis do Vercel quando os testes terminarem.
 //
 // Variáveis de ambiente necessárias no Vercel (Settings → Environment Variables):
 //   GEMINI_API_KEY     → grátis em https://aistudio.google.com/apikey
@@ -112,15 +114,16 @@ async function verifyFirebaseToken(idToken) {
     body: JSON.stringify({ idToken })
   });
   const data = await resp.json();
-  const uid = data?.users?.[0]?.localId;
+  const user = data?.users?.[0];
+  const uid = user?.localId;
   if (!resp.ok || !uid) throw new Error('unauthorized');
-  return uid;
+  return { uid, email: String(user.email || '').toLowerCase() };
 }
 
 // Lê e incrementa o contador diário do usuário via API REST do Firestore,
 // usando o próprio idToken do usuário (respeita as regras de segurança —
 // cada um só lê/escreve o próprio contador).
-async function checkAndIncrementUsage(idToken, uid) {
+async function checkAndIncrementUsage(idToken, uid, bypassLimit = false) {
   const projectId = process.env.FIREBASE_PROJECT_ID;
   if (!projectId) throw new Error('FIREBASE_PROJECT_ID não configurada no servidor.');
 
@@ -142,7 +145,7 @@ async function checkAndIncrementUsage(idToken, uid) {
     return { blocked: false, count: 0 };
   }
 
-  if (count >= DAILY_LIMIT) {
+  if (!bypassLimit && count >= DAILY_LIMIT) {
     return { blocked: true, count };
   }
 
@@ -197,9 +200,9 @@ module.exports = async function handler(req, res) {
     return res.status(401).json({ error: 'É preciso estar logado no app para usar a importação com IA.' });
   }
 
-  let uid;
+  let authUser;
   try {
-    uid = await verifyFirebaseToken(idToken);
+    authUser = await verifyFirebaseToken(idToken);
   } catch {
     return res.status(401).json({ error: 'Sessão inválida ou expirada. Recarregue a página e faça login novamente.' });
   }
@@ -213,14 +216,21 @@ module.exports = async function handler(req, res) {
   // em arquivos maiores como foto/PDF, pra estourar o tempo e falhar).
   // Rodando as leituras em paralelo, e sem esperar as gravações (que já são
   // "best-effort" internamente), esse trecho fica bem mais rápido.
+  const uid = authUser.uid;
+  const testEmail = String(process.env.GEMINI_TEST_EMAIL || '').trim().toLowerCase();
+  const testUid = String(process.env.GEMINI_TEST_UID || '').trim();
+  const testBypass = Boolean((testEmail && authUser.email === testEmail) || (testUid && uid === testUid));
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const [usageResult, sharedCountResult] = await Promise.allSettled([
-    checkAndIncrementUsage(idToken, uid),
+    checkAndIncrementUsage(idToken, uid, testBypass),
     sharedQuota.readSharedCount(idToken, projectId)
   ]);
 
   if (usageResult.status === 'fulfilled' && usageResult.value.blocked) {
     return res.status(429).json({ error: `Limite de ${DAILY_LIMIT} importações por dia atingido. Tente novamente amanhã.` });
+  }
+  if (testBypass) {
+    console.warn(`[api/gemini] limite diário de importação temporariamente ignorado para conta de teste configurada no Vercel (${authUser.email || uid}).`);
   }
   if (usageResult.status === 'rejected') {
     console.error('[api/gemini] erro ao checar limite de uso:', usageResult.reason?.message);
