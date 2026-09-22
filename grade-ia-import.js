@@ -109,15 +109,15 @@ Regras:
   // clicar "Tentar novamente" manualmente para algo que se resolve sozinho.
   async function callGemini(parts, onRetryStatus) {
     let lastErr = null;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         return await callGeminiOnce(parts);
       } catch (err) {
         lastErr = err;
-        const overloaded = err.status === 503 || isOverloadMsg(err.message);
-        if (!overloaded || attempt === 2) throw err;
+        const overloaded = [408, 429, 500, 502, 503, 504].includes(Number(err.status)) || isOverloadMsg(err.message);
+        if (!overloaded || attempt === 1) throw err;
         if (typeof onRetryStatus === 'function') onRetryStatus(attempt + 1);
-        await wait(3000 * (attempt + 1));
+        await wait(2000 * (attempt + 1));
       }
     }
     throw lastErr;

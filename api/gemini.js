@@ -32,66 +32,66 @@ const sharedQuota = require('./_lib/gemini-shared-quota');
 // Não usar modelos legados aqui. Em contas novas, o Gemini pode responder 404 para
 // modelos antigos (ex.: gemini-2.5-flash). Começamos pelo modelo atual e só
 // usamos o alias latest como fallback.
-const GEMINI_MODELS = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash'];
+const GEMINI_MODELS = ['gemini-3.6-flash', 'gemini-3.7-flash'];
+
 const DAILY_LIMIT = 8; // importações de grade por usuário por dia
 
-function isOverloadError(status, data) {
-  if (status === 503) return true;
+function isTransientGeminiError(status, data) {
   const msg = (data?.error?.message || '').toLowerCase();
-  return msg.includes('overload') || msg.includes('high demand') || msg.includes('unavailable');
+  return [408, 429, 500, 502, 503, 504].includes(status) ||
+    /overload|high demand|temporar|unavailable|resource.?exhausted|deadline.?exceeded|timeout/i.test(msg);
 }
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
-// Antes tentava até 2x no MESMO modelo antes de trocar (até 6 chamadas no
-// total: 3 modelos x 2 tentativas, com sleep de 900ms entre elas). Em
-// arquivos maiores (foto/PDF do fluxograma), cada chamada ao Gemini já pode
-// levar vários segundos sozinha — somado ao sleep, isso estourava com
-// facilidade o tempo máximo de execução da function na Vercel, derrubando a
-// importação bem no meio (e é isso que aparecia pro usuário como "trava" ou
-// "não funciona", tanto pra foto quanto pra texto colado). Agora tentamos
-// cada modelo só 1 vez antes de já passar pro próximo — a redundância entre
-// os 3 modelos da lista já cobre bem os casos de sobrecarga momentânea, sem
-// gastar tempo extra em espera.
+// Uma importação é uma única análise de documento. Não fazemos 6 chamadas
+// sequenciais: isso aumenta a chance de outro timeout e pode multiplicar a
+// cota consumida. Tentamos no máximo dois modelos, uma vez cada.
 async function callGeminiWithFallback(geminiKey, contents) {
   let lastError = null;
 
-  // 503/429 are transient Gemini conditions. Try each stable Flash model once,
-  // then retry the most promising model once with a short backoff. The browser
-  // already has its own retry, so we deliberately keep server-side attempts bounded.
-  for (let round = 0; round < 2; round += 1) {
-    for (let i = 0; i < GEMINI_MODELS.length; i += 1) {
-      const model = GEMINI_MODELS[i];
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
-      try {
-        const geminiRes = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents,
-            generationConfig: { responseMimeType: 'application/json' }
-          })
-        });
-        const data = await geminiRes.json().catch(() => ({}));
+  for (let i = 0; i < GEMINI_MODELS.length; i += 1) {
+    const model = GEMINI_MODELS[i];
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 25000);
 
-        if (geminiRes.ok) return { ok: true, data, modelUsed: model };
+    try {
+      const geminiRes = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents,
+          generationConfig: { responseMimeType: 'application/json' }
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+      const data = await geminiRes.json().catch(() => ({}));
 
-        lastError = { status: geminiRes.status, data, model };
-        const msg = data?.error?.message || '';
-        const modelUnavailable = geminiRes.status === 404 ||
-          (geminiRes.status === 400 && /model.*(not found|not available|unsupported)|not found.*model/i.test(msg));
-        const transient = geminiRes.status === 429 || geminiRes.status === 503 ||
-          /overload|high demand|temporar|unavailable|resource.?exhausted/i.test(msg);
+      if (geminiRes.ok) return { ok: true, data, modelUsed: model };
 
-        if (!modelUnavailable && !transient) {
-          return { ok: false, status: geminiRes.status, data };
-        }
-      } catch (err) {
-        lastError = { status: 503, data: { error: { message: err.message || 'Falha de rede ao chamar o Gemini' } }, model };
+      lastError = { status: geminiRes.status, data, model };
+      const msg = data?.error?.message || '';
+      const modelUnavailable = geminiRes.status === 404 ||
+        (geminiRes.status === 400 && /model.*(not found|not available|unsupported)|not found.*model/i.test(msg));
+
+      if (modelUnavailable) continue;
+      if (isTransientGeminiError(geminiRes.status, data)) {
+        if (i < GEMINI_MODELS.length - 1) await sleep(800);
+        continue;
       }
+      return { ok: false, status: geminiRes.status, data };
+    } catch (err) {
+      clearTimeout(timeout);
+      const aborted = err?.name === 'AbortError';
+      lastError = {
+        status: aborted ? 504 : 503,
+        data: { error: { message: aborted ? 'O Gemini excedeu o tempo limite de 25 segundos.' : (err.message || 'Falha de rede ao chamar o Gemini') } },
+        model
+      };
+      if (i < GEMINI_MODELS.length - 1) await sleep(800);
     }
-
-    if (round === 0) await sleep(1200);
   }
 
   return { ok: false, status: lastError?.status || 503, data: lastError?.data || {} };
@@ -251,10 +251,12 @@ module.exports = async function handler(req, res) {
     const result = await callGeminiWithFallback(geminiKey, body.contents);
 
     if (!result.ok) {
-      const overloaded = isOverloadError(result.status, result.data) || result.status === 429;
+      const overloaded = isTransientGeminiError(result.status, result.data);
       const modelUnavailable = result.status === 404 || /model.*(not found|not available|unsupported)|not found.*model/i.test(result.data?.error?.message || '');
       const msg = overloaded
-        ? 'O Gemini está temporariamente indisponível ou atingiu o limite de requisições. O SLCampus tentou os modelos disponíveis. Aguarde alguns segundos e tente novamente.'
+        ? (result.status === 504
+          ? 'O Gemini demorou demais para processar o PDF. O SLCampus tentou outro modelo. Tente novamente; se continuar, use a opção de colar o texto do SIGAA.'
+          : 'O Gemini está temporariamente indisponível ou atingiu o limite de requisições. O SLCampus tentou os modelos disponíveis. Aguarde alguns segundos e tente novamente.')
         : modelUnavailable
           ? 'Nenhum modelo Gemini configurado está disponível para a chave do Vercel. Verifique GEMINI_API_KEY.'
           : (result.data?.error?.message || `Erro HTTP ${result.status} do Gemini`);
