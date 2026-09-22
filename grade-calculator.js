@@ -105,7 +105,7 @@ class GradeCalculator {
             materia: notaData.materia,
             avaliacao: notaData.avaliacao,
             valor: parseFloat(notaData.valor),
-            peso: parseInt(notaData.peso, 10) || 100,
+            peso: Number.isFinite(Number(notaData.peso)) ? Number(notaData.peso) : 100,
             data: new Date().toISOString()
         };
 

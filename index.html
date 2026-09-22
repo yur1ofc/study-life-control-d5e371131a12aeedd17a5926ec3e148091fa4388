@@ -418,6 +418,7 @@
                         <div class="page-title">
                             <h1 id="page-title">Dashboard</h1>
                         </div>
+                        <div id="semester-context-switcher" class="semester-context-switcher" aria-label="Semestre em visualização"></div>
                         <div class="header-actions">
 
                             <button class="btn-icon" id="daily-log-btn" onclick="window.diaryView?.openModal()" title="Registrar Dia">
@@ -561,7 +562,7 @@
                     </div>
                     <div class="form-group">
                         <label>Peso (%)</label>
-                        <input type="number" id="prova-peso" min="0" max="100" value="100">
+                        <input type="number" id="prova-peso" min="0.1" max="100" step="0.1" value="100">
                     </div>
                 </div>
                 <div class="form-group">
@@ -722,7 +723,7 @@
                     </div>
                     <div class="form-group">
                         <label>Peso (%)</label>
-                        <input type="number" id="nota-peso" min="0" max="100" value="100">
+                        <input type="number" id="nota-peso" min="0.1" max="100" step="0.1" value="100">
                     </div>
                 </div>
                 <div class="form-actions">
@@ -1188,5 +1189,6 @@
     <script defer src="improvements.js"></script>
     <script defer src="ux-improvements.js"></script>
     <script defer src="reprovado-ecosystem.js"></script>
+    <script defer src="semester-context.js"></script>
 </body>
 </html>

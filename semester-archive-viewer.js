@@ -30,6 +30,8 @@
             .semarch-header p{margin:0;color:var(--text-secondary,#94a3b8);font-size:.92rem;}
             .semarch-close{cursor:pointer;font-size:1.4rem;line-height:1;opacity:.6;background:none;border:none;color:var(--text-primary,#f8fafc);}
             .semarch-close:hover{opacity:1;}
+.semarch-open{border:1px solid rgba(59,130,246,.28);background:rgba(59,130,246,.12);color:#93c5fd;border-radius:10px;padding:7px 11px;font:inherit;font-size:.8rem;font-weight:700;cursor:pointer;white-space:nowrap;}
+            .semarch-open:hover{background:rgba(59,130,246,.2);}
             .semarch-body{padding:20px 22px;}
             .semarch-empty{padding:24px;text-align:center;color:var(--text-secondary,#94a3b8);}
             .semarch-item{border:1px solid var(--border,#2d3a4f);border-radius:14px;margin-bottom:12px;background:var(--bg-tertiary,#1e2b3a);overflow:hidden;}
@@ -96,7 +98,10 @@
                         <strong>${esc(titulo)}</strong>
                         <small>Finalizado em ${formatDate(archive.finalizadoEm)} • ${materias.length} matéria${materias.length === 1 ? '' : 's'} • ${totalItens} itens arquivados</small>
                     </div>
-                    <i class="fas fa-chevron-down semarch-chevron"></i>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <button type="button" class="semarch-open" data-semarch-open="${index}"><i class="fas fa-pen"></i> Abrir e editar</button>
+                        <i class="fas fa-chevron-down semarch-chevron"></i>
+                    </div>
                 </div>
                 <div class="semarch-item-body">
                     <div class="semarch-materias">
@@ -118,7 +123,7 @@
                 <div class="semarch-header">
                     <div>
                         <h2><i class="fas fa-box-archive"></i> Semestres anteriores</h2>
-                        <p>Consulta somente leitura do que já foi arquivado ao finalizar um semestre. Nada aqui pode ser editado ou apagado.</p>
+                        <p>Abra um semestre anterior para consultar ou editar os dados dele. O histórico fica isolado do semestre atual.</p>
                     </div>
                     <button class="semarch-close" type="button" aria-label="Fechar">&times;</button>
                 </div>
@@ -136,8 +141,20 @@
         overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
 
         overlay.querySelectorAll('[data-semarch-toggle]').forEach(head => {
-            head.addEventListener('click', () => {
+            head.addEventListener('click', (event) => {
+                if (event.target.closest('[data-semarch-open]')) return;
                 head.closest('.semarch-item').classList.toggle('open');
+            });
+        });
+
+        overlay.querySelectorAll('[data-semarch-open]').forEach(btn => {
+            btn.addEventListener('click', async (event) => {
+                event.stopPropagation();
+                const index = Number(btn.dataset.semarchOpen);
+                overlay.remove();
+                if (Number.isInteger(index) && typeof app.enterSemesterContext === 'function') {
+                    await app.enterSemesterContext(index);
+                }
             });
         });
     }

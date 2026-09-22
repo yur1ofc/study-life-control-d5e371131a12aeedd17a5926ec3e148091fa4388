@@ -86,11 +86,20 @@
     // materiais, diários de aula, revisões e a grade horária inteira.
     // Fica guardado em app.data.archivedSemesters para histórico, e some
     // das telas ativas do site.
-    async function archiveFinishedSemesterData(app, subjectNames, semesterLabel) {
+    async function archiveFinishedSemesterData(app, subjectNames, semesterLabel, snapshots = {}) {
         const nameSet = new Set(subjectNames.filter(Boolean).map(n => slug(n)));
-        if (!nameSet.size) return { archivedCount: 0 };
+        if (!nameSet.size) return { archivedCount: 0, archive: null };
 
-        const archive = { semestre: semesterLabel || null, finalizadoEm: new Date().toISOString(), materias: subjectNames.slice() };
+        const archive = {
+            semestre: semesterLabel || null,
+            finalizadoEm: new Date().toISOString(),
+            materias: subjectNames.slice(),
+            // Snapshot da grade e das matérias exatamente como estavam antes
+            // do fechamento. Isso permite abrir e editar o histórico sem
+            // reutilizar a estrutura do semestre atual.
+            subjects: Array.isArray(snapshots.subjects) ? snapshots.subjects.map(item => ({ ...item })) : [],
+            curriculum: Array.isArray(snapshots.curriculum) ? snapshots.curriculum.map(item => ({ ...item })) : []
+        };
         let archivedCount = 0;
 
         MATERIA_COLLECTIONS.forEach(key => {
@@ -133,8 +142,11 @@
         if (!Array.isArray(app.data.archivedSemesters)) app.data.archivedSemesters = [];
         app.data.archivedSemesters.push(archive);
 
-        await dbService.saveAllData(app.data);
-        return { archivedCount };
+        // A função agora só monta/muta o estado em memória. O fechamento do
+        // semestre faz UM saveAllData no final, evitando o estado parcialmente
+        // salvo (currículo novo + histórico antigo, por exemplo) quando uma
+        // das escritas anteriores falha.
+        return { archivedCount, archive };
     }
 
     // Depois de finalizar, garante que toda a interface reflete o novo
@@ -497,55 +509,68 @@
             return acc;
         }, { aprovadas: 0, reprovadas: 0, trancadas: 0 });
 
-        // Nomes das matérias que estavam "cursando" neste semestre que está
-        // sendo fechado agora — é isso que vira histórico/arquivo.
         const materiasDoSemestreQueFecha = state.cursando.map(item => item.nome);
+        const currentSemester = parseInt(app.data?.user?.semestre || 0, 10) || 0;
+
+        // Backup completo em memória. Nenhuma escrita no Firestore acontece
+        // até o estado novo + arquivo histórico estarem prontos.
+        const backupData = JSON.parse(JSON.stringify(app.data));
+        const snapshot = {
+            subjects: (app.data.subjects || [])
+                .filter(s => materiasDoSemestreQueFecha.some(nome => slug(nome) === slug(s.nome)))
+                .map(item => ({ ...item })),
+            curriculum: state.cursando.map(item => ({ ...item }))
+        };
 
         working.forEach(item => {
             if (state.selecionadas.has(item.id)) {
                 // Repescagem: matéria já reprovada antes está sendo cursada de novo.
                 if (item.status === 'reprovada' && (!Array.isArray(item.tentativas) || !item.tentativas.length)) {
-                    // Reprovação antiga, de antes dessa função existir — guarda a
-                    // nota que já estava salva como 1ª tentativa, pra não perder
-                    // a base de comparação.
                     item.tentativas = (item.nota !== null && item.nota !== undefined)
                         ? [{ semestre: null, nota: item.nota, resultado: 'reprovado', data: null }]
                         : [];
                 }
                 item.status = 'cursando';
-                // Zera a nota: a matéria está sendo cursada do zero de novo.
-                // O histórico em item.tentativas guarda a(s) nota(s) antiga(s)
-                // separado, pra comparação — sem misturar com o progresso atual
-                // nem deixar a nota antiga "vazar" pro semestre novo.
                 item.nota = null;
             }
         });
 
         app.data.curriculum = working;
-        const okCurriculum = await dbService.saveData('curriculum', app.data.curriculum);
-        if (okCurriculum && typeof window.syncSubjectsWithCurriculumAndRefresh === 'function') {
-            await window.syncSubjectsWithCurriculumAndRefresh(app, { reload: false });
+
+        // Sincroniza `subjects` apenas em memória. O save único abaixo grava
+        // currículo, matérias, usuário e histórico juntos.
+        if (typeof app.syncSubjectsWithCurriculum === 'function') {
+            app.syncSubjectsWithCurriculum();
         }
 
-        const currentSemester = parseInt(app.data?.user?.semestre || 0, 10) || 0;
         const nextSemester = currentSemester + 1;
-        if (currentSemester && app.data.user) {
-            app.data.user.semestre = nextSemester;
-            await dbService.saveData('user', app.data.user);
+        if (currentSemester && app.data.user) app.data.user.semestre = nextSemester;
+
+        const { archivedCount } = await archiveFinishedSemesterData(
+            app,
+            materiasDoSemestreQueFecha,
+            currentSemester || null,
+            snapshot
+        );
+
+        const okSave = await dbService.saveAllData(app.data);
+        if (!okSave) {
+            // Como ainda não houve escrita parcial, restaurar a memória deixa
+            // o usuário exatamente como estava antes de clicar em finalizar.
+            app.data = backupData;
+            refreshWholeApp(app);
+            showToast('Não foi possível finalizar o semestre. Seus dados anteriores foram preservados.', 'error');
+            return;
         }
 
-        const { archivedCount } = await archiveFinishedSemesterData(app, materiasDoSemestreQueFecha, currentSemester || null);
         refreshWholeApp(app);
-
         closeModal();
         app._semFinState = null;
 
-        if (okCurriculum) {
-            const extra = archivedCount ? ` ${archivedCount} item(ns) do semestre anterior (tarefas, provas, sessões, grade horária etc.) foram arquivados e saíram das telas ativas.` : '';
-            showToast(`Semestre finalizado! ✅ ${contagem.aprovadas} aprovada(s), ❌ ${contagem.reprovadas} reprovada(s), 🔒 ${contagem.trancadas} trancada(s), ${state.selecionadas.size} matéria(s) selecionada(s) para o próximo semestre.${extra}`, 'success');
-        } else {
-            showToast('Semestre finalizado, mas houve um problema ao sincronizar. Verifique sua conexão.', 'warning');
-        }
+        const extra = archivedCount
+            ? ` ${archivedCount} item(ns) do semestre anterior (tarefas, provas, sessões, grade horária etc.) foram arquivados e saíram das telas ativas.`
+            : '';
+        showToast(`Semestre finalizado! ✅ ${contagem.aprovadas} aprovada(s), ❌ ${contagem.reprovadas} reprovada(s), 🔒 ${contagem.trancadas} trancada(s), ${state.selecionadas.size} matéria(s) selecionada(s) para o próximo semestre.${extra}`, 'success');
 
         if (typeof app.loadView === 'function') app.loadView('dashboard');
     }
@@ -673,6 +698,10 @@
 
     if (window.StudyLifeControl) {
         window.StudyLifeControl.prototype.abrirFinalizarSemestre = function () {
+            if (this._semesterContext?.type === 'archived') {
+                showToast('Você está visualizando um semestre anterior. Volte ao semestre atual para finalizar o semestre.', 'warning');
+                return;
+            }
             if (this.normalizeCurriculumInMemory) this.normalizeCurriculumInMemory();
             const curriculum = this.getNormalizedCurriculum ? this.getNormalizedCurriculum() : (this.data.curriculum || []);
             const cursando = curriculum.filter(item => item.status === 'cursando');
@@ -693,6 +722,10 @@
         };
 
         window.StudyLifeControl.prototype.abrirGerenciarSemestreAtual = function () {
+            if (this._semesterContext?.type === 'archived') {
+                showToast('Esse painel altera o semestre atual. Volte ao semestre atual antes de usá-lo.', 'warning');
+                return;
+            }
             if (this.normalizeCurriculumInMemory) this.normalizeCurriculumInMemory();
             renderGerenciar(this);
         };

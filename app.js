@@ -1594,12 +1594,18 @@ class StudyLifeControl {
     async handleProvaSubmit(e) {
         e.preventDefault();
 
+        const pesoProva = parseFloat(document.getElementById('prova-peso').value);
+        if (!Number.isFinite(pesoProva) || pesoProva <= 0 || pesoProva > 100) {
+            showToast('Informe um peso entre 0,1% e 100% para a avaliação.', 'warning');
+            return;
+        }
+
         const provaData = {
-            titulo: document.getElementById('prova-titulo').value,
+            titulo: document.getElementById('prova-titulo').value.trim(),
             materia: document.getElementById('prova-materia').value,
             tipo: document.getElementById('prova-tipo').value,
             data: document.getElementById('prova-data').value,
-            peso: parseInt(document.getElementById('prova-peso').value, 10) || 100,
+            peso: pesoProva,
             importancia: document.getElementById('prova-importancia').value,
             horario: document.getElementById('prova-horario').value,
             local: document.getElementById('prova-local').value,
@@ -1706,11 +1712,26 @@ class StudyLifeControl {
     async handleNotaSubmit(e) {
         e.preventDefault();
 
+        const materia = document.getElementById('nota-materia').value;
+        const valor = parseFloat(document.getElementById('nota-valor').value);
+        const peso = parseFloat(document.getElementById('nota-peso').value);
+        if (!materia || !Number.isFinite(valor) || valor < 0 || valor > 10 || !Number.isFinite(peso) || peso <= 0 || peso > 100) {
+            showToast('Informe uma nota de 0 a 10 e um peso entre 0,1% e 100%.', 'warning');
+            return;
+        }
+
+        const outrasNotas = (this.data.grades || []).filter(n => n.materia === materia && n.id !== this.editingGradeId);
+        const pesoTotal = outrasNotas.reduce((sum, n) => sum + (Number(n.peso) || 0), 0) + peso;
+        if (pesoTotal > 100.0001) {
+            showToast(`Os pesos das avaliações de ${materia} ultrapassariam 100% (${pesoTotal.toFixed(1)}%).`, 'warning');
+            return;
+        }
+
         const notaData = {
-            materia: document.getElementById('nota-materia').value,
-            avaliacao: document.getElementById('nota-avaliacao').value,
-            valor: parseFloat(document.getElementById('nota-valor').value),
-            peso: parseInt(document.getElementById('nota-peso').value, 10) || 100,
+            materia,
+            avaliacao: document.getElementById('nota-avaliacao').value.trim(),
+            valor,
+            peso,
             data: new Date().toISOString()
         };
 
@@ -2187,47 +2208,79 @@ class StudyLifeControl {
     }
 
     calcularPrevisaoNota(subject, notas) {
-        const media = calcularMediaPonderada(notas);
+        const listaNotas = Array.isArray(notas) ? notas : [];
+        const media = calcularMediaPonderada(listaNotas);
+        const pesoConcluido = Math.min(100, listaNotas.reduce((a, n) => a + (Number(n?.peso) || 0), 0));
+        const somaPonderada = listaNotas.reduce((a, n) => a + ((Number(n?.valor) || 0) * (Number(n?.peso) || 0)), 0);
+        const acumulado = somaPonderada / 100;
+        const pesoRestante = Math.max(0, 100 - pesoConcluido);
         const horas = this.data.sessions
             .filter(s => s.materia === subject.nome && s.concluida)
-            .reduce((a, s) => a + s.duracao, 0) / 60;
+            .reduce((a, s) => a + (Number(s.duracao) || 0), 0) / 60;
 
-        const restantes = this.data.exams.filter(
-            e => e.materia === subject.nome && !e.concluida && new Date(e.data) >= new Date()
-        );
+        const notaDesejada = Number(subject.notaDesejada) || 7;
 
-        // O peso de cada prova representa a fatia (%) que ela ainda vai
-        // valer na nota final. Toda prova nova nasce com peso 100 por
-        // padrão — se a pessoa cadastra várias sem ajustar esse campo, a
-        // soma passa de 100 (ex.: 5 provas x 100 = 500) e quebrava a conta,
-        // gerando um "necessário" bem menor que a nota desejada mesmo sem
-        // nenhuma nota lançada ainda. Limitamos a 100 porque não existe
-        // mais que 100% da nota ainda em aberto.
-        const pesoRestante = Math.min(100, restantes.reduce((a, e) => a + (Number(e.peso) || 0), 0));
+        // A nota registrada é a nota obtida (0–10); o peso é a fatia da
+        // média final (0–100%). Portanto, com 5,5 em uma avaliação de 20%,
+        // o aluno tem 1,1 ponto acumulado e 80% ainda em aberto.
+        let notaNecessaria = pesoRestante > 0
+            ? ((notaDesejada * 100) - somaPonderada) / pesoRestante
+            : 0;
 
-        let notaNecessaria = subject.notaDesejada || 7;
-        if (pesoRestante > 0) {
-            notaNecessaria = (((subject.notaDesejada || 7) * 100) - (media * (100 - pesoRestante))) / pesoRestante;
+        // Se todas as avaliações já foram lançadas, a situação é determinada
+        // pela média final acumulada, não pela média isolada das avaliações.
+        const mediaFinalProjetada = acumulado + (Math.max(0, pesoRestante) * 10 / 100);
+        const jaFechou = pesoRestante <= 0;
+        const possivel = jaFechou ? acumulado >= notaDesejada : notaNecessaria <= 10;
+
+        // A "chance" é uma indicação heurística, não uma probabilidade
+        // estatística. O cálculo anterior zerava a barra simplesmente porque
+        // não havia uma prova futura cadastrada, mesmo quando ainda havia 80%
+        // da média em aberto. Agora a barra usa a nota realmente necessária.
+        let chance;
+        if (jaFechou) {
+            chance = acumulado >= notaDesejada ? 100 : 0;
+        } else if (!listaNotas.length) {
+            chance = 50;
+        } else if (notaNecessaria <= 4) {
+            chance = 85;
+        } else if (notaNecessaria <= 6) {
+            chance = 70;
+        } else if (notaNecessaria <= 7.5) {
+            chance = 55;
+        } else if (notaNecessaria <= 9) {
+            chance = 35;
+        } else if (notaNecessaria <= 10) {
+            chance = 15;
+        } else {
+            chance = 0;
         }
 
-        let chance = 50;
-        if (horas > subject.dificuldade * 5) chance += 20;
-        if (media > 7) chance += 20;
-        if (media < 5) chance -= 20;
-        if (subject.dificuldade >= 4) chance -= 10;
-        if (!restantes.length) chance = media >= 6 ? 100 : 0;
+        if (!jaFechou) {
+            if (horas > (Number(subject.dificuldade) || 3) * 5) chance += 10;
+            if (media >= 8) chance += 10;
+            else if (media < 5) chance -= 10;
+            if ((Number(subject.dificuldade) || 3) >= 4) chance -= 5;
+        }
 
         chance = Math.min(100, Math.max(0, chance));
 
         const risco = chance < 30 ? 'alto' : chance < 60 ? 'medio' : 'baixo';
         const motivo =
-            chance >= 80 ? 'Você está no caminho certo!' :
-            chance >= 50 ? 'Mantenha o foco que dá tempo' :
-            'Precisa intensificar os estudos';
+            jaFechou
+                ? (acumulado >= notaDesejada ? 'Média final acima da meta.' : 'Média final abaixo da meta.')
+                : notaNecessaria > 10
+                    ? 'A meta atual não é atingível apenas com o peso que ainda resta.'
+                    : `Faltam ${pesoRestante.toFixed(0)}% da média; você precisa de ${Math.max(0, notaNecessaria).toFixed(1)} nas avaliações restantes.`;
 
         return {
             chance: Math.round(chance),
-            notaNecessaria: Math.max(0, notaNecessaria).toFixed(1),
+            notaNecessaria: notaNecessaria > 10 ? '>10' : Math.max(0, notaNecessaria).toFixed(1),
+            pesoConcluido,
+            pesoRestante,
+            acumulado: acumulado.toFixed(1),
+            mediaFinalMaxima: mediaFinalProjetada.toFixed(1),
+            possivel,
             risco,
             motivo
         };

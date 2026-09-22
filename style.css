@@ -810,6 +810,74 @@ button:active,
     flex-wrap: wrap;
 }
 
+/* Seletor global de semestre: o histórico é um contexto isolado; editar
+   enquanto ele estiver ativo nunca altera os dados do semestre atual. */
+.semester-context-switcher {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+.semester-context-select {
+    max-width: 250px;
+    min-width: 170px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 9px 34px 9px 12px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font: inherit;
+    font-size: .85rem;
+    font-weight: 600;
+}
+.semester-context-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: rgba(245,158,11,.12);
+    border: 1px solid rgba(245,158,11,.25);
+    color: var(--accent-warning);
+    font-size: .76rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.semester-context-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    border: 1px solid rgba(245,158,11,.25);
+    border-radius: 14px;
+    background: rgba(245,158,11,.08);
+    color: var(--text-primary);
+    font-size: .84rem;
+}
+.semester-context-banner strong { color: var(--accent-warning); }
+.semester-context-banner button {
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-radius: 9px;
+    padding: 7px 10px;
+    cursor: pointer;
+    font: inherit;
+    font-size: .8rem;
+    font-weight: 700;
+}
+@media (max-width: 900px) {
+    .semester-context-switcher { flex: 1 1 100%; order: 3; }
+    .semester-context-select { width: 100%; max-width: none; }
+}
+@media (max-width: 480px) {
+    .semester-context-banner { align-items: flex-start; flex-direction: column; }
+    .semester-context-banner button { width: 100%; }
+}
+
 .notification-badge {
     position: relative;
     cursor: pointer;
@@ -1558,6 +1626,32 @@ button:active,
     font-size: 20px;
     font-weight: 700;
     color: var(--accent-primary);
+}
+.grade-context {
+    display:block;
+    margin-top:2px;
+    font-size:.68rem;
+    line-height:1.2;
+    color:var(--text-tertiary);
+}
+.grade-accumulated-note {
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    margin:-4px 0 14px;
+    padding:8px 10px;
+    border:1px solid rgba(59,130,246,.12);
+    border-radius:10px;
+    background:rgba(59,130,246,.05);
+    color:var(--text-secondary);
+    font-size:.76rem;
+}
+.grade-accumulated-note strong { color:var(--accent-primary); }
+@media (max-width:480px) {
+    .grade-stats { gap:8px; }
+    .grade-label { font-size:11px; }
+    .grade-value { font-size:18px; }
+    .grade-accumulated-note { flex-direction:column; gap:3px; }
 }
 
 .previsao-motivo {

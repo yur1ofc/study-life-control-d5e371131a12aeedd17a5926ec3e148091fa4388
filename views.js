@@ -737,7 +737,7 @@ class ViewRenderer {
                 <h2><i class="fas fa-tasks"></i> Tarefas</h2>
                 <button class="btn-primary" id="btn-nova-tarefa"><i class="fas fa-plus"></i> Nova Tarefa</button>
             </div>
-            ${arquivadas ? `<p class="text-secondary archived-note"><i class="fas fa-box-archive"></i> ${arquivadas} matéria${arquivadas > 1 ? 's' : ''} arquivada${arquivadas > 1 ? 's' : ''} (fora do semestre atual) — as tarefas continuam salvas em Configurações › Grade Curricular › Semestres anteriores.</p>` : ''}
+            ${arquivadas ? `<p class="text-secondary archived-note"><i class="fas fa-box-archive"></i> ${arquivadas} matéria${arquivadas > 1 ? 's' : ''} arquivada${arquivadas > 1 ? 's' : ''} (fora do semestre atual) — as tarefas continuam salvas em Grade Curricular › Semestres anteriores.</p>` : ''}
 
             <div class="dashboard-grid">
                 <div class="card">
@@ -861,7 +861,7 @@ class ViewRenderer {
                 <h2><i class="fas fa-graduation-cap"></i> Provas e Trabalhos</h2>
                 <button class="btn-primary" id="btn-nova-prova"><i class="fas fa-plus"></i> Novo Evento</button>
             </div>
-            ${arquivadas ? `<p class="text-secondary archived-note"><i class="fas fa-box-archive"></i> ${arquivadas} matéria${arquivadas > 1 ? 's' : ''} arquivada${arquivadas > 1 ? 's' : ''} (fora do semestre atual) — as provas continuam salvas em Configurações › Grade Curricular › Semestres anteriores.</p>` : ''}
+            ${arquivadas ? `<p class="text-secondary archived-note"><i class="fas fa-box-archive"></i> ${arquivadas} matéria${arquivadas > 1 ? 's' : ''} arquivada${arquivadas > 1 ? 's' : ''} (fora do semestre atual) — as provas continuam salvas em Grade Curricular › Semestres anteriores.</p>` : ''}
 
             <h3 class="section-subtitle">📅 Próximos por matéria (${proximas.length})</h3>
             <div class="mapa-grid mapa-grid-compact">
@@ -1101,7 +1101,7 @@ class ViewRenderer {
                 <h2><i class="fas fa-chart-line"></i> Previsão de Notas</h2>
                 <button class="btn-primary" id="btn-registrar-nota"><i class="fas fa-plus"></i> Registrar Nota</button>
             </div>
-            ${arquivadas ? `<p class="text-secondary archived-note"><i class="fas fa-box-archive"></i> ${arquivadas} matéria${arquivadas > 1 ? 's' : ''} arquivada${arquivadas > 1 ? 's' : ''} (fora do semestre atual) — as notas continuam salvas em Configurações › Grade Curricular › Semestres anteriores.</p>` : ''}
+            ${arquivadas ? `<p class="text-secondary archived-note"><i class="fas fa-box-archive"></i> ${arquivadas} matéria${arquivadas > 1 ? 's' : ''} arquivada${arquivadas > 1 ? 's' : ''} (fora do semestre atual) — as notas continuam salvas em Grade Curricular › Semestres anteriores.</p>` : ''}
 
             <div class="dashboard-grid">
                 ${subjectsAtuais.map(s => {
@@ -1120,15 +1120,22 @@ class ViewRenderer {
                                     <div class="grade-item">
                                         <span class="grade-label">Média atual</span>
                                         <span class="grade-value">${media.toFixed(1)}</span>
+                                        <span class="grade-context">nas avaliações</span>
                                     </div>
                                     <div class="grade-item">
                                         <span class="grade-label">Nota desejada</span>
                                         <span class="grade-value">${this.esc(s.notaDesejada)}</span>
+                                        <span class="grade-context">média final</span>
                                     </div>
                                     <div class="grade-item">
                                         <span class="grade-label">Necessário</span>
                                         <span class="grade-value">${this.esc(previsao.notaNecessaria)}</span>
+                                        <span class="grade-context">nas avaliações restantes</span>
                                     </div>
+                                </div>
+                                <div class="grade-accumulated-note">
+                                    <span><strong>${this.esc(previsao.acumulado)}</strong>/10 acumulado</span>
+                                    <span>${this.esc(previsao.pesoConcluido)}% das avaliações lançadas</span>
                                 </div>
                                 <div class="progress-container">
                                     <div class="progress-label">
@@ -2067,7 +2074,10 @@ class ViewRenderer {
         const progressoCursando = totais.totalHoras ? Math.round((totais.horasCursando / totais.totalHoras) * 100) : 0;
         const progressoPendente = Math.max(0, 100 - progresso - progressoCursando);
         const horasRestantes = Math.max(0, totais.totalHoras - totais.horasConcluidas);
-        const currentSemester = parseInt(this.app.data?.user?.semestre || 0, 10) || 0;
+        const isHistorical = this.app._semesterContext?.type === 'archived';
+        const currentSemester = isHistorical
+            ? (parseInt(this.app._semesterContext?.label || '', 10) || 0)
+            : (parseInt(this.app.data?.user?.semestre || 0, 10) || 0);
         const cursandoAgora = curriculum.filter(item => item.status === 'cursando').length;
 
         const porSemestre = curriculum.reduce((acc, item) => {
@@ -2124,13 +2134,15 @@ class ViewRenderer {
                     <button class="btn-secondary" id="btn-importar-ufob">
                         <i class="fas fa-wand-magic-sparkles"></i> Importar grade pronta
                     </button>
+                    ${!isHistorical ? `
                     <button class="btn-secondary" id="btn-editar-semestre-atual" title="Adicionar, remover ou trancar matérias do semestre em andamento">
                         <i class="fas fa-sliders"></i> Editar Semestre Atual
                         ${cursandoAgora ? `<span class="badge badge-soft">${cursandoAgora}</span>` : ''}
                     </button>
                     <button class="btn-secondary btn-finalizar-semestre-cta" id="btn-finalizar-semestre" title="Encerrar o semestre atual, registrar aprovações/reprovações e escolher as matérias do próximo">
                         <i class="fas fa-flag-checkered"></i> Finalizar Semestre
-                    </button>
+                    </button>` : `
+                    <span class="badge badge-soft"><i class="fas fa-box-archive"></i> Histórico em edição</span>`}
                     <button class="btn-secondary" id="btn-semestres-anteriores" title="Ver o histórico de tarefas, provas, sessões e notas dos semestres já finalizados">
                         <i class="fas fa-box-archive"></i> Semestres anteriores
                         ${(this.app.data.archivedSemesters || []).length ? `<span class="badge badge-soft">${this.app.data.archivedSemesters.length}</span>` : ''}
