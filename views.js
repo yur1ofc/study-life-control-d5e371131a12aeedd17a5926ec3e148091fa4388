@@ -1825,7 +1825,7 @@ class ViewRenderer {
                         <div class="card subject-card">
                             <div class="card-header">
                                 <h3>${this.esc(s.nome)}</h3>
-                                <span class="badge" style="background: ${this.getDificuldadeColor(s.dificuldade)};">Dificuldade ${this.esc(s.dificuldade)}/5</span>
+                                <span class="badge" style="background: ${this.getDificuldadeColor(s.dificuldade)};">${this.esc(this.getDificuldadeLabel(s))}</span>
                             </div>
                             <div class="card-body">
                                 <div class="subject-stats">
@@ -1956,6 +1956,14 @@ class ViewRenderer {
             exame: 'fa-graduation-cap'
         };
         return icons[tipo] || 'fa-calendar';
+    }
+
+    getDificuldadeLabel(subjectOrValue) {
+        const s = typeof subjectOrValue === 'object' ? subjectOrValue : null;
+        const value = Number(s ? s.dificuldade : subjectOrValue) || 3;
+        const labels = {1:'Fácil', 2:'Média-baixa', 3:'Média', 4:'Média-alta', 5:'Difícil'};
+        const label = labels[value] || 'Média';
+        return s?.dificuldadeAutomatica ? `Dificuldade ${label} • automática` : `Dificuldade ${label}`;
     }
 
     getDificuldadeColor(dificuldade) {

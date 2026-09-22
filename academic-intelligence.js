@@ -392,5 +392,145 @@
     try { window.aiAssistant?.updateContext?.(app.data); } catch (_) {}
     console.info('[AcademicIntelligence] motor central ativado.');
   }
+
+  // ── Camada adaptativa + respostas determinísticas do Mentor ─────────────
+  // Tudo aqui usa os dados do app. Gemini fica reservado para perguntas abertas.
+  function installSmartMentor(app) {
+    const P = window.AIAssistant?.prototype;
+    if (!P || P.__smartMentorV11) return;
+    const ai = window.academicIntelligence;
+    const n = v => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+    const dayDiff = d => { const x=new Date(d); if(Number.isNaN(x.getTime())) return 999; const a=new Date(); a.setHours(0,0,0,0); x.setHours(0,0,0,0); return Math.round((x-a)/86400000); };
+    const subjectByName = name => (app.data.subjects||[]).find(s=>n(s.nome)===n(name));
+
+    function adaptiveDifficulty(name) {
+      const s=subjectByName(name); const r=ai.getSubjectHistory ? ai.subject(s) : null;
+      if (!s || !r) return null;
+      const grades=(app.data.grades||[]).filter(g=>n(g.materia)===n(name));
+      const vals=grades.map(g=>Number(g.valor ?? g.nota ?? g.notaObtida ?? g.notaFinal ?? g.media)).filter(x=>Number.isFinite(x));
+      if(!vals.length) return {label:['','fácil','média-baixa','média','média-alta','difícil'][Number(s.dificuldade)||3], value:Number(s.dificuldade)||3, confidence:0, reason:'Ainda sem notas atuais.'};
+      const avg=r.grade.currentAverage;
+      const recent=vals.slice(-2).reduce((a,b)=>a+b,0)/Math.min(2,vals.length);
+      const label=s.dificuldadeRotulo || ['','fácil','média-baixa','média','média-alta','difícil'][Number(s.dificuldade)||3];
+      return {label,value:Number(s.dificuldade)||3,confidence:Number(s.dificuldadeConfianca)||35,reason:s.dificuldadeMotivo||`média atual ${avg?.toFixed?.(1)}`,avg,recent};
+    }
+
+    function overdue() {
+      const tasks=(app.data.tasks||[]).filter(t=>!t?.concluida && (t.dataLimite||t.data) && dayDiff(t.dataLimite||t.data)<0)
+        .map(t=>({type:'Tarefa',title:t.titulo||t.nome||'Sem título',materia:t.materia||'Sem matéria',date:t.dataLimite||t.data,days:Math.abs(dayDiff(t.dataLimite||t.data))}));
+      const reviews=(app.data.learningMap||[]).filter(t=>['estudando','revisando'].includes(n(t.status)) && t.ultimaRevisao && dayDiff(t.ultimaRevisao)>7)
+        .map(t=>({type:'Revisão',title:t.topico||t.nome||'Tópico',materia:t.materia||'Sem matéria',days:dayDiff(t.ultimaRevisao)}));
+      return {tasks,reviews};
+    }
+
+    function riskAnswer() {
+      const a=ai.analyze(); const active=a.subjects.filter(r=>r.riskLevel!=='baixo'||r.priorityScore>=20).sort((x,y)=>y.priorityScore-x.priorityScore);
+      if(!active.length) return 'Nenhum alerta acadêmico forte foi identificado nos dados atuais. Continue registrando notas, estudo, presença e avaliações para manter a análise atualizada.';
+      const lines=['Raio de risco acadêmico atual:'];
+      active.slice(0,6).forEach(r=>{
+        const diff=r.difficulty?.label || app.data.subjects.find(s=>n(s.nome)===n(r.name))?.dificuldadeRotulo || 'não definida';
+        lines.push(`- ${r.name} — atenção ${r.riskLevel.toUpperCase()} | dificuldade atual: ${diff}. ${r.riskReasons.slice(0,3).join('; ') || r.recommendation}`);
+      });
+      return lines.join('\n');
+    }
+
+    function rayAnswer() {
+      const a=ai.analyze();
+      const ordered=a.subjects.slice().sort((x,y)=>y.priorityScore-x.priorityScore);
+      const lines=['Raio-x acadêmico completo:'];
+      if(a.overall.currentAverage!==null) lines.push(`- Média atual das matérias com notas: ${a.overall.currentAverage.toFixed(1)}.`);
+      lines.push(`- Histórico: ${a.overall.passedHistory} aprovação(ões) e ${a.overall.failedHistory} reprovação(ões) registrada(s).`);
+      lines.push(`- Matérias com tentativa anterior: ${a.overall.repeatedSubjects}.`);
+      ordered.forEach(r=>{ const d=r.difficulty?.label||'média'; const grade=r.grade.hasGrades?`média ${r.grade.currentAverage.toFixed(1)}`:'sem notas'; const exam=r.workload.nextExam?`, avaliação em ${r.workload.nextExam.days} dia(s)`:''; lines.push(`\n**${r.name}** — atenção ${r.riskLevel.toUpperCase()} | dificuldade ${d} | ${grade}${exam}.`); if(r.history.length) lines.push(`  Histórico: ${r.history.map(h=>`${h.period||'?'} ${h.grade==null?'—':h.grade.toFixed(1)}`).join(' → ')}.`); if(r.riskReasons.length) lines.push(`  Fatores: ${r.riskReasons.slice(0,3).join('; ')}.`); });
+      if(a.priorities.length) lines.push(`\nPrioridades de ação: ${a.priorities.slice(0,3).map(r=>r.name).join(' → ')}.`);
+      return lines.join('\n');
+    }
+
+    function delayedAnswer() {
+      const o=overdue(); const lines=['O que está mais atrasado:'];
+      if(o.tasks.length) o.tasks.slice(0,8).forEach(x=>lines.push(`- Tarefa: ${x.title} — ${x.materia} — ${x.days} dia(s) atrasada.`));
+      if(o.reviews.length) o.reviews.slice(0,6).forEach(x=>lines.push(`- Revisão: ${x.title} — ${x.materia} — ${x.days} dia(s) sem revisão.`));
+      if(!o.tasks.length&&!o.reviews.length) return 'Não encontrei tarefas vencidas nem tópicos de revisão atrasados nos dados cadastrados.';
+      return lines.join('\n');
+    }
+
+    function studyNow() {
+      const a=ai.analyze(); const list=a.subjects.slice().sort((x,y)=>y.priorityScore-x.priorityScore);
+      if(!list.length) return 'Cadastre suas matérias para eu calcular por onde começar.';
+      const r=list[0], diff=r.difficulty?.label || 'média';
+      const plan=r.workload?.nextExam ? `20 min de revisão + 30 min de exercícios + 10 min corrigindo erros` : r.learning?.weakTopics ? `25 min nos tópicos fracos + 20 min de exercícios` : `25 min de teoria ativa + 25 min de exercícios`;
+      return [`Comece por **${r.name}**.`, `Motivo: ${r.riskReasons.slice(0,3).join('; ') || 'maior prioridade calculada no momento'}.`, `Dificuldade atual para você: **${diff}**.`, `Agora: ${plan}.`, r.workload?.nextExam ? `Avaliação: ${r.workload.nextExam.title} em ${r.workload.nextExam.days} dia(s).` : 'Depois, reavalie a prioridade com base no que você conseguir concluir.'].join(' ');
+    }
+
+    function weekPlan() {
+      const a=ai.analyze(); const subjects=a.subjects.slice().sort((x,y)=>y.priorityScore-x.priorityScore).slice(0,5);
+      if(!subjects.length) return 'Cadastre matérias para montar o plano semanal.';
+      const user=app.data.user||{}; const daily=Math.max(60,Math.min(480,(Number(user.horasMaximas)||4)*60));
+      const names=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']; const out=['Plano semanal adaptativo:'];
+      for(let i=0;i<7;i++){
+        const d=new Date(); d.setDate(d.getDate()+i); const ranked=subjects.slice().sort((x,y)=>{
+          const ex=x.workload.nextExam?.days??99, ey=y.workload.nextExam?.days??99;
+          return (y.priorityScore + (ex<=i?25:0))-(x.priorityScore + (ey<=i?25:0));
+        });
+        const take=ranked.slice(0, i<3?2:3); let remain=daily; const blocks=[];
+        take.forEach((r,j)=>{ const m=Math.min(remain,j===0?60:45); if(m>=25){blocks.push(`${r.name} (${m} min)`); remain-=m;} });
+        out.push(`\n${names[d.getDay()]} (${d.toLocaleDateString('pt-BR')}): ${blocks.join(' + ') || 'revisão leve/pendências'}.`);
+      }
+      return out.join('');
+    }
+
+    function subjectStatus(name) {
+      const r=ai.getSubjectHistory ? ai.subject(subjectByName(name)) : null; if(!r) return null;
+      const d=r.difficulty||{}; const hist=r.history.length ? r.history.map(h=>`${h.period||'?'}: ${h.grade==null?'sem nota':h.grade.toFixed(1)}${h.status?' ('+h.status+')':''}`).join(' | ') : 'sem histórico importado';
+      const current=r.grade.hasGrades ? `média ${r.grade.currentAverage.toFixed(1)}, peso lançado ${r.grade.weightDone.toFixed(0)}%, precisa ${r.grade.required==null?'—':r.grade.required>10?'>10':r.grade.required.toFixed(1)} nas avaliações restantes` : 'sem notas atuais';
+      return [`**${name}**`, `- Dificuldade adaptativa: **${d.label||'média'}** (${d.confidence||0}% de confiança) — ${d.reason||'sem evidência suficiente'}.`, `- Atual: ${current}.`, `- Estudo: ${r.study.totalHours.toFixed(1)}h total; ${r.study.recent7Hours.toFixed(1)}h nos últimos 7 dias.`, `- Histórico: ${hist}.`, `- Presença: ${r.attendance.percentage==null?'sem dados':r.attendance.percentage+'%'}${r.riskReasons.length?'\n- Alertas: '+r.riskReasons.slice(0,4).join('; '):''}`, `- Recomendação: ${r.recommendation}`].join('\n');
+    }
+
+    // Expõe a nova dificuldade também no motor acadêmico.
+    const oldSubject=ai.subject.bind(ai);
+    ai.subject=function(subject){
+      const r=oldSubject(subject); const grades=(app.data.grades||[]).filter(g=>n(g.materia)===n(r.name));
+      const vals=grades.map(g=>Number(g.valor ?? g.nota ?? g.notaObtida ?? g.notaFinal ?? g.media)).filter(Number.isFinite);
+      const avg=r.grade.currentAverage; let value=Number(subject.dificuldade)||3;
+      if(vals.length){ if(avg>=8.5)value=1; else if(avg>=7.5)value=2; else if(avg>=6.5)value=3; else if(avg>=5.5)value=4; else value=5; if(r.failedAttempts>0&&avg<8.5)value=Math.max(3,value); if(r.grade.required>8.5)value=Math.max(4,value); }
+      const labels={1:'fácil',2:'média-baixa',3:'média',4:'média-alta',5:'difícil'};
+      r.difficulty={value,label:labels[value],confidence:vals.length?Math.min(95,35+vals.length*15):0,reason:subject.dificuldadeMotivo|| (vals.length?`média atual ${avg.toFixed(1)}`:'sem notas atuais')};
+      return r;
+    };
+
+    const oldRisk=app.analyzeAcademicRisk;
+    app.analyzeAcademicRisk=function(){ return ai.analyze().subjects.filter(r=>r.priorityScore>=20).map(r=>({materia:r.name,nivel:r.riskLevel,motivo:r.riskReasons.slice(0,4).join('; ')||r.recommendation,score:r.priorityScore,intelligence:r})); };
+
+    const oldAsk=P.ask;
+    P.ask=async function(q){
+      const p=n(q), words=p.split(/\s+/).filter(Boolean).length;
+      if(/risco academico|riscos academicos|meu risco/.test(p)) return riskAnswer();
+      if(/raio x|raiox|diagnostico completo|visao geral academica/.test(p)) return rayAnswer();
+      if(/o que esta mais atrasado|o que esta atrasado|o que ta atrasado|estou atrasado/.test(p)) return delayedAnswer();
+      if(/o que estudar agora|oque estudar agora|por onde eu comeco|por onde comeco|comecar agora/.test(p)) return studyNow();
+      if((/plano.*semana|plano semanal/.test(p)) || (p.includes('plano')&&p.includes('semana')&&words<=8)) return weekPlan();
+      const m=P._findSubjectInQuestion ? P._findSubjectInQuestion.call(this,q) : null;
+      if(m && /como estou|situacao|status|nota|media|dificuldade/.test(p)) return subjectStatus(m.nome);
+      return oldAsk.call(this,q);
+    };
+
+    if(P.askRich && !P.__askRichV11){
+      const oldRich=P.askRich;
+      P.askRich=async function(q){
+        const p=n(q), m=P._findSubjectInQuestion ? P._findSubjectInQuestion.call(this,q) : null;
+        const direct = /risco academico|riscos academicos|meu risco|o que esta mais atrasado|o que esta atrasado|o que ta atrasado|o que estudar agora|oque estudar agora|por onde eu comeco|por onde comeco|comecar agora|plano.*semana|plano semanal|raio x|raiox|diagnostico completo/.test(p) || (m && /como estou|situacao|status|nota|media|dificuldade/.test(p));
+        if(direct){ const text=await this.ask(q); this._rememberTurn?.(q,text,{subject:m?.nome||null,intent:'deterministic'}); return {text,actions:[],memory:this.sessionMemory?.slice(-6)||[]}; }
+        return oldRich.call(this,q);
+      };
+      P.__askRichV11=true;
+    }
+    P.__smartMentorV11=true;
+  }
+
+  // Instala depois que o app + AIAssistant existirem.
+  const installTimer = setInterval(() => {
+    if (window.app && window.academicIntelligence && window.AIAssistant) { clearInterval(installTimer); installSmartMentor(window.app); }
+  }, 300);
+
   engine();
 })();

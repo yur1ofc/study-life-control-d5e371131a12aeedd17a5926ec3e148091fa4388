@@ -5973,3 +5973,7 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 /* Inteligência acadêmica central */
 .subject-history-intel{margin-top:9px;padding:8px 10px;border-radius:10px;background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.12);font-size:.78rem;line-height:1.4;opacity:.92}
 .subject-history-intel i{margin-right:5px}
+
+/* SLCampus v11 — sinais de inteligência adaptativa */
+.subject-card .badge { transition: opacity .2s ease, transform .2s ease; }
+.subject-card .badge::after { font-size: .72em; opacity: .82; }
