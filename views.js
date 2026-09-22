@@ -1137,14 +1137,15 @@ class ViewRenderer {
                                     <span><strong>${this.esc(previsao.acumulado)}</strong>/10 acumulado</span>
                                     <span>${this.esc(previsao.pesoConcluido)}% das avaliações lançadas</span>
                                 </div>
-                                <div class="progress-container">
+                                <div class="progress-container grade-goal-progress">
                                     <div class="progress-label">
-                                        <span>Chance de aprovação</span>
-                                        <span>${previsao.chance}%</span>
+                                        <span>${this.esc(previsao.indicadorLabel || 'Progresso para meta')}</span>
+                                        <span>${this.esc(previsao.indicadorValor || '—')}</span>
                                     </div>
                                     <div class="progress-bar">
-                                        <div class="progress-fill" style="width: ${previsao.chance}%"></div>
+                                        <div class="progress-fill" style="width: ${previsao.progressoMeta || 0}%"></div>
                                     </div>
+                                    <small class="grade-progress-note">Indicador objetivo baseado no que já entrou na média; não representa probabilidade estatística.</small>
                                 </div>
                                 <p class="previsao-motivo">💡 ${this.esc(previsao.motivo)}</p>
                                 

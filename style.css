@@ -5965,3 +5965,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover,
 input[type="time"]::-webkit-calendar-picker-indicator:hover {
     background-color: var(--bg-tertiary);
 }
+
+/* Previsão de notas: indicador determinístico, sem falsa probabilidade */
+.grade-goal-progress .grade-progress-note{display:block;margin-top:7px;color:var(--text-tertiary);font-size:.68rem;line-height:1.35;}
+.risk-sem-dados{background:rgba(148,163,184,.12);color:var(--text-secondary,#94a3b8);}

@@ -2209,6 +2209,7 @@ class StudyLifeControl {
 
     calcularPrevisaoNota(subject, notas) {
         const listaNotas = Array.isArray(notas) ? notas : [];
+        const temNotas = listaNotas.length > 0;
         const media = calcularMediaPonderada(listaNotas);
         const pesoConcluido = Math.min(100, listaNotas.reduce((a, n) => a + (Number(n?.peso) || 0), 0));
         const somaPonderada = listaNotas.reduce((a, n) => a + ((Number(n?.valor) || 0) * (Number(n?.peso) || 0)), 0);
@@ -2217,72 +2218,57 @@ class StudyLifeControl {
         const horas = this.data.sessions
             .filter(s => s.materia === subject.nome && s.concluida)
             .reduce((a, s) => a + (Number(s.duracao) || 0), 0) / 60;
+        const notaDesejada = Math.min(10, Math.max(0, Number(subject.notaDesejada) || 7));
 
-        const notaDesejada = Number(subject.notaDesejada) || 7;
-
-        // A nota registrada é a nota obtida (0–10); o peso é a fatia da
-        // média final (0–100%). Portanto, com 5,5 em uma avaliação de 20%,
-        // o aluno tem 1,1 ponto acumulado e 80% ainda em aberto.
+        // A meta é determinística: soma ponderada já conquistada + média necessária
+        // sobre o peso restante. Não existe "probabilidade" estatística aqui.
         let notaNecessaria = pesoRestante > 0
             ? ((notaDesejada * 100) - somaPonderada) / pesoRestante
             : 0;
 
-        // Se todas as avaliações já foram lançadas, a situação é determinada
-        // pela média final acumulada, não pela média isolada das avaliações.
-        const mediaFinalProjetada = acumulado + (Math.max(0, pesoRestante) * 10 / 100);
-        const jaFechou = pesoRestante <= 0;
+        const mediaFinalMaxima = acumulado + (pesoRestante * 10 / 100);
+        const jaFechou = pesoRestante <= 0.0001;
         const possivel = jaFechou ? acumulado >= notaDesejada : notaNecessaria <= 10;
+        const progressoMeta = notaDesejada > 0
+            ? Math.min(100, Math.max(0, (acumulado / notaDesejada) * 100))
+            : 100;
 
-        // A "chance" é uma indicação heurística, não uma probabilidade
-        // estatística. O cálculo anterior zerava a barra simplesmente porque
-        // não havia uma prova futura cadastrada, mesmo quando ainda havia 80%
-        // da média em aberto. Agora a barra usa a nota realmente necessária.
-        let chance;
-        if (jaFechou) {
-            chance = acumulado >= notaDesejada ? 100 : 0;
-        } else if (!listaNotas.length) {
-            chance = 50;
-        } else if (notaNecessaria <= 4) {
-            chance = 85;
-        } else if (notaNecessaria <= 6) {
-            chance = 70;
-        } else if (notaNecessaria <= 7.5) {
-            chance = 55;
-        } else if (notaNecessaria <= 9) {
-            chance = 35;
-        } else if (notaNecessaria <= 10) {
-            chance = 15;
+        let risco;
+        if (!temNotas) risco = 'sem-dados';
+        else if (jaFechou) risco = acumulado >= notaDesejada ? 'baixo' : 'alto';
+        else if (notaNecessaria > 10) risco = 'alto';
+        else if (notaNecessaria > 8) risco = 'medio';
+        else risco = 'baixo';
+
+        let motivo;
+        if (!temNotas) {
+            motivo = `Nenhuma avaliação lançada. Você precisa de ${notaDesejada.toFixed(1)} de média nas avaliações restantes.`;
+        } else if (jaFechou) {
+            motivo = acumulado >= notaDesejada
+                ? `Média final ${acumulado.toFixed(1)}: meta de ${notaDesejada.toFixed(1)} atingida.`
+                : `Média final ${acumulado.toFixed(1)}: meta de ${notaDesejada.toFixed(1)} não atingida.`;
+        } else if (notaNecessaria > 10) {
+            motivo = `A meta de ${notaDesejada.toFixed(1)} não é mais atingível apenas com os ${pesoRestante.toFixed(0)}% de peso restantes.`;
         } else {
-            chance = 0;
+            motivo = `Faltam ${pesoRestante.toFixed(0)}% da média; você precisa de ${notaNecessaria.toFixed(1)} nas avaliações restantes.`;
         }
-
-        if (!jaFechou) {
-            if (horas > (Number(subject.dificuldade) || 3) * 5) chance += 10;
-            if (media >= 8) chance += 10;
-            else if (media < 5) chance -= 10;
-            if ((Number(subject.dificuldade) || 3) >= 4) chance -= 5;
-        }
-
-        chance = Math.min(100, Math.max(0, chance));
-
-        const risco = chance < 30 ? 'alto' : chance < 60 ? 'medio' : 'baixo';
-        const motivo =
-            jaFechou
-                ? (acumulado >= notaDesejada ? 'Média final acima da meta.' : 'Média final abaixo da meta.')
-                : notaNecessaria > 10
-                    ? 'A meta atual não é atingível apenas com o peso que ainda resta.'
-                    : `Faltam ${pesoRestante.toFixed(0)}% da média; você precisa de ${Math.max(0, notaNecessaria).toFixed(1)} nas avaliações restantes.`;
 
         return {
-            chance: Math.round(chance),
+            // Mantido por compatibilidade com módulos antigos. Não é uma probabilidade.
+            chance: null,
+            progressoMeta: Math.round(progressoMeta),
+            indicadorLabel: temNotas ? 'Progresso para meta' : 'Sem avaliações',
+            indicadorValor: temNotas ? `${Math.round(progressoMeta)}%` : '—',
             notaNecessaria: notaNecessaria > 10 ? '>10' : Math.max(0, notaNecessaria).toFixed(1),
             pesoConcluido,
             pesoRestante,
             acumulado: acumulado.toFixed(1),
-            mediaFinalMaxima: mediaFinalProjetada.toFixed(1),
+            mediaFinalMaxima: mediaFinalMaxima.toFixed(1),
             possivel,
             risco,
-            motivo
+            motivo,
+            mediaAtual: media.toFixed(1),
+            horasEstudo: horas
         };
     }
 
@@ -2507,6 +2493,12 @@ StudyLifeControl.prototype.isMateriaSemestrePassado = function(materiaNome) {
 // aviso "N matérias arquivadas" nas telas).
 StudyLifeControl.prototype.filterSemestreAtual = function(list, materiaField = 'materia') {
     const items = Array.isArray(list) ? list : [];
+    // Em um contexto histórico, o conjunto inteiro pertence ao semestre aberto.
+    // Aplicar o filtro de "semestre atual" aqui esconderia matérias concluídas e
+    // faria o usuário entrar no histórico e encontrar telas vazias.
+    if (this._semesterContext?.type === 'archived') {
+        return { atuais: items, arquivadas: 0 };
+    }
     const atuais = [];
     const materiasArquivadas = new Set();
     items.forEach(item => {

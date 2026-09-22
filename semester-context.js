@@ -209,6 +209,12 @@
                 // O catálogo do histórico não deve substituir o ponteiro
                 // `archivedSemesters` inteiro por uma cópia do workspace.
                 if (field === 'archivedSemesters') return persistArchive(app);
+                // Perfil acadêmico é global à conta; não permita que editar um
+                // semestre antigo altere silenciosamente o semestre atual.
+                if (field === 'user') {
+                    window.showToast?.('O perfil e o semestre atual só podem ser alterados fora do histórico.', 'warning');
+                    return false;
+                }
             }
             return originalSaveData(field, data);
         };
