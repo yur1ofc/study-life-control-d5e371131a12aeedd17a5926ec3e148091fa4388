@@ -117,7 +117,7 @@ Regras:
         const overloaded = err.status === 503 || isOverloadMsg(err.message);
         if (!overloaded || attempt === 2) throw err;
         if (typeof onRetryStatus === 'function') onRetryStatus(attempt + 1);
-        await wait(1500 * (attempt + 1));
+        await wait(3000 * (attempt + 1));
       }
     }
     throw lastErr;
