@@ -5,7 +5,10 @@ const quota = require('./_lib/gemini-admin-quota');
 // No máximo dois modelos por importação. Não fazemos chamadas paralelas:
 // isso multiplicaria a quota e pode piorar sobrecarga no Free Tier.
 const GEMINI_MODELS = ['gemini-3.6-flash', 'gemini-3.7-flash'];
-const MODEL_TIMEOUT_MS = 8500;
+// A importação de histórico pode exigir bastante tempo para o Gemini ler PDFs grandes.
+// Mantemos até 140s por modelo; com no máximo dois modelos, o endpoint fica abaixo
+// do limite de 300s configurado para a Function da Vercel.
+const MODEL_TIMEOUT_MS = 140000;
 const FALLBACK_DELAY_MS = 700;
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -61,7 +64,7 @@ async function callOne(geminiKey, model, contents, meta) {
   } catch (err) {
     const aborted = err?.name === 'AbortError';
     status = aborted ? 504 : 503;
-    data = { error: { message: aborted ? `O modelo excedeu o limite interno de ${MODEL_TIMEOUT_MS / 1000}s.` : (err.message || 'Falha de rede ao chamar o Gemini') } };
+    data = { error: { message: aborted ? `O modelo excedeu o limite interno de ${Math.round(MODEL_TIMEOUT_MS / 1000)}s.` : (err.message || 'Falha de rede ao chamar o Gemini') } };
     return { ok: false, status, data, model, transient: true };
   } finally {
     clearTimeout(timer);
