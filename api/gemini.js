@@ -29,7 +29,10 @@ const sharedQuota = require('./_lib/gemini-shared-quota');
 // 503 ("model is overloaded"/"high demand"). Antes disso derrubava a importação
 // direto — agora, se o primeiro modelo estiver sobrecarregado, tentamos o próximo
 // da lista antes de desistir e mostrar erro pro usuário.
-const GEMINI_MODELS = ['gemini-flash-latest', 'gemini-3.6-flash', 'gemini-2.5-flash'];
+// Não usar modelos legados aqui. Em contas novas, o Gemini pode responder 404 para
+// modelos antigos (ex.: gemini-2.5-flash). Começamos pelo modelo atual e só
+// usamos o alias latest como fallback.
+const GEMINI_MODELS = ['gemini-3.6-flash', 'gemini-flash-latest'];
 const DAILY_LIMIT = 8; // importações de grade por usuário por dia
 
 function isOverloadError(status, data) {
@@ -68,10 +71,15 @@ async function callGeminiWithFallback(geminiKey, contents) {
     if (geminiRes.ok) return { ok: true, data, modelUsed: model };
 
     lastError = { status: geminiRes.status, data };
-    if (isOverloadError(geminiRes.status, data)) {
-      continue; // tenta o próximo modelo da lista, sem espera
+    // 404 em um modelo significa que ele não está disponível para esta chave/conta.
+    // Não devolva isso imediatamente: tente o próximo modelo suportado.
+    const modelUnavailable = geminiRes.status === 404 ||
+      (geminiRes.status === 400 && /model.*(not found|not available|unsupported)|not found.*model/i.test(data?.error?.message || ''));
+    if (isOverloadError(geminiRes.status, data) || modelUnavailable) {
+      continue;
     }
-    // Erro que não é de sobrecarga (ex: chave inválida, request malformado) — não adianta trocar de modelo
+    // Erro que não é de sobrecarga/disponibilidade do modelo (ex.: chave inválida
+    // ou request malformado) — trocar de modelo não resolve.
     return { ok: false, status: geminiRes.status, data };
   }
   return { ok: false, status: lastError?.status || 503, data: lastError?.data || {} };
@@ -232,9 +240,12 @@ module.exports = async function handler(req, res) {
 
     if (!result.ok) {
       const overloaded = isOverloadError(result.status, result.data);
+      const modelUnavailable = result.status === 404 || /model.*(not found|not available|unsupported)|not found.*model/i.test(result.data?.error?.message || '');
       const msg = overloaded
-        ? 'A IA está sobrecarregada no momento (todos os modelos tentados falharam). Isso costuma ser temporário — tente novamente em alguns segundos.'
-        : (result.data?.error?.message || `Erro HTTP ${result.status} do Gemini`);
+        ? 'A IA está sobrecarregada no momento. Tente novamente em alguns segundos.'
+        : modelUnavailable
+          ? 'Nenhum modelo Gemini configurado está disponível para a chave do Vercel. Verifique GEMINI_API_KEY e os modelos habilitados no projeto.'
+          : (result.data?.error?.message || `Erro HTTP ${result.status} do Gemini`);
       return res.status(result.status || 503).json({ error: msg });
     }
 

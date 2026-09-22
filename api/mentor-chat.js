@@ -48,7 +48,7 @@
 
 const sharedQuota = require('./_lib/gemini-shared-quota');
 
-const GEMINI_MODELS = ['gemini-flash-latest', 'gemini-3.6-flash', 'gemini-2.5-flash'];
+const GEMINI_MODELS = ['gemini-3.6-flash', 'gemini-flash-latest'];
 const DAILY_LIMIT = parseInt(process.env.MENTOR_DAILY_LIMIT || '60', 10);
 const DEGRADE_RATIO = Math.min(0.95, Math.max(0.3, parseFloat(process.env.MENTOR_DEGRADE_RATIO || '0.75')));
 // Quanto da cota total o chat pode usar, no máximo — o resto fica garantido
