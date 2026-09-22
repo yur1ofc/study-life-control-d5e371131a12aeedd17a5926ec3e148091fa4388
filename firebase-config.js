@@ -13,6 +13,9 @@ const firebaseConfig = {
   measurementId:     window.__ENV?.FIREBASE_MEASUREMENT_ID      || ''
 };
 
+// Disponível para páginas estáticas internas (ex.: painel administrativo).
+window.firebaseConfig = firebaseConfig;
+
 const missingFirebaseKeys = Object.entries(firebaseConfig).filter(([, v]) => !v).map(([k]) => k);
 
 if (missingFirebaseKeys.length) {

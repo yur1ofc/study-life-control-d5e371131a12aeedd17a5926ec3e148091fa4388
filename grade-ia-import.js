@@ -97,30 +97,12 @@ Regras:
     }
   }
 
-  function isOverloadMsg(msg) {
-    const m = String(msg || '').toLowerCase();
-    return m.includes('overload') || m.includes('sobrecarr') || m.includes('high demand') || m.includes('demanda');
-  }
-
-  // O proxy (api/gemini.js) já tenta modelos alternativos sozinho, mas em
-  // picos de tráfego às vezes até isso falha na primeira tentativa. Aqui a
-  // gente dá mais 2 tentativas do lado do cliente, com pequena espera entre
-  // elas, antes de mostrar o erro pro usuário — evita que a pessoa precise
-  // clicar "Tentar novamente" manualmente para algo que se resolve sozinho.
-  async function callGemini(parts, onRetryStatus) {
-    let lastErr = null;
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      try {
-        return await callGeminiOnce(parts);
-      } catch (err) {
-        lastErr = err;
-        const overloaded = [408, 429, 500, 502, 503, 504].includes(Number(err.status)) || isOverloadMsg(err.message);
-        if (!overloaded || attempt === 1) throw err;
-        if (typeof onRetryStatus === 'function') onRetryStatus(attempt + 1);
-        await wait(2000 * (attempt + 1));
-      }
-    }
-    throw lastErr;
+  // O proxy já faz no máximo duas chamadas reais: um modelo principal e um
+  // fallback. Não repetimos a operação no navegador, porque isso poderia
+  // transformar uma única importação em 4 chamadas e consumir a quota global.
+  async function callGemini(parts, onStatus) {
+    if (typeof onStatus === 'function') onStatus();
+    return callGeminiOnce(parts);
   }
 
   // ─── Normalização ───────────────────────────────────────────────────────────

@@ -101,52 +101,24 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // ─── Contador de uso da importação de grade por IA ────────────────────────
-    // Um documento por usuário só com "date" e "count" — usado pelo
-    // api/gemini.js para limitar quantas importações cada um faz por dia.
-
+    // ─── Contadores de IA — SOMENTE servidor ───────────────────────────────
+    // As quotas agora usam Firebase Admin SDK dentro das Vercel Functions.
+    // O navegador não pode ler, alterar ou resetar esses contadores.
     match /ai_usage/{userId} {
-      allow read: if isOwner(userId);
-      allow write: if isOwner(userId)
-        && strLen(request.resource.data.date, 10)
-        && request.resource.data.count is int
-        && request.resource.data.count >= 0
-        && request.resource.data.count <= 1000;
+      allow read, write: if false;
     }
-
-    // ─── Contador de uso do chat do Mentor IA ─────────────────────────────────
-    // Igual ao ai_usage acima, mas em coleção própria — usada pelo
-    // api/mentor-chat.js para limitar quantas mensagens de chat cada um manda
-    // por dia, sem disputar cota com a importação de grade (ai_usage).
 
     match /mentor_usage/{userId} {
-      allow read: if isOwner(userId);
-      allow write: if isOwner(userId)
-        && strLen(request.resource.data.date, 10)
-        && request.resource.data.count is int
-        && request.resource.data.count >= 0
-        && request.resource.data.count <= 2000;
+      allow read, write: if false;
     }
 
-    // ─── Contador GLOBAL de uso do Gemini (import de grade + chat, somados) ───
-    // Documento único ("counter"), usado por api/gemini.js E api/mentor-chat.js
-    // (via api/_lib/gemini-shared-quota.js) pra saber quantas chamadas ao
-    // Gemini o SITE INTEIRO já fez hoje — a chave de API é uma só,
-    // compartilhada por todos, então o limite por usuário sozinho não
-    // protege a cota do projeto. O import de grade tem prioridade sobre o
-    // chat dentro desse total (ver GEMINI_IMPORT_RESERVE no código). Qualquer
-    // usuário logado pode incrementar (é um contador agregado, sem dado
-    // pessoal), mas só em +1 por vez e dentro de um teto alto de segurança.
-    // Best-effort: não é uma trava perfeitamente atômica contra concorrência,
-    // só suficiente para evitar estourar a cota grátis por uma margem grande.
-
     match /gemini_usage_global/counter {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null
-        && strLen(request.resource.data.date, 10)
-        && request.resource.data.count is int
-        && request.resource.data.count >= 0
-        && request.resource.data.count <= 100000;
+      allow read, write: if false;
+    }
+
+    // Logs internos de chamadas Gemini: somente servidor.
+    match /gemini_ai_logs/{logId} {
+      allow read, write: if false;
     }
 
     // ─── Feed de calendário assinável (.ics) ───────────────────────────────────

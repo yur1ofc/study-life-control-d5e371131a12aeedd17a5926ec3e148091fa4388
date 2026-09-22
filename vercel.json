@@ -5,6 +5,12 @@
   "functions": {
     "api/gemini.js": {
       "maxDuration": 60
+    },
+    "api/mentor-chat.js": {
+      "maxDuration": 30
+    },
+    "api/admin-ai-usage.js": {
+      "maxDuration": 10
     }
   },
   "rewrites": [

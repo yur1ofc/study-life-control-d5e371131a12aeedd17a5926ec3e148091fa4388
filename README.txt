@@ -49,3 +49,20 @@ Sistema web para organização acadêmica de universitários, com foco em rotina
 
 ## Observação importante
 Este pacote contém os arquivos críticos já fortalecidos para lançamento. O `app.js`, `views.js`, `index.html` e `style.css` ainda merecem uma refatoração maior em uma segunda rodada para separar responsabilidades e melhorar manutenção.
+
+--- QUOTA GEMINI / PRODUÇÃO ---
+
+As quotas de IA agora são controladas somente pelo servidor (Firebase Admin SDK + transações Firestore). O navegador não pode alterar ai_usage, mentor_usage, gemini_usage_global ou gemini_ai_logs.
+
+Variáveis recomendadas no Vercel:
+- GEMINI_API_KEY = chave do Google AI Studio
+- FIREBASE_SERVICE_ACCOUNT_KEY = JSON da Service Account do Firebase em base64 (necessária para as quotas atômicas)
+- GEMINI_TOTAL_DAILY_LIMIT = orçamento interno diário do SLCampus. Configure abaixo do RPD efetivo mostrado no AI Studio para os modelos usados; o valor padrão de código é conservador e não representa a quota oficial do Google.
+- GEMINI_IMPORT_RESERVE = parcela do orçamento global reservada para importações. Com 8 importações/usuário e até 2 modelos por importação, o padrão é 16.
+- GEMINI_USER_IMPORT_LIMIT = 8
+- MENTOR_DAILY_LIMIT = 60
+- MENTOR_DEGRADE_RATIO = 0.75
+- GEMINI_ADMIN_EMAIL ou GEMINI_ADMIN_UID = conta que pode abrir /admin-ai.html
+- GEMINI_TEST_EMAIL ou GEMINI_TEST_UID = conta temporariamente isenta do limite de 8 importações durante testes. REMOVER AO FINAL DOS TESTES.
+
+O endpoint /api/gemini nunca faz mais de duas chamadas Gemini por importação. O navegador não repete automaticamente a importação, evitando multiplicar chamadas. Cada chamada real ao modelo recebe uma reserva atômica antes de ser enviada e um log de resultado depois.

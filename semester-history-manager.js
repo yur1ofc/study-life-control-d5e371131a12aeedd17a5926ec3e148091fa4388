@@ -437,7 +437,7 @@ REGRAS CRÍTICAS:
             overlay.querySelector('#sigaa-ai-analyze').disabled=true; status('<div class="hist-note">Analisando o histórico com IA… isso pode levar alguns segundos.</div>');
             try {
                 if (!window.GradeIAImport?.analyzeFile) throw new Error('Módulo de IA não carregado. Recarregue a página.');
-                const result=await window.GradeIAImport.analyzeFile(file,HISTORY_AI_PROMPT,(n)=>status(`<div class="hist-note">O Gemini está ocupado. Tentativa automática ${n+1}/3…</div>`));
+                const result=await window.GradeIAImport.analyzeFile(file,HISTORY_AI_PROMPT,()=>status('<div class="hist-note">Analisando com IA. Se o primeiro modelo estiver indisponível, o servidor tentará automaticamente um segundo modelo.</div>'));
                 prepare(result); status('<div class="hist-note" style="border-color:rgba(34,197,94,.3);color:#86efac">Análise concluída. Confira a prévia antes de confirmar.</div>');
             } catch(err) { status(`<div class="hist-note" style="color:#fca5a5">${esc(err.message || 'Falha ao analisar o PDF.')}</div>`); }
             overlay.querySelector('#sigaa-ai-analyze').disabled=false;

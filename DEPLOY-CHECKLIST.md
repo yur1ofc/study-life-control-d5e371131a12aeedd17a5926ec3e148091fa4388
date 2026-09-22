@@ -40,3 +40,13 @@
 - [ ] `CRON_SECRET` configurada
 - [ ] Cron externo (cron-job.org ou similar) apontando pra `/api/send-reminders`
 
+
+## Gemini — checklist obrigatório para produção
+
+- [ ] Configurar `FIREBASE_SERVICE_ACCOUNT_KEY` no Vercel.
+- [ ] Configurar `GEMINI_TOTAL_DAILY_LIMIT` com base no RPD efetivo exibido pelo Google AI Studio; este valor é um orçamento interno do SLCampus.
+- [ ] Configurar `GEMINI_IMPORT_RESERVE` (recomendado: suficiente para o pior caso de 8 imports × 2 modelos = 16 chamadas).
+- [ ] Configurar `GEMINI_ADMIN_EMAIL` ou `GEMINI_ADMIN_UID` para o painel `/admin-ai.html`.
+- [ ] Durante testes, `GEMINI_TEST_EMAIL`/`GEMINI_TEST_UID` pode isentar uma única conta do limite de 8; remover depois.
+- [ ] Publicar `firestore.rules` com os contadores de IA bloqueados para clientes.
+- [ ] Conferir `/admin-ai.html` após o primeiro deploy.

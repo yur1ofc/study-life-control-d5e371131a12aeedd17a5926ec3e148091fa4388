@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SLCampus — Uso da IA</title>
+<script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script defer src="env-config.js"></script>
+<script defer src="firebase-config.js"></script>
+<style>
+body{margin:0;background:#0a0f1f;color:#e5e7eb;font:14px system-ui,sans-serif}.wrap{max-width:1100px;margin:40px auto;padding:0 20px}.card{background:#111827;border:1px solid #263247;border-radius:16px;padding:20px;margin:14px 0}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.kpi{font-size:28px;font-weight:800}.muted{color:#94a3b8}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:9px;border-bottom:1px solid #263247;vertical-align:top}button{background:#2563eb;color:white;border:0;padding:10px 14px;border-radius:9px;cursor:pointer}@media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head><body><div class="wrap">
+<h1>Uso da IA — SLCampus</h1><p class="muted">Painel administrativo. Os contadores são mantidos somente pelo servidor.</p>
+<div id="status" class="card">Autenticando…</div><div id="app" style="display:none">
+<div class="grid"><div class="card"><div class="muted">Chamadas hoje</div><div id="total" class="kpi">—</div></div><div class="card"><div class="muted">Importações</div><div id="imports" class="kpi">—</div></div><div class="card"><div class="muted">Mentor</div><div id="mentor" class="kpi">—</div></div><div class="card"><div class="muted">Restantes</div><div id="remaining" class="kpi">—</div></div></div>
+<div class="card"><h2>Orçamento interno</h2><div id="budget"></div><p class="muted">O orçamento configurado aqui é uma trava do SLCampus; não é a quota oficial do Google.</p></div>
+<div class="card"><h2>Últimas chamadas</h2><button onclick="loadData()">Atualizar</button><div style="overflow:auto;margin-top:12px"><table><thead><tr><th>Data</th><th>Usuário</th><th>Operação</th><th>Modelo</th><th>Status</th><th>HTTP</th><th>Tempo</th><th>Erro</th></tr></thead><tbody id="logs"></tbody></table></div></div>
+</div></div>
+<script>
+let authReady=false;
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+async function loadData(){const u=firebase.auth().currentUser;if(!u)return;const token=await u.getIdToken();const r=await fetch('/api/admin-ai-usage',{headers:{Authorization:'Bearer '+token}});const d=await r.json();if(!r.ok)throw new Error(d.error||'Falha');document.getElementById('status').textContent='Admin autenticado.';document.getElementById('app').style.display='block';document.getElementById('total').textContent=d.usage.total+'/'+d.budget.total;document.getElementById('imports').textContent=d.usage.import;document.getElementById('mentor').textContent=d.usage.mentor;document.getElementById('remaining').textContent=d.usage.remaining;document.getElementById('budget').innerHTML=`Total/dia: <b>${d.budget.total}</b> · reserva import: <b>${d.budget.importReserve}</b> · teto chat: <b>${d.budget.chatCeiling}</b> · import/usuário: <b>${d.budget.userImportLimit}/dia</b> · mentor/usuário: <b>${d.budget.mentorDailyLimit}/dia</b> · origem: <b>${esc(d.budget.source)}</b>`;document.getElementById('logs').innerHTML=d.logs.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.email||x.uid)}</td><td>${esc(x.operation)}</td><td>${esc(x.model)}</td><td>${esc(x.status)}</td><td>${esc(x.httpStatus)}</td><td>${x.latencyMs?esc(x.latencyMs+'ms'):'—'}</td><td>${esc(x.errorMessage||'')}</td></tr>`).join('');}
+window.addEventListener('load',()=>{const timer=setInterval(()=>{if(window.firebase?.auth&&window.firebaseConfig){clearInterval(timer);firebase.initializeApp(window.firebaseConfig);firebase.auth().onAuthStateChanged(async u=>{try{if(!u){document.getElementById('status').textContent='Faça login no SLCampus e abra esta página novamente.';return;}await loadData();}catch(e){document.getElementById('status').textContent=e.message;}});}},100);setTimeout(()=>clearInterval(timer),10000);});
+</script></body></html>
