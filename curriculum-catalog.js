@@ -543,7 +543,6 @@
         subjects: dedupeCurriculum(subjects).map(neutralizeForCatalog),
         submittedAt: new Date().toISOString(),
         sourceUserId: user?.uid || null,
-        sourceUserEmail: user?.email || null,
         version: extra?.version || '',
         semester: extra?.semester || '',
         mode: extra?.mode || 'manual',

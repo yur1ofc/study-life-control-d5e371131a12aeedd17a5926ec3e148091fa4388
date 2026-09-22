@@ -88,7 +88,8 @@ service cloud.firestore {
     // ─── Submissions comunitárias ─────────────────────────────────────────────
 
     match /community_catalog_submissions/{docId} {
-      allow read: if isSignedIn();
+      // Contribuições podem conter sourceUserEmail; não ficam legíveis para outros usuários.
+      allow read: if false;
 
       allow create: if isSignedIn()
         && request.resource.data.sourceUserId == request.auth.uid

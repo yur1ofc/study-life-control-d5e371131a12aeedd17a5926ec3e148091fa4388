@@ -5,7 +5,7 @@
 // adicione ele aqui também — senão ele só entra no cache dinâmico depois
 // do primeiro acesso online, e falha se o usuário abrir o app offline
 // (ou logo após instalar como PWA) antes disso acontecer.
-const CACHE_VERSION = 'slc-v30';
+const CACHE_VERSION = 'slc-v31';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 
@@ -67,7 +67,15 @@ const STATIC_ASSETS = [
   './launch-polish.js',
   './improvements.js',
   './ux-improvements.js',
-  './reprovado-ecosystem.js'
+  './reprovado-ecosystem.js',
+  './academic-intelligence.js',
+  './perfil-adaptativo.js',
+  './audit-fixes.js',
+  './app-enhancements.js',
+  './curriculum-catalog.js',
+  './concursos-brasil.js',
+  './ensino-medio-curriculo.js',
+  './quick-search.js'
 ];
 
 // Firebase SDK vem da CDN (gstatic.com) — não existe cópia local no repo.
@@ -251,7 +259,10 @@ self.addEventListener('notificationclick', event => {
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
       for (const client of list) {
-        if ('focus' in client) return client.focus();
+        if (client.url && client.url.startsWith(self.location.origin) && 'focus' in client) {
+          const nav = ('navigate' in client && client.url !== targetUrl) ? client.navigate(targetUrl).catch(() => null) : Promise.resolve();
+          return nav.then(() => client.focus());
+        }
       }
       if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
     })

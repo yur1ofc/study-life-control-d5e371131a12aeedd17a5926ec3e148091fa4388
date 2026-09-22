@@ -605,7 +605,7 @@ Regras:
   const PROFILES = [
     { valor: 'faculdade',    icon: '🎓', title: 'Faculdade / Universidade', desc: 'Curso superior, com grade curricular e semestres.' },
     { valor: 'concurso',     icon: '📋', title: 'Concurso Público',         desc: 'Estudando pra um edital específico.' },
-    { valor: 'ensino_medio', icon: '🏫', title: 'Ensino Médio / Escola',    desc: '1º, 2º ou 3º ano, técnico ou EJA.' },
+    { valor: 'ensino_medio', icon: '🏫', title: 'Escola',                    desc: 'Ensino Fundamental, Médio, técnico ou EJA.' },
     { valor: 'geral',        icon: '📚', title: 'Estudo Geral / Pessoal',   desc: 'Idiomas, certificações, empreendedorismo ou o que quiser.' }
   ];
 
@@ -728,7 +728,7 @@ Regras:
     return `
 <div class="wiz-card" id="wiz-step-1">
   <div class="wiz-card-title">🏫 Sua Escola</div>
-  <div class="wiz-card-sub">Vamos pré-preencher suas matérias com base na sua série</div>
+  <div class="wiz-card-sub">Vamos pré-preencher matérias quando houver uma base compatível com seu ano</div>
 
   <div class="wiz-field">
     <label>Seu nome</label>
@@ -736,11 +736,10 @@ Regras:
   </div>
 
   <div class="wiz-field">
-    <label>Que série você está cursando?</label>
+    <label>Que série/ano você está cursando?</label>
     <div class="wiz-radio-group" id="wiz-serie-group">
-      <div class="wiz-radio-card" data-val="1">1º ano</div>
-      <div class="wiz-radio-card" data-val="2">2º ano</div>
-      <div class="wiz-radio-card" data-val="3">3º ano</div>
+      ${['6','7','8','9'].map(n => `<div class="wiz-radio-card" data-val="${n}">${n}º Fundamental</div>`).join('')}
+      ${['1','2','3'].map(n => `<div class="wiz-radio-card" data-val="${n}">${n}º Médio</div>`).join('')}
     </div>
     <input type="hidden" id="wiz-serie" value="">
   </div>
@@ -1888,7 +1887,7 @@ Regras:
         instituicaoEquivalente = 'Concurso';
       } else if (wizardState.perfil === 'ensino_medio') {
         const tipoLabel = (window.SLC_EnsinoMedio?.TIPOS_ESCOLA || []).find(t => t.valor === wizardState.tipoEscola)?.label || 'Ensino Médio';
-        cursoEquivalente = `${wizardState.serie || ''}º ano — ${tipoLabel}`.replace(/^º ano — /, tipoLabel);
+        cursoEquivalente = `${wizardState.serie || ''}º ano — ${String(wizardState.serie) <= '3' ? 'Ensino Médio' : 'Ensino Fundamental'} — ${tipoLabel}`.replace(/^º ano — /, tipoLabel);
         instituicaoEquivalente = tipoLabel;
       } else if (wizardState.perfil === 'geral') {
         cursoEquivalente = wizardState.objetivo || 'Estudo Geral';

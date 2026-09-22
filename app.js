@@ -740,6 +740,17 @@ class StudyLifeControl {
                 if (universidade) this.data.user.universidade = universidade;
                 if (curso) this.data.user.curso = curso;
                 if (semestre) this.data.user.semestre = semestre;
+                const perfilAtual = this.data.user.perfil || 'faculdade';
+                if (perfilAtual === 'concurso' || perfilAtual === 'vestibular') {
+                    if (curso) this.data.user.concurso = curso;
+                } else if (perfilAtual === 'ensino_medio') {
+                    const serie = document.getElementById('config-serie')?.value;
+                    const tipoEscola = document.getElementById('config-tipo-escola')?.value;
+                    if (serie) this.data.user.serie = serie;
+                    if (tipoEscola) this.data.user.tipoEscola = tipoEscola;
+                } else if (perfilAtual === 'geral') {
+                    if (curso) this.data.user.objetivo = curso;
+                }
                 await dbService.saveData('user', this.data.user);
                 window.showToast?.('Perfil atualizado!', 'success');
             });

@@ -1501,8 +1501,22 @@ class ViewRenderer {
                     <input type="text" id="config-universidade" value="${this.esc(user.universidade || '')}" placeholder="Ex: UFOB">
                 </div>` : ''}
                 <div class="wiz-field" style="width:100%"><label>${labelPrincipal}</label>
-                    <input type="text" id="config-curso" value="${this.esc(user.curso || '')}" placeholder="${placeholderPrincipal}">
+                    <input type="text" id="config-curso" value="${this.esc(perfil === 'concurso' || perfil === 'vestibular' ? (user.concurso || user.curso || '') : perfil === 'geral' ? (user.objetivo || user.curso || '') : user.curso || '')}" placeholder="${placeholderPrincipal}">
                 </div>
+                ${perfil === 'ensino_medio' ? `
+                <div style="display:flex;gap:10px;flex-wrap:wrap;width:100%">
+                  <div class="wiz-field" style="flex:1;min-width:140px"><label>Série</label>
+                    <select id="config-serie">
+                      ${['6','7','8','9'].map(n => `<option value="${n}" ${String(user.serie)===n?'selected':''}>${n}º ano — Ensino Fundamental</option>`).join('')}
+                      ${['1','2','3'].map(n => `<option value="${n}" ${String(user.serie)===n?'selected':''}>${n}º ano — Ensino Médio</option>`).join('')}
+                    </select>
+                  </div>
+                  <div class="wiz-field" style="flex:1;min-width:140px"><label>Tipo de escola</label>
+                    <select id="config-tipo-escola">
+                      ${((window.SLC_EnsinoMedio?.TIPOS_ESCOLA)||[]).map(t => `<option value="${this.esc(t.valor)}" ${user.tipoEscola===t.valor?'selected':''}>${this.esc(t.label)}</option>`).join('')}
+                    </select>
+                  </div>
+                </div>` : ''}
                 ${perfil === 'faculdade' ? `
                 <div class="wiz-field" style="width:100%"><label>Semestre atual</label>
                     <select id="config-semestre">
