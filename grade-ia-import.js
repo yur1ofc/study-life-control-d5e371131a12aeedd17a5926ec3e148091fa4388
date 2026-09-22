@@ -523,7 +523,19 @@ Regras:
   // ─── API pública ────────────────────────────────────────────────────────────
 
   window.GradeIAImport = {
-    openModal(ctx) { createImportModal(ctx || 'grade'); }
+    openModal(ctx) { createImportModal(ctx || 'grade'); },
+    // Reutilizado por módulos internos (ex.: importação do histórico escolar).
+    // Mantém a chave Gemini no backend e usa exatamente o mesmo proxy seguro
+    // da importação de grade.
+    async analyzeFile(file, prompt, onRetryStatus) {
+      if (!file) throw new Error('Nenhum arquivo selecionado.');
+      const data = await fileToBase64(file);
+      const mime = getMimeType(file);
+      return callGemini([
+        { text: String(prompt || '') },
+        { inline_data: { mime_type: mime, data } }
+      ], onRetryStatus);
+    }
   };
 
   // ─── Assume o clique do botão "Importar grade pronta" ───────────────────────
