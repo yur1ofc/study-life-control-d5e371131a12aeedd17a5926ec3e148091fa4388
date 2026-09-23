@@ -9,7 +9,23 @@ function init(){if(app)return app;const raw=process.env.FIREBASE_SERVICE_ACCOUNT
 const DAY={dom:0,domingo:0,seg:1,segunda:1,"segunda-feira":1,ter:2,terça:2,terca:2,"terça-feira":2,"terca-feira":2,qua:3,quarta:3,"quarta-feira":3,qui:4,quinta:4,"quinta-feira":4,sex:5,sexta:5,"sexta-feira":5,sab:6,sábado:6,sabado:6,"sábado-feira":6};
 function token(){const t=process.env.TELEGRAM_BOT_TOKEN;if(!t)throw new Error('TELEGRAM_BOT_TOKEN não configurado.');return t;}
 async function tg(method,body){const r=await fetch(`https://api.telegram.org/bot${token()}/${method}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});const j=await r.json();if(!r.ok||!j.ok)throw new Error(j.description||`Telegram ${method} falhou`);return j.result;}
-async function reply(chatId,text){return tg('sendMessage',{chat_id:chatId,text});}
+async function reply(chatId,text){
+  const raw=String(text||'');
+  if(!raw)return null;
+  const max=3900;
+  const chunks=[];
+  let rest=raw;
+  while(rest.length>max){
+    let cut=Math.max(rest.lastIndexOf('\n\n',max),rest.lastIndexOf('\n',max),rest.lastIndexOf(' ',max));
+    if(cut<1200)cut=max;
+    chunks.push(rest.slice(0,cut).trim());
+    rest=rest.slice(cut).trim();
+  }
+  if(rest)chunks.push(rest);
+  let last=null;
+  for(const chunk of chunks)last=await tg('sendMessage',{chat_id:chatId,text:chunk});
+  return last;
+}
 function parts(text){return text.split('|').map(x=>x.trim()).filter(Boolean);}
 function id(prefix='tg'){return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;}
 function addInbox(data,item){const list=Array.isArray(data.telegramInbox)?data.telegramInbox:[];const safe={...item,text:String(item.text||'').slice(0,4000),caption:String(item.caption||'').slice(0,4000),fileName:String(item.fileName||'').slice(0,180),materia:String(item.materia||'').slice(0,180)};return [safe,...list].slice(0,100);}
@@ -285,27 +301,185 @@ function compactForAI(data){
   const sessions=(current.sessions||[]).slice(-40).map(x=>({materia:clean(x.materia),topico:clean(x.topico),min:Number(x.duracaoReal||x.duracaoMin||0),data:x.data||x.inicio}));
   const evidence=(Array.isArray(data.learningEvidence)?data.learningEvidence:[]).slice(-50).map(x=>({materia:clean(x.materia),topico:clean(x.topico),resultado:clean(x.resultado||x.status||x.feedback),confianca:x.confianca,dificuldade:x.dificuldade,data:x.data||x.createdAt}));
   const learning=(Array.isArray(data.learningMap)?data.learningMap:[]).slice(0,80).map(x=>({materia:clean(x.materia),topico:clean(x.topico),status:x.status,confianca:x.confianca,dificuldade:x.dificuldade,proximaRevisao:x.proximaRevisao}));
+  const reviews=(current.reviews||[]).filter(x=>String(x.data||'')>=todayBR()).slice().sort((a,b)=>String(a.data||'').localeCompare(String(b.data||''))).slice(0,40).map(x=>({materia:clean(x.materia),topico:clean(x.topico),data:x.data,concluida:x.concluida,dificuldade:x.dificuldade,dominio:x.dominio}));
+  const diaries=(current.classDiaries||[]).slice().sort((a,b)=>String(b.data||'').localeCompare(String(a.data||''))).slice(0,25).map(x=>({materia:clean(x.materia),data:x.data,conteudo:clean(x.conteudo||x.resumo),duvidas:clean(x.duvidas||x.doubt||''),tarefas:clean(x.tarefas||'')}));
+  const materials=(current.materials||[]).slice(0,30).map(x=>({materia:clean(x.materia),titulo:clean(x.titulo||x.nome),tipo:clean(x.tipo||x.type),conteudo:clean(x.conteudo||x.descricao||'')}));
+  const attendance=current.attendance||{};
   const archived=(Array.isArray(data.archivedSemesters)?data.archivedSemesters:[]).map(a=>({periodo:a.periodo,numero:a.numero,materias:(a.subjects||a.curriculum||[]).slice(0,80).map(s=>({nome:clean(s.nome),codigo:s.codigo,status:s.status,nota:s.notaFinal??s.nota,tentativas:s.tentativas?.length||0}))}));
   const user=data.user||{};
   return {
     agora:todayBR(),
     perfil:{nome:user.nome||user.name||'',curso:user.curso||'',instituicao:user.instituicao||'',semestre:user.semestre||null},
-    atual:{subjects:current.subjects.map(s=>({nome:clean(s.nome),codigo:s.codigo,status:s.status,dificuldade:s.dificuldade,notaDesejada:s.notaDesejada})),grades,exams,tasks,classSchedule:current.classSchedule||[]},
+    qualidade:AcademicCore.dataQuality(data),
+    atual:{subjects:current.subjects.map(s=>({nome:clean(s.nome),codigo:s.codigo,status:s.status,dificuldade:s.dificuldade,notaDesejada:s.notaDesejada})),grades,exams,tasks,classSchedule:current.classSchedule||[],reviews,diarios:diaries,materiais:materials,frequencia:attendance},
     aprendizagem:{learning,evidence,adaptive:user.adaptiveLearning||{}},
     execucao:{sessions},
     historico:archived
   };
 }
+function hasPhrase(text, phrases){
+  return phrases.some(p=>text.includes(p));
+}
 function mentorLikeTelegram(text){
   const n=normalize(text);
-  // Perguntas de decisão/diagnóstico acadêmico devem ir para o Mentor antes
-  // das respostas determinísticas do parser natural. Assim, por exemplo,
-  // "qual matéria eu deveria estudar hoje?" usa o mesmo contexto/IA do site.
-  const asksStudyDecision=/\b(qual|que|o que)\b.*\b(materia|disciplinas?|conteudo|conteudos)\b.*\b(devo|deveria|preciso|estudar|revisar)\b/.test(n)
-    ||/\b(o que|oq|qual)\b.*\b(devo|deveria)\b.*\b(estudar|revisar)\b/.test(n);
-  return asksStudyDecision || /\b(como estou|como eu estou|como foi minha evolucao|evolucao|desempenho|risco academico|riscos|o que devo estudar|qual materia devo estudar|o que estudar|prioridade|prioridades|por que .*prioridade|por que .*dificil|materia mais dificil|materias mais dificeis|quanto preciso|media necessaria|ja reprovei|reprovei|historico|diagnostico|raio x|plano de estudos|plano semanal|organizar meus estudos|me ajude a estudar)\b/.test(n);
+  if(!n)return false;
+
+  // Intenção analítica/decisória: estas mensagens devem chegar ao Mentor antes
+  // do parser determinístico. O objetivo é entender linguagem natural, não exigir
+  // uma frase exata. A lista é deliberadamente ampla e cobre abreviações,
+  // sinônimos, perguntas curtas e formas comuns de escrever no Telegram.
+  const decisionPhrases=[
+    // prioridade / decisão
+    'qual materia eu deveria estudar','qual materia devo estudar','qual materia estudar',
+    'qual disciplina eu deveria estudar','qual disciplina devo estudar','qual disciplina estudar',
+    'o que eu deveria estudar','o que devo estudar','o que eu devo estudar','o que estudar hoje',
+    'o que estudar agora','por onde comeco','por onde começo','onde devo comecar','onde devo começar',
+    'o que faco agora','o que faço agora','qual deve ser meu foco','qual e meu foco','qual é meu foco',
+    'no que devo focar','em que devo focar','onde devo focar','qual prioridade','quais prioridades',
+    'qual e a prioridade','qual é a prioridade','o que e prioridade','o que é prioridade',
+    'o que merece minha atencao','o que merece minha atenção','o que precisa de atencao','o que precisa de atenção',
+    'onde investir meu tempo','onde gastar meu tempo','como devo distribuir meu tempo',
+    'devo estudar','deveria estudar','vale a pena estudar','vale mais a pena estudar',
+    'devo revisar','deveria revisar','o que revisar','o que devo revisar','o que deveria revisar',
+    'qual revisao fazer','qual revisão fazer','o que precisa ser revisado','o que precisa revisar',
+    'qual conteudo estudar','qual conteúdo estudar','qual conteudo revisar','qual conteúdo revisar',
+    'qual assunto estudar','qual assunto revisar','qual assunto preciso estudar',
+    // dificuldade / fraquezas / risco
+    'minha maior dificuldade','qual minha dificuldade','qual e minha dificuldade','qual é minha dificuldade',
+    'onde tenho mais dificuldade','em que tenho mais dificuldade','onde tenho dificuldade',
+    'qual materia tenho mais dificuldade','qual disciplina tenho mais dificuldade',
+    'qual materia esta mais dificil','qual matéria está mais difícil','qual disciplina esta mais dificil','qual disciplina está mais difícil',
+    'qual materia e mais dificil','qual matéria é mais difícil','qual e a mais dificil','qual é a mais difícil',
+    'onde estou pior','em que estou pior','qual meu ponto fraco','qual e meu ponto fraco','qual é meu ponto fraco',
+    'quais sao meus pontos fracos','quais são meus pontos fracos','onde estou errando','onde estou com dificuldade',
+    'qual materia esta ruim','qual matéria está ruim','qual disciplina esta ruim','qual disciplina está ruim',
+    'alguma materia em risco','alguma matéria em risco','alguma disciplina em risco','tem materia em risco',
+    'tem matéria em risco','tem alguma materia em risco','tem alguma matéria em risco',
+    'tem alguma disciplina em risco','quais materias estao em risco','quais matérias estão em risco',
+    'quais disciplinas estao em risco','quais disciplinas estão em risco','estou em risco','estou mal em alguma materia',
+    'estou mal em alguma matéria','estou mal em alguma disciplina','posso reprovar','vou reprovar',
+    'estou perto de reprovar','corro risco de reprovar','risco de reprovacao','risco de reprovação',
+    // situação / desempenho / panorama
+    'como estou academicamente','como estou academicamente','como estou indo','como andam meus estudos',
+    'como estao meus estudos','como estão meus estudos','como esta meu semestre','como está meu semestre',
+    'como estou no semestre','como esta minha situacao','como está minha situação','qual minha situacao',
+    'qual é minha situação','qual e minha situacao','como esta minha vida academica','como está minha vida acadêmica',
+    'como esta meu desempenho','como está meu desempenho','qual meu desempenho','qual e meu desempenho','qual é meu desempenho',
+    'como esta meu rendimento','como está meu rendimento','qual meu rendimento','como estou de notas',
+    'como estao minhas notas','como estão minhas notas','como esta meu boletim','como está meu boletim',
+    'qual minha situacao academica','qual é minha situação acadêmica','panorama academico','panorama acadêmico',
+    'visao geral das minhas materias','visão geral das minhas matérias','raio x academico','raio-x academico','diagnostico academico','diagnóstico acadêmico',
+    // evolução / histórico
+    'como foi minha evolucao','como foi minha evolução','qual foi minha evolucao','qual foi minha evolução',
+    'como eu evolui','como evolui','estou evoluindo','estou melhorando','estou piorando',
+    'melhorei','piorou','o que mudou no meu desempenho','como mudei academicamente',
+    'o que meu historico mostra','o que meu histórico mostra','como meu historico influencia','como meu histórico influencia',
+    'ja reprovei','já reprovei','quantas vezes reprovei','em quais materias reprovei','em quais matérias reprovei',
+    'quais materias ja reprovei','quais matérias já reprovei','minhas tentativas anteriores','meu passado academico','meu passado acadêmico',
+    // planejamento / estratégia
+    'monte um plano','monta um plano','crie um plano','cria um plano','faca um plano','faça um plano',
+    'plano de estudos','plano de estudo','plano semanal','plano para hoje','plano para essa semana','plano para esta semana',
+    'organiza meus estudos','organize meus estudos','organizar meus estudos','me ajuda a estudar','me ajude a estudar',
+    'como organizar meus estudos','como devo estudar','como estudar melhor','como posso estudar melhor',
+    'como recuperar','como recuperar a materia','como recuperar a matéria','como melhorar','o que fazer para melhorar',
+    'como recuperar o semestre','como sair do risco','como recuperar minha media','como recuperar minha média',
+    'qual estrategia','qual estratégia','qual abordagem','como devo me preparar','como me preparar para as provas',
+    'o que fazer primeiro','o que fazer depois','qual o proximo passo','qual o próximo passo',
+    // cálculos/diagnósticos que exigem contexto
+    'quanto preciso tirar','quanto tenho que tirar','quanto devo tirar','quanto preciso tirar na',
+    'quanto preciso tirar em','qual nota preciso','qual nota devo tirar','qual nota tenho que tirar',
+    'quanto falta para passar','quanto falta para minha media','quanto falta para minha média',
+    'qual minha media necessaria','qual minha média necessária','media necessaria','média necessária',
+    'posso passar','consigo passar','tenho chance de passar','qual minha chance de passar',
+    'como esta minha nota','como está minha nota','o que preciso tirar','o que falta para passar',
+    // análise aberta / linguagem coloquial
+    'analise meu semestre','analisa meu semestre','analise minhas materias','analisa minhas materias',
+    'analise minhas matérias','me analise','me analisa','faz uma analise','faca uma analise','faça uma análise',
+    'me de um diagnostico','me dê um diagnóstico','me da um diagnostico','me dá um diagnóstico',
+    'qual meu maior desafio','qual e meu maior desafio','qual é meu maior desafio','meu maior desafio',
+    'qual meu maior problema','qual e meu maior problema','qual é meu maior problema',
+    'o que esta me atrapalhando','o que está me atrapalhando','o que esta me prejudicando','o que está me prejudicando',
+    'onde devo melhorar','em que devo melhorar','o que devo melhorar','o que preciso melhorar',
+    'o que estou fazendo errado','onde estou falhando','onde estou perdendo pontos',
+    'estou no caminho certo','estou no caminho certo nos estudos','estou indo bem nos estudos',
+    'como posso render mais','como posso ter um rendimento melhor','como estudar de forma mais eficiente',
+    'o que voce acha do meu desempenho','o que você acha do meu desempenho','o que voce acha das minhas notas','o que você acha das minhas notas'
+  ];
+  if(hasPhrase(n,decisionPhrases))return true;
+
+  // Consultas puramente factuais/operacionais continuam no motor determinístico.
+  // Isso evita mandar para a IA perguntas que já têm resposta exata no Firestore,
+  // como "quais provas tenho?", "qual a próxima aula?" ou "quanto estudei?".
+  const deterministic=naturalQuery(text,{subjects:[]});
+  const deterministicKinds=new Set(['adaptiveGoal','dayOverview','agenda','nextClass','tasks','exams','grades','studySummary']);
+  if(deterministic?.kind && deterministicKinds.has(deterministic.kind))return false;
+
+  // Vocabulário semântico amplo para frases que não coincidem com uma expressão
+  // pronta. Combina termo acadêmico + termo analítico/decisório para evitar que
+  // consultas simples como "quais provas tenho?" sejam enviadas à IA sem necessidade.
+  const academicTerms=[
+    'materia','materias','disciplina','disciplinas','semestre','academico','academica','academicos','academicas',
+    'estudo','estudos','estudar','revisao','revisar','conteudo','conteudos','assunto','assuntos','prova','provas',
+    'avaliacao','avaliacoes','nota','notas','media','medias','boletim','desempenho','rendimento','dificuldade',
+    'risco','reprovacao','reprovacoes','reprovar','historico','evolucao','aprendizagem','aprendizado','planejamento',
+    'prioridade','prioridades','foco','revisao','revisar','tarefa','tarefas','pendencia','pendencias','aula','aulas'
+  ];
+  const analysisTerms=[
+    'dificil','dificeis','dificuldade','dificuldades','complicado','complicada','complicados','complicadas','ameaçado','ameacada','ameacado','ameacada','perigo','alerta','recuperacao','recuperar','reprovando','fraco','fraca','fracos','fracas','forte','fortes','risco','urgente','urgencia','prioridade',
+    'priorizar','priorize','melhorar','melhorei','piorar','piorando','evolucao','evoluir','desempenho','rendimento',
+    'situacao','diagnostico','panorama','raio','problema','problemas','erro','erros','atencao','atenção','foco',
+    'recomenda','recomendacao','recomendação','estrategia','estratégia','plano','organizar','organize','decidir',
+    'decisao','decisão','comparar','comparacao','comparação','progresso','dominio','domínio','lacuna','lacunas',
+    'preciso','devo','deveria','vale','compensa','melhor','pior','importante','necessario','necessária','necessidade',
+    'recuperar','passar','reprovar','preparar','preparacao','preparação','revisar','revisao','revisão','atrasado','atrasada'
+  ];
+  const hasAcademic=academicTerms.some(x=>n.includes(x));
+  const hasAnalysis=analysisTerms.some(x=>n.includes(x));
+  const isQuestion=/[?؟]$/.test(String(text).trim()) || /^(como|qual|quais|quanto|quantas|o que|oq|por que|porque|onde|quando|devo|deveria|posso|consigo|existe|tem|há|ha|vale|compensa)/.test(n);
+  if(hasAcademic&&hasAnalysis&&isQuestion)return true;
+
+  // Formas muito comuns de autoavaliação que podem omitir o nome da matéria.
+  if(/^(como|onde|qual|quais)\b/.test(n) && /\b(indo|estou|estamos|estao|estão|situacao|situação|desempenho|rendimento|evolucao|evolução|melhor|pior|dificil|dificeis|complicado|complicada)\b/.test(n))return true;
+  if(/\b(como posso|como consigo|como devo|o que posso|o que devo|o que deveria)\b.*\b(melhorar|melhor|recuperar|estudar|revisar|organizar|preparar|preparacao|preparação)\b/.test(n))return true;
+  if(/\b(estou|to|tô)\b.*\b(bem|mal|ruim|atrasado|atrasada|perdido|perdida|seguro|segura|preocupado|preocupada|reprovando|quase reprovando)\b/.test(n))return true;
+  if(/\bcomo estou\b.*\b(em|na|no|nessa|nesta)\b/.test(n))return true;
+  if(/^(como (esta|está|ta|tá)\b.*\?)$/.test(n))return true;
+  if(/\bcomo (esta|está|ta|tá)\b.*\b(em|na|no|nessa|nesta)\b/.test(n))return true;
+  if(/\b(tem|tenho|existe|existe alguma)\b.*\b(alguma coisa|algo)\b.*\b(melhorar|recuperar|revisar|corrigir|atencao|atenção)\b/.test(n))return true;
+  if(/\b(materia|materias|disciplina|disciplinas)\b.*\b(mais|menos)\b.*\b(dificil|dificeis|complicad|fraca|forte|urgente|importante|ameacad|ameacado|risco|perigo)\b/.test(n))return true;
+  if(/\b(dificuldade|dificuldades|risco|reprovacao|reprovação|desempenho|rendimento)\b.*\b(em|na|no|com|nessa|nesta)\b/.test(n))return true;
+
+  // Perguntas abertas em primeira pessoa sobre o estado acadêmico.
+  if(/\b(meu|minha|meus|minhas|eu|estou|tenho|preciso)\b/.test(n) && hasAcademic && hasAnalysis && isQuestion)return true;
+
+  return false;
 }
-function telegramSystemInstruction(){return `Você é o Mentor IA do SLCampus no Telegram. Você é a mesma inteligência acadêmica disponível no site, não um bot separado. Use somente os dados fornecidos no CONTEXTO ACADÊMICO. Diferencie SEMESTRE ATUAL de HISTÓRICO. Histórico serve para explicar padrões, reprovações e tentativas anteriores, mas não deve virar prova, tarefa ou compromisso atual. Não invente datas, notas, matérias, horários ou fatos. Se faltar dado, diga claramente. Quando fizer uma recomendação de estudo, explique brevemente quais dados objetivos levaram à prioridade. Responda em português do Brasil, de forma natural e útil para Telegram, sem tabelas largas e sem mencionar APIs, provedores ou detalhes internos. Se a pergunta pedir cálculo de média, use somente os valores e pesos disponíveis. Se houver conflito entre dados, prefira o semestre atual e avise sobre a inconsistência.`;}
+function telegramSystemInstruction(){return `Você é o Mentor IA do SLCampus no Telegram. Você é a mesma inteligência acadêmica disponível no site, usando o mesmo contexto acadêmico real do aluno, e não um bot genérico.
+
+REGRAS DE CONTEXTO:
+- Use somente os dados presentes no CONTEXTO ACADÊMICO fornecido nesta mensagem.
+- Diferencie SEMESTRE ATUAL de HISTÓRICO. O histórico explica padrões, reprovações e tentativas anteriores; não transforme histórico em prova, tarefa, nota ou compromisso atual.
+- Não invente matérias, notas, pesos, datas, horários, frequência, tarefas, conteúdos ou eventos.
+- Se um dado necessário estiver ausente, diga exatamente o que falta e, se possível, responda apenas com o que é objetivamente possível concluir.
+- A seção 'qualidade' do contexto indica lacunas de dados; considere isso antes de afirmar algo como completo.
+
+REGRAS DE RACIOCÍNIO ACADÊMICO:
+- Para perguntas de prioridade, dificuldade, risco, desempenho, evolução ou planejamento, combine os sinais disponíveis: provas e prazos, notas e pesos, dificuldade cadastrada, histórico, tarefas, revisões, evidências de aprendizagem, sessões reais de estudo, diário, frequência e meta adaptativa.
+- Não escolha uma matéria somente porque a prova é a mais próxima quando houver outros sinais relevantes; explique os principais fatores objetivos usados.
+- Para cálculos de média, use somente notas e pesos realmente registrados. Se não houver dados suficientes, não estime nem invente.
+- Diferencie fato objetivo de interpretação. Pode dizer 'os dados indicam' quando houver base, mas não transforme uma hipótese em fato.
+- Quando o aluno perguntar 'qual matéria devo estudar' ou 'o que devo revisar', entregue uma prioridade prática e breve, com justificativa baseada nos dados.
+- Quando perguntar sobre evolução, compare histórico e semestre atual sem confundir períodos.
+- Quando perguntar sobre risco, descreva os sinais objetivos e o que está faltando para concluir; não invente probabilidades.
+
+FORMATO:
+- Português do Brasil.
+- Natural para Telegram.
+- Seja direto, mas suficiente para explicar a conclusão.
+- Prefira listas curtas quando houver várias matérias/provas.
+- Não mencione APIs, modelos, provedores, prompts, Firebase, Vercel ou detalhes internos.
+- Não diga que 'deixou na Caixa de Entrada' quando a pergunta tiver sido atendida pelo Mentor.
+- Se a pergunta for objetiva e os dados forem insuficientes, diga isso claramente em vez de preencher a lacuna com suposição.`;}
 async function askTelegramMentor({uid,email,text,data}){
   const context=compactForAI(data);
   const prompt=`PERGUNTA DO ALUNO:\n${String(text).slice(0,4000)}\n\nCONTEXTO ACADÊMICO REAL:\n${JSON.stringify(context).slice(0,30000)}`;
@@ -388,7 +562,7 @@ module.exports=async function(req,res){
     if(msg.document||msg.photo){
       await ref.set({telegramInbox:addInbox(data,inboxItem)},{merge:true});
       const fileText=normalize(`${msg.caption||''} ${msg.document?.file_name||''}`);
-      if(msg.document && /historico|histórico|sigaa/.test(fileText) && (/\.pdf$/i.test(msg.document.file_name||'') || /application\/pdf/i.test(msg.document.mime_type||''))){
+      if(msg.document && /\bhistorico\b|sigaa/.test(fileText) && (/\.pdf$/i.test(msg.document.file_name||'') || /application\/pdf/i.test(msg.document.mime_type||''))){
         try{
           const processed=await processTelegramHistory(ref,data,inboxItem);
           await reply(chatId,`Histórico processado pelo SLCampus. ${processed.added} período(s) novo(s) e ${processed.updated} atualizado(s) foram incorporados ao histórico. Ele já pode ser usado pelo Mentor, pelo planejamento e pelas consultas do Telegram.`);
