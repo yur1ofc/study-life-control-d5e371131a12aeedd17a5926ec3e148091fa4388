@@ -298,7 +298,12 @@ function compactForAI(data){
 }
 function mentorLikeTelegram(text){
   const n=normalize(text);
-  return /\b(como estou|como eu estou|como foi minha evolucao|evolucao|desempenho|risco academico|riscos|o que devo estudar|qual materia devo estudar|o que estudar|prioridade|prioridades|por que .*prioridade|por que .*dificil|materia mais dificil|materias mais dificeis|quanto preciso|media necessaria|ja reprovei|reprovei|historico|diagnostico|raio x|plano de estudos|plano semanal|organizar meus estudos|me ajude a estudar)\b/.test(n);
+  // Perguntas de decisão/diagnóstico acadêmico devem ir para o Mentor antes
+  // das respostas determinísticas do parser natural. Assim, por exemplo,
+  // "qual matéria eu deveria estudar hoje?" usa o mesmo contexto/IA do site.
+  const asksStudyDecision=/\b(qual|que|o que)\b.*\b(materia|disciplinas?|conteudo|conteudos)\b.*\b(devo|deveria|preciso|estudar|revisar)\b/.test(n)
+    ||/\b(o que|oq|qual)\b.*\b(devo|deveria)\b.*\b(estudar|revisar)\b/.test(n);
+  return asksStudyDecision || /\b(como estou|como eu estou|como foi minha evolucao|evolucao|desempenho|risco academico|riscos|o que devo estudar|qual materia devo estudar|o que estudar|prioridade|prioridades|por que .*prioridade|por que .*dificil|materia mais dificil|materias mais dificeis|quanto preciso|media necessaria|ja reprovei|reprovei|historico|diagnostico|raio x|plano de estudos|plano semanal|organizar meus estudos|me ajude a estudar)\b/.test(n);
 }
 function telegramSystemInstruction(){return `Você é o Mentor IA do SLCampus no Telegram. Você é a mesma inteligência acadêmica disponível no site, não um bot separado. Use somente os dados fornecidos no CONTEXTO ACADÊMICO. Diferencie SEMESTRE ATUAL de HISTÓRICO. Histórico serve para explicar padrões, reprovações e tentativas anteriores, mas não deve virar prova, tarefa ou compromisso atual. Não invente datas, notas, matérias, horários ou fatos. Se faltar dado, diga claramente. Quando fizer uma recomendação de estudo, explique brevemente quais dados objetivos levaram à prioridade. Responda em português do Brasil, de forma natural e útil para Telegram, sem tabelas largas e sem mencionar APIs, provedores ou detalhes internos. Se a pergunta pedir cálculo de média, use somente os valores e pesos disponíveis. Se houver conflito entre dados, prefira o semestre atual e avise sobre a inconsistência.`;}
 async function askTelegramMentor({uid,email,text,data}){
@@ -398,6 +403,15 @@ module.exports=async function(req,res){
     if(lower.startsWith('/prova')){const p=parts(text.replace(/^\/prova\s*/i,''));if(p.length<3){await reply(chatId,'Formato: /prova | Matéria | Título | 2026-10-02');await mark();return res.status(200).json({ok:true});}const item={id:id('exam'),materia:p[0],titulo:p[1],data:p[2],concluida:false,criadaEm:new Date().toISOString(),origem:'telegram'};await saveArray(ref,data,'exams',item);await reply(chatId,`Prova/trabalho adicionado: ${item.titulo}.`);await mark();return res.status(200).json({ok:true});}
     if(lower.startsWith('/nota')){const p=parts(text.replace(/^\/nota\s*/i,''));const value=Number(String(p[1]||'').replace(',','.'));if(p.length<2||!Number.isFinite(value)||value<0||value>10){await reply(chatId,'Formato: /nota | Matéria | 7.5 | P1 | 20');await mark();return res.status(200).json({ok:true});}const grade={id:id('grade'),materia:p[0],nome:p[2]||'Nota Telegram',valor:value,peso:Math.min(100,Math.max(.1,Number(p[3]||20))),data:todayBR(),origem:'telegram'};await saveArray(ref,data,'grades',grade);await reply(chatId,`Nota registrada: ${value.toFixed(1)} em ${grade.materia}.`);await mark();return res.status(200).json({ok:true});}
     if(lower.startsWith('/anotar')){const p=parts(text.replace(/^\/anotar\s*/i,''));if(p.length<2){await reply(chatId,'Formato: /anotar | Matéria | sua anotação');await mark();return res.status(200).json({ok:true});}inboxItem.type='note';inboxItem.materia=p[0];inboxItem.text=p.slice(1).join(' | ');await ref.set({telegramInbox:addInbox(data,inboxItem)},{merge:true});await reply(chatId,'Anotação salva na caixa de entrada do SLCampus.');await mark();return res.status(200).json({ok:true});}
+    // Decisões acadêmicas abertas têm prioridade sobre o parser determinístico.
+    // Isso mantém "qual matéria eu deveria estudar?" alinhado ao Mentor do site,
+    // em vez de devolver apenas a meta adaptativa/plano local.
+    if(mentorLikeTelegram(text)){
+      const answer=await askTelegramMentor({uid:q.docs[0].id,email:String(data.email||''),text,data});
+      if(answer.ok){await reply(chatId,answer.text);await mark();return res.status(200).json({ok:true,provider:answer.provider,model:answer.model});}
+      if(answer.limit){await reply(chatId,'O limite diário do Mentor IA foi atingido. As consultas acadêmicas básicas continuam disponíveis pelo Telegram.');await mark();return res.status(200).json({ok:true,limited:true});}
+      console.warn('[telegram-webhook] AI fallback:',answer.error||answer.code||'indisponível');
+    }
     const natural=parseNatural(text,data);
     if(natural?.kind==='adaptiveGoal'){
       const g=adaptiveTelegram(data); const h=Math.floor(g.target/60),m=g.target%60; const targetLabel=h?`${h}h${m?` ${m}min`:''}`:`${m}min`; const doneLabel=g.actual>=60?`${Math.floor(g.actual/60)}h ${g.actual%60?`${g.actual%60}min`:''}`.trim():`${g.actual}min`;
@@ -486,15 +500,6 @@ ${formatDateBR(x.data)}`);}
     if(natural?.kind==='grade'){const dup=duplicateBy(data,'grades',x=>sameSubject(x.materia,natural.item.materia)&&normalize(x.nome)===normalize(natural.item.nome)&&Number(x.valor)===Number(natural.item.valor)&&Number(x.peso)===Number(natural.item.peso)&&x.data===natural.item.data);if(dup){await reply(chatId,'Essa nota já está registrada hoje.');await mark();return res.status(200).json({ok:true,duplicate:true});}await saveArray(ref,data,'grades',natural.item);await reply(chatId,`Nota registrada: ${natural.item.valor.toFixed(1)} em ${natural.item.materia} · ${natural.item.nome} · peso ${natural.item.peso}%.`);await mark();return res.status(200).json({ok:true});}
     if(natural?.kind==='session'){await saveArray(ref,data,'sessions',natural.item);await reply(chatId,`Sessão registrada: ${natural.item.materia} · ${natural.item.duracaoReal} min. Ela já entra no histórico de estudos.`);await mark();return res.status(200).json({ok:true});}
     if(natural?.kind==='note'){inboxItem.type='note';inboxItem.text=natural.text;await ref.set({telegramInbox:addInbox(data,inboxItem)},{merge:true});await reply(chatId,'Anotação salva na caixa de entrada do SLCampus.');await mark();return res.status(200).json({ok:true});}
-    // Perguntas abertas passam pelo mesmo AI Router do Mentor do site. Isso faz do Telegram
-    // uma segunda interface do mesmo cérebro, usando o mesmo histórico/contexto do usuário.
-    if(mentorLikeTelegram(text)){
-      const answer=await askTelegramMentor({uid:q.docs[0].id,email:String(data.email||''),text,data});
-      if(answer.ok){await reply(chatId,answer.text);await mark();return res.status(200).json({ok:true,provider:answer.provider,model:answer.model});}
-      if(answer.limit){await reply(chatId,'O limite diário do Mentor IA foi atingido. As consultas acadêmicas básicas continuam disponíveis pelo Telegram.');await mark();return res.status(200).json({ok:true,limited:true});}
-      // Se os provedores de IA estiverem indisponíveis, a mensagem ainda fica registrada.
-      console.warn('[telegram-webhook] AI fallback:',answer.error||answer.code||'indisponível');
-    }
     await ref.set({telegramInbox:addInbox(data,inboxItem)},{merge:true});await reply(chatId,'Recebi. Deixei a mensagem na Caixa de Entrada do SLCampus. Se quiser que eu registre automaticamente, escreva a ação de forma natural, por exemplo: “me lembra de fazer a lista de Física sexta”.');await mark();return res.status(200).json({ok:true});
   }catch(e){console.error('[telegram-webhook]',e);try{if(req.body?.message?.chat?.id)await reply(req.body.message.chat.id,'O SLCampus encontrou um erro ao processar isso. Tente novamente.');}catch(_){}return res.status(200).json({ok:false,error:e.message});}
 };
