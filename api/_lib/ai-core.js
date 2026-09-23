@@ -194,49 +194,91 @@ async function buildMessagesFromGemini(contents){
 function parseSigaaHistoryText(text){
   const source=normalizeExtractedPdfText(text);
   const statusRe='APR(?:N)?|CANC|DISP|MATR|REC|REP(?:F|MF|N|NF)?|TRANC|TRANS|INCORP|CUMP';
-  const blockRe=/(^|\n)(\d{4}\.\d)\s+([\s\S]*?)(?=\n\d{4}\.\d\s+|\nPágina\s+\d+\s+de\s+\d+|\nComponentes Curriculares Obrigatórios Pendentes|\nComponentes Extra Curriculares|\nLegenda\b|$)/g;
-  const periods={};
-  let match;
-  while((match=blockRe.exec(source))){
-    const periodo=match[2];
-    const block=match[3].replace(/\s+/g,' ').trim();
-    if(!block || /^(ENADE\b|SISU\b)/i.test(block)) continue;
-    const codeMatch=block.match(/\b([A-Z]{2,5}\s?\d{3,5})\b/);
-    if(!codeMatch) continue;
-    const codigo=codeMatch[1].replace(/\s+/g,'').toUpperCase();
-    // O SIGAA coloca docente antes do código. O nome da disciplina vem antes
-    // do primeiro docente; se não houver docente, usamos o trecho antes do código.
-    let before=block.slice(0,codeMatch.index).trim();
-    const teacherAt=before.search(/\s+(?:Dr|Dra|Prof|Profa|MSc|Esp|Me|Ma)\.?\s+/i);
-    if(teacherAt>0) before=before.slice(0,teacherAt).trim();
-    before=before.replace(/\s+e\s*$/i,'').trim();
-    if(!before) continue;
-    // Remove cabeçalhos que eventualmente ficaram no mesmo bloco.
-    before=before.replace(/^(?:Histórico Escolar.*?|Componentes Curriculares Cursados\/Cursando\s*)/i,'').trim();
-    const statusMatch=block.match(new RegExp('\\b('+statusRe+')\\b\\s*$','i'));
-    const situacao=statusMatch?statusMatch[1].toUpperCase():'';
-    if(!situacao) continue;
-    const tail=statusMatch?block.slice(codeMatch.index+codeMatch[0].length,statusMatch.index):'';
-    const nums=[...tail.matchAll(/(?:^|\s)(\d+(?:[.,]\d+)?|--)(?=\s|$)/g)].map(m=>m[1]);
-    const cleanNum=v=>v==='--'?null:Number(String(v).replace(',','.'));
-    // Depois do código, o SIGAA costuma trazer CH, hora-aula, turma, frequência,
-    // média e nota mínima. A média final é o penúltimo valor numérico antes da situação.
-    const numeric=nums.map(cleanNum).filter(v=>v!==null || nums.length);
-    let frequencia=null, notaFinal=null;
-    if(nums.length>=2){
-      const vals=nums.map(cleanNum);
-      // frequência é o valor que costuma aparecer antes da média; notas vêm no fim.
-      for(let i=vals.length-1;i>=0;i--){ if(vals[i]!==null){ notaFinal=vals[i]; break; } }
-      if(vals.length>=4 && vals[3]!==null && vals[3]>=0 && vals[3]<=100) frequencia=vals[3];
-      // Em registros MATR/sem nota, o bloco termina em -- --, portanto nota deve ser null.
-      if(/^(MATR|REC|TRANC|CANC)$/i.test(situacao)) notaFinal=null;
+  const statusMap=new Set(['APR','APRN','CANC','DISP','MATR','REC','REP','REPF','REPMF','REPN','REPNF','TRANC','TRANS','INCORP','CUMP']);
+  const rows=[];
+  const cleanName=(value)=>String(value||'')
+    .replace(/\s+/g,' ').replace(/^[-–—:]+|[-–—:]+$/g,'').trim()
+    .replace(/\s+(?:Dr|Dra|Prof|Profa|MSc|Esp|Me|Ma)\.?(?:\s+[^\d]+)?$/i,'').trim();
+  const toNum=(v)=>v==='--'?null:Number(String(v||'').replace(',','.'));
+  const pushRow=(period,codigo,nome,nums,status)=>{
+    period=String(period||'').trim(); codigo=String(codigo||'').replace(/\s+/g,'').toUpperCase();
+    status=String(status||'').toUpperCase(); nome=cleanName(nome);
+    if(!/^\d{4}\.\d$/.test(period)||!codigo||!statusMap.has(status)||!nome) return;
+    if(/^ENADE$/i.test(nome)||/^(Histórico|Nome|Ano\/Período|Componentes|Página|Legenda)\b/i.test(nome)) return;
+    const vals=(nums||[]).map(toNum);
+    let notaFinal=null, frequencia=null;
+    for(let i=vals.length-1;i>=0;i--){ if(vals[i]!==null){notaFinal=vals[i];break;} }
+    if(/^(MATR|REC|TRANC|CANC)$/i.test(status)) notaFinal=null;
+    if(vals.length>=4 && vals[3]!==null && vals[3]>=0 && vals[3]<=100) frequencia=vals[3];
+    rows.push({periodo:period,codigo,nome,cargaHoraria:vals.length?Number(vals[0])||0:0,creditos:0,notaFinal,status,frequencia});
+  };
+
+  // SIGAA's extracted PDF text can place a complete row on one line.
+  // Accept the row whenever period, component code, numeric columns and status are present,
+  // even if the teacher/name spacing differs between PDF versions.
+  const lineRows=source.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  const headerRe=/^(\d{4}\.\d)\s+(.+)$/;
+  const fullRowRe=new RegExp('^(\\d{4}\\.\\d)\\s+(.*?)\\s+([A-Z]{2,5}\\s?\\d{3,5})\\s+(.*?)(?:\\s+)(\\d{2,3})\\s+(\\d+)\\s+(\\d+)\\s+([\\d,.-]+|--)\\s+([\\d,.-]+|--)\\s+([\\d,.-]+|--)\\s+('+statusRe+')\\s*$','i');
+  const tailRe=new RegExp('(?:^|\\s)([A-Z]{2,5}\\s?\\d{3,5})\\s+(\\d{2,3})\\s+(\\d+)\\s+(\\d+)\\s+([\\d,.-]+|--)\\s+([\\d,.-]+|--)\\s+([\\d,.-]+|--)\\s+('+statusRe+')\\s*$','i');
+  let pendingPeriod='', pendingName='';
+  for(const line of lineRows){
+    if(/^(Componentes Curriculares Obrigatórios Pendentes|Componentes Extra Curriculares|Legenda\b)/i.test(line)) { pendingPeriod=''; pendingName=''; break; }
+    const full=line.match(fullRowRe);
+    if(full){
+      const nums=[full[5],full[6],full[7],full[8],full[9],full[10]];
+      pushRow(full[1],full[3],full[2],nums,full[11]);
+      pendingPeriod=''; pendingName=''; continue;
     }
-    const row={codigo,nome:before.replace(/\s+/g,' ').trim(),cargaHoraria:nums.length?cleanNum(nums[0])||0:0,notaFinal,situacao,frequencia};
-    if(!periods[periodo]) periods[periodo]=[];
-    if(!periods[periodo].some(x=>x.codigo===row.codigo)) periods[periodo].push(row);
+    const h=line.match(headerRe);
+    if(h && !/^(Histórico|Nome:|Ano\/Período|Componentes|Página)/i.test(line)){
+      pendingPeriod=h[1]; pendingName=h[2].trim();
+      // A header can itself contain a course code and the trailing result columns.
+      const tail=line.match(tailRe);
+      if(tail){
+        const namePart=line.slice(line.indexOf(h[1])+h[1].length, line.indexOf(tail[1])).trim();
+        pushRow(h[1],tail[1],namePart,[tail[2],tail[3],tail[4],tail[5],tail[6],tail[7]],tail[8]);
+        pendingPeriod=''; pendingName='';
+      }
+      continue;
+    }
+    if(pendingPeriod){
+      const tail=line.match(tailRe);
+      if(tail){
+        const codeIndex=line.search(new RegExp(tail[1].replace(/([.*+?^${}()|[\]\\])/g,'\\$1'),'i'));
+        const namePart=codeIndex>0 ? line.slice(0,codeIndex).trim() : pendingName;
+        pushRow(pendingPeriod,tail[1],namePart || pendingName,[tail[2],tail[3],tail[4],tail[5],tail[6],tail[7]],tail[8]);
+        pendingPeriod=''; pendingName=''; continue;
+      }
+      // If the line is just part of the discipline name, retain it for the next result line.
+      if(!/^(Dr|Dra|Prof|Profa|MSc|Esp|Me|Ma)\.?\s/i.test(line) && !/^\d{2,3}\s+\d+\s+\d+/.test(line)) pendingName=`${pendingName} ${line}`.trim();
+    }
+  }
+
+  // Fallback for PDFs where pdf-parse collapses line breaks into large blocks.
+  if(!rows.length){
+    const blockRe=/(^|\n)(\d{4}\.\d)\s+([\s\S]*?)(?=\n\d{4}\.\d\s+|\nPágina\s+\d+\s+de\s+\d+|\nComponentes Curriculares Obrigatórios Pendentes|\nComponentes Extra Curriculares|\nLegenda\b|$)/g;
+    let match;
+    while((match=blockRe.exec(source))){
+      const periodo=match[2]; const block=match[3].replace(/\s+/g,' ').trim();
+      if(!block || /^(ENADE\b|SISU\b)/i.test(block)) continue;
+      const codeMatch=block.match(/\b([A-Z]{2,5}\s?\d{3,5})\b/); if(!codeMatch) continue;
+      const statusMatch=block.match(new RegExp('\\b('+statusRe+')\\b\\s*$','i')); if(!statusMatch) continue;
+      const before=block.slice(0,codeMatch.index).trim();
+      const teacherAt=before.search(/\s+(?:Dr|Dra|Prof|Profa|MSc|Esp|Me|Ma)\.?\s+/i);
+      const nome=cleanName(teacherAt>0?before.slice(0,teacherAt):before);
+      const tail=block.slice(codeMatch.index+codeMatch[0].length,statusMatch.index);
+      const nums=[...tail.matchAll(/(?:^|\s)(\d+(?:[.,]\d+)?|--)(?=\s|$)/g)].map(m=>m[1]);
+      pushRow(periodo,codeMatch[1],nome,nums,statusMatch[1]);
+    }
+  }
+
+  const periods={};
+  for(const row of rows){
+    if(!periods[row.periodo]) periods[row.periodo]=[];
+    if(!periods[row.periodo].some(x=>x.codigo===row.codigo)) periods[row.periodo].push(row);
   }
   const periodos=Object.keys(periods).sort().map(periodo=>({periodo,disciplinas:periods[periodo]})).filter(p=>p.disciplinas.length);
-  const atual=[...periodos].reverse().find(p=>p.disciplinas.some(d=>d.situacao==='MATR'||d.situacao==='REC'))?.periodo||'';
+  const atual=[...periodos].reverse().find(p=>p.disciplinas.some(d=>String(d.status||d.situacao||'').toUpperCase()==='MATR'||String(d.status||d.situacao||'').toUpperCase()==='REC'))?.periodo||'';
   return {periodos,periodoAtualDetectado:atual,equivalencias:[]};
 }
 

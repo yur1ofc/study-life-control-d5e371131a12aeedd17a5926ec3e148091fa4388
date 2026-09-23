@@ -223,7 +223,7 @@
         // Formato do PDF copiado com layout preservado: período + código + nome + colunas na mesma linha.
         const sameLine = /^(\d{4}\.\d)\s+(?:e\s+)?([A-Z]{2,}\d{4})\s+(.+?)\s+(\d{2,3})\s+(\d+)\s+(\d+)\s+([\d,.-]+|--)\s+([\d,.-]+|--)\s+([\d,.-]+|--)\s+([A-Z]+)$/i;
         const headerRe = /^(\d{4}\.\d)\s+(.+)$/;
-        const resultRe = /([A-Z]{2,}\d{4})\s+(\d+)\s+(\d+)\s+(\d+)\s+([\d,.-]+|--)\s+([\d,.-]+|--)\s+([\d,.-]+|--)\s+([A-Z]+)\s*$/i;
+        const resultRe = /(?:^|\s)([A-Z]{2,}\d{4})\s+(\d+)\s+(\d+)\s+(\d+)\s+([\d,.-]+|--)\s+([\d,.-]+|--)\s+([\d,.-]+|--)\s+([A-Z]+)\s*$/i;
         let pending = null;
         for (const line of lines) {
             const m = line.match(sameLine);
