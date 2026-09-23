@@ -44,7 +44,16 @@ service cloud.firestore {
           && (!('curriculum' in d) || d.curriculum.size() <= 500)
           && (!('extraCourses' in d) || d.extraCourses.size() <= 200)
           && (!('pushSubscriptions' in d) || d.pushSubscriptions.size() <= 10)
-          && (!('sentReminders' in d) || d.sentReminders.size() <= 500);
+          && (!('sentReminders' in d) || d.sentReminders.size() <= 500)
+          && (!('sentTelegramReminders' in d) || d.sentTelegramReminders.size() <= 500)
+          && (!('telegramProcessedUpdates' in d) || d.telegramProcessedUpdates.size() <= 300)
+          && (!('telegramInbox' in d) || d.telegramInbox.size() <= 200)
+          && (!('learningEvidence' in d) || d.learningEvidence.size() <= 5000)
+          && (!('questionAttempts' in d) || d.questionAttempts.size() <= 5000)
+          && (!('reviews' in d) || d.reviews.size() <= 2000)
+          && (!('learningMap' in d) || d.learningMap.size() <= 2000)
+          && (!('classSchedule' in d) || d.classSchedule.size() <= 500)
+          && (!('archivedSemesters' in d) || d.archivedSemesters.size() <= 20);
     }
 
     // ─── Dados do usuário ────────────────────────────────────────────────────

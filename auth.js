@@ -139,7 +139,13 @@ async function loginWithGoogle() {
 
 async function logout() {
   try {
+    const uid = auth.currentUser?.uid;
     await auth.signOut();
+    // O backup local é por UID e não é necessário após o logout.
+    // Isso evita deixar dados acadêmicos no navegador de um dispositivo compartilhado.
+    if (uid) {
+      try { localStorage.removeItem(`slc-backup:${uid}`); } catch (_) {}
+    }
     window.showToast?.('Desconectado com sucesso', 'success');
   } catch (error) {
     console.error('Erro no logout:', error);

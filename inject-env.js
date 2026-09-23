@@ -20,7 +20,7 @@ try {
     'FIREBASE_APP_ID'
   ];
 
-  const optionalKeys = ['FIREBASE_MEASUREMENT_ID'];
+  const optionalKeys = ['FIREBASE_MEASUREMENT_ID', 'FIREBASE_APPCHECK_RECAPTCHA_SITE_KEY'];
 
   const missing = keys.filter(k => !process.env[k]);
 

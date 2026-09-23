@@ -50,6 +50,21 @@ if (missingFirebaseKeys.length) {
 } else {
   firebase.initializeApp(firebaseConfig);
 
+// App Check opcional e seguro: fica desativado até FIREBASE_APPCHECK_RECAPTCHA_SITE_KEY
+// existir no Vercel. A enforcement deve ser ligada no Firebase Console somente
+// depois de observar métricas de produção.
+try {
+  const appCheckKey = window.__ENV?.FIREBASE_APPCHECK_RECAPTCHA_SITE_KEY;
+  if (appCheckKey && firebase.appCheck) {
+    const appCheck = firebase.appCheck();
+    appCheck.activate(new firebase.appCheck.ReCaptchaEnterpriseProvider(appCheckKey), true);
+    window.firebaseAppCheck = appCheck;
+    console.info('[SLC] Firebase App Check ativado.');
+  }
+} catch (e) {
+  console.warn('[SLC] App Check não foi ativado:', e?.message || e);
+}
+
   const auth = firebase.auth();
   const db   = firebase.firestore();
 
