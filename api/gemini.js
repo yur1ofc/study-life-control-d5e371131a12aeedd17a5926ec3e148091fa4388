@@ -45,7 +45,29 @@ module.exports=async function handler(req,res){
       results=[parsed];
     }
 
-    const merged=AI.mergeJsonObjects(results);
-    return res.status(200).json({candidates:[{content:{role:'model',parts:[{text:JSON.stringify(merged)}]}}],meta:{provider:'groq',model,requestId:rid,pdfCount:built.pdfCount,chunks:results.length}});
+    let merged=AI.mergeJsonObjects(results);
+
+    // Alguns PDFs acadêmicos são extraídos pelo pdf-parse em uma ordem de leitura
+    // ruim (especialmente fluxogramas e tabelas). Se a primeira passada não achar
+    // nenhuma disciplina, fazemos uma segunda passada mais focada no texto bruto.
+    if(!built.hasImage && (!Array.isArray(merged.disciplinas) || merged.disciplinas.length===0) && built.pdfChunks?.length){
+      const rawPdfText=String(built.pdfChunks.join('\n\n')).slice(0,28000);
+      const rescuePrompt=`Você está fazendo uma segunda tentativa de extração de uma grade curricular acadêmica. O PDF pode ter sido extraído de um fluxograma/tabela e a ordem do texto pode estar quebrada.
+
+Retorne SOMENTE JSON no formato:
+{"faculdade":"","curso":"","disciplinas":[{"nome":"","codigo":"","semestre":0,"cargaHoraria":0,"creditos":0,"prerequisitos":[],"tipo":"obrigatoria"}]}
+
+Extraia todas as disciplinas que conseguir identificar no texto. Não invente nomes. Considere como disciplina linhas/itens que tenham nomes acadêmicos, códigos de componentes, carga horária, créditos ou indicação de semestre. Preserve nomes em português. Se uma informação não estiver disponível, use 0 ou string vazia.
+
+TEXTO EXTRAÍDO DO PDF:
+${rawPdfText}`;
+      const rescue=await AI.callGroq({messages:[{role:'user',content:rescuePrompt}],systemInstruction:'Faça extração estruturada de dados acadêmicos. Retorne apenas JSON válido.',operation:'import',uid:user.uid,email:user.email,requestId:`${rid}_rescue`,maxTokens:5000,reasoningEffort:'medium',model:AI.TEXT_MODEL,json:true});
+      if(rescue.ok){
+        const rescued=AI.parseJsonResponse(rescue.text);
+        if(rescued?.disciplinas?.length) merged=AI.mergeJsonObjects([merged,rescued]);
+      }
+    }
+
+    return res.status(200).json({candidates:[{content:{role:'model',parts:[{text:JSON.stringify(merged)}]}}],meta:{provider:'groq',model,requestId:rid,pdfCount:built.pdfCount,chunks:results.length,extractedTextChars:String(built.pdfChunks?.join('')||'').length}});
   }catch(err){console.error('[api/gemini] internal:',err);return res.status(500).json({error:err.message||'Erro interno na IA.',code:'AI_INTERNAL_ERROR',requestId:rid});}
 };

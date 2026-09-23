@@ -110,8 +110,18 @@ function dataUrlFromPart(part){
   return {mime:detected,dataUrl:`data:${detected};base64,${raw}`};
 }
 
+function normalizeExtractedPdfText(text){
+  return String(text||'')
+    .replace(/\r/g,'')
+    .replace(/[\u00ad]/g,'')
+    .replace(/-\n(?=\S)/g,'')
+    .replace(/[ \t]+\n/g,'\n')
+    .replace(/\n{3,}/g,'\n\n')
+    .trim();
+}
+
 function splitIntoChunks(text, size=CHUNK_CHARS){
-  const source=String(text||'').replace(/\r/g,'').trim();
+  const source=normalizeExtractedPdfText(text);
   if(!source) return [];
   const chunks=[];
   let start=0;
@@ -151,7 +161,7 @@ async function extractPdfText(contents){
     }
     if(total>=PDF_MAX_TEXT_CHARS) break;
   }
-  const text=out.join('\n\n--- NOVO PDF ---\n\n');
+  const text=normalizeExtractedPdfText(out.join('\n\n--- NOVO PDF ---\n\n'));
   return {pdfCount,text,pdfChunks:splitIntoChunks(text)};
 }
 
@@ -210,4 +220,4 @@ function mergeJsonObjects(objects){
   return out;
 }
 
-module.exports={TEXT_MODEL,SMALL_TEXT_MODEL,VISION_MODEL,requestId,geminiContentsToGroq,buildMessagesFromGemini,callGroq,splitIntoChunks,parseJsonResponse,mergeJsonObjects,CHUNK_CHARS,sniffMimeFromBase64};
+module.exports={TEXT_MODEL,SMALL_TEXT_MODEL,VISION_MODEL,requestId,geminiContentsToGroq,buildMessagesFromGemini,callGroq,splitIntoChunks,parseJsonResponse,mergeJsonObjects,CHUNK_CHARS,sniffMimeFromBase64,normalizeExtractedPdfText};
