@@ -117,6 +117,7 @@
               <button class="btn-primary" id="quick-tarefa"><i class="fas fa-tasks"></i> Tarefa</button>
               <button class="btn-primary" id="quick-prova"><i class="fas fa-graduation-cap"></i> Prova</button>
               <button class="btn-primary" id="quick-aula"><i class="fas fa-calendar-week"></i> Aula</button>
+              <button class="btn-primary" id="quick-diario"><i class="fas fa-book-open"></i> Diário</button>
               <button class="btn-secondary" id="quick-foco"><i class="fas fa-bullseye"></i> Foco</button>
             </div>
           </section>
@@ -371,6 +372,7 @@
         originalSetupViewEvents.call(this,view,...rest);
         if(view==='dashboard'){
           $('#quick-aula')?.addEventListener('click',()=>this.openModal('aula'));
+          $('#quick-diario')?.addEventListener('click',()=>this.loadView('diario'));
         }
         setTimeout(()=>{ renderNotifications(); },50);
       };

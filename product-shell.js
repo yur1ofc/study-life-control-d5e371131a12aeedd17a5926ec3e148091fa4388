@@ -132,7 +132,7 @@
     };
     proto.__slcProductShellLoadView = true;
   }
-  function titleFor(v){return ({dashboard:'Início',perfil:'Perfil','estudar':'Estudar','mentor-ia':'Mentor IA',telegram:'Telegram',tarefas:'Tarefas',provas:'Provas e trabalhos',biblioteca:'Biblioteca',configuracoes:'Configurações',materias:'Matérias',calendario:'Calendário',foco:'Modo Foco',sessoes:'Sessões de estudo',estatisticas:'Estatísticas','grade-horaria':'Grade horária','grade-curricular':'Grade curricular','mapa-aprendizado':'Mapa de aprendizado'}[v]||'SLCampus');}
+  function titleFor(v){return ({dashboard:'Início',perfil:'Perfil','estudar':'Estudar','mentor-ia':'Mentor IA',telegram:'Telegram',tarefas:'Tarefas',provas:'Provas e trabalhos',biblioteca:'Biblioteca',configuracoes:'Configurações',materias:'Matérias',calendario:'Calendário',foco:'Modo Foco',sessoes:'Sessões de estudo',estatisticas:'Estatísticas','grade-horaria':'Grade horária','grade-curricular':'Grade curricular','mapa-aprendizado':'Mapa de aprendizado','diario':'Diário'}[v]||'SLCampus');}
   function updateTitle(t){const e=document.getElementById('page-title');if(e)e.textContent=t;}
   function updateActive(v){document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.view===v));}
   function bindStudyActions(){document.querySelectorAll('[data-slcnavigate]').forEach(b=>{if(b.dataset.bound)return;b.dataset.bound='1';b.addEventListener('click',e=>{e.preventDefault();navigate(b.dataset.slcnavigate,{materia:b.dataset.slcmateria||''});});});}
@@ -149,7 +149,7 @@
     nav.append(make('dashboard','fa-house','Início'),make('estudar','fa-compass','Estudar','<span class="nav-pill">CENTRAL</span>'),make('mentor-ia','fa-robot','Mentor IA','<span class="badge">IA</span>'));
     nav.append(section('Organizar'),make('tarefas','fa-check-square','Tarefas'),make('provas','fa-graduation-cap','Provas e trabalhos'),make('calendario','fa-calendar-alt','Calendário'),make('grade-horaria','fa-calendar-week','Grade horária'));
     nav.append(section('Aprender'),make('materias','fa-book','Matérias'),make('foco','fa-bullseye','Modo Foco'),make('sessoes','fa-clock','Sessões de estudo'),make('biblioteca','fa-layer-group','Biblioteca','<span class="nav-pill">NOVO</span>'),make('mapa-aprendizado','fa-map','Mapa de aprendizado'));
-    nav.append(section('Acompanhar'),make('estatisticas','fa-chart-line','Estatísticas'),make('grade-curricular','fa-sitemap','Grade curricular'),make('previsao-notas','fa-chart-bar','Notas e previsão'));
+    nav.append(section('Acompanhar'),make('diario','fa-book-open','Diário'),make('estatisticas','fa-chart-line','Estatísticas'),make('grade-curricular','fa-sitemap','Grade curricular'),make('previsao-notas','fa-chart-bar','Notas e previsão'));
     nav.append(section('Conta'),make('telegram','fa-telegram-plane','Telegram','<span class="nav-pill">BOT</span>'),make('configuracoes','fa-cog','Configurações'),make('ajuda','fa-question-circle','Ajuda'));
   }
 
@@ -161,7 +161,7 @@
       ['materias','fa-book','Matérias'],['sessoes','fa-clock','Sessões de estudo'],['biblioteca','fa-layer-group','Biblioteca'],['mapa-aprendizado','fa-map','Mapa de aprendizado'],['foco','fa-bullseye','Modo Foco']
     ]},
     { label:'Acompanhar', items:[
-      ['estatisticas','fa-chart-line','Estatísticas'],['grade-curricular','fa-sitemap','Grade curricular'],['previsao-notas','fa-chart-line','Notas e previsão'],['situacao-academica','fa-heartbeat','Situação acadêmica']
+      ['diario','fa-book-open','Diário'],['estatisticas','fa-chart-line','Estatísticas'],['grade-curricular','fa-sitemap','Grade curricular'],['previsao-notas','fa-chart-line','Notas e previsão'],['situacao-academica','fa-heartbeat','Situação acadêmica']
     ]},
     { label:'Conta', items:[
       ['telegram','fa-telegram-plane','Telegram'],['perfil','fa-user','Perfil'],['configuracoes','fa-cog','Configurações'],['ajuda','fa-question-circle','Ajuda']

@@ -170,10 +170,10 @@ class DiaryView {
 
         return `
             <div class="view-header">
-                <h2><i class="fas fa-book-open"></i> Diário</h2>
+                <div><h2><i class="fas fa-book-open"></i> Diário</h2><p>Registre cada aula, presença, conteúdo, dificuldade e dúvidas. Depois, consulte tudo por dia ou por matéria.</p></div>
                 <div class="diario-quick-actions">
                     ${this.temRegistroHoje(app) ? '' : `<button class="btn-secondary" id="diario-dia-livre-btn" title="Salva o dia em 1 clique, sem abrir o formulário completo"><i class="fas fa-mug-hot"></i> Dia sem nada pra registrar</button>`}
-                    <button class="btn-primary" id="diario-novo-btn"><i class="fas fa-plus"></i> Novo registro</button>
+                    <button class="btn-primary" id="diario-novo-btn"><i class="fas fa-plus"></i> Registrar hoje</button>
                 </div>
             </div>
 
@@ -353,7 +353,7 @@ class DiaryView {
                 <div class="diary-empty-state">
                     <i class="fas fa-book" style="font-size:32px; opacity:.4; margin-bottom:10px;"></i>
                     <p>Nenhum registro por aqui ainda.</p>
-                    <button class="btn-primary" id="diario-empty-novo-btn"><i class="fas fa-plus"></i> Criar primeiro registro</button>
+                    <button class="btn-primary" id="diario-empty-novo-btn"><i class="fas fa-plus"></i> Registrar primeiro dia</button>
                 </div>
             `;
         }
