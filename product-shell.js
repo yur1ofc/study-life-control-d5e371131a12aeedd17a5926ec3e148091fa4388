@@ -87,7 +87,10 @@
       const u=this.app?.data?.user||{}; const a=window.auth?.currentUser;
       const initials=(u.nome||a?.displayName||'U').split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase();
       const perfil=u.perfil==='faculdade'?'Faculdade':u.perfil==='concurso'?'Concurso':u.perfil==='ensino_medio'?'Escola':'Estudos';
-      return `<section class="slc-profile-page"><div class="slc-profile-hero"><div class="slc-avatar-xl">${esc(initials)}</div><div><span class="slc-eyebrow">MINHA CONTA</span><h2>${esc(u.nome||a?.displayName||'Usuário')}</h2><p>${esc(a?.email||'')} · ${esc(perfil)}</p></div><button class="btn-secondary" data-slcnavigate="configuracoes"><i class="fas fa-cog"></i> Configurações</button></div><div class="slc-profile-grid"><div class="card"><div class="card-header"><h3><i class="fas fa-user"></i> Perfil de estudos</h3></div><div class="card-body"><div class="slc-profile-row"><span>Perfil</span><strong>${esc(perfil)}</strong></div><div class="slc-profile-row"><span>Objetivo</span><strong>${esc(u.objetivo||u.curso||u.concurso||'Não definido')}</strong></div><div class="slc-profile-row"><span>Matérias</span><strong>${this.app?.data?.subjects?.length||0}</strong></div></div></div><div class="card"><div class="card-header"><h3><i class="fas fa-sliders-h"></i> Ações rápidas</h3></div><div class="card-body slc-profile-actions"><button data-slcnavigate="configuracoes"><i class="fas fa-user-edit"></i> Editar perfil</button><button data-slcnavigate="biblioteca"><i class="fas fa-layer-group"></i> Minha biblioteca</button><button data-slcnavigate="estatisticas"><i class="fas fa-chart-line"></i> Ver desempenho</button></div></div></div></section>`;
+      const xp=Number(u.gamification?.xp||0); const level=Number(u.gamification?.level||1); const streak=Number(u.streak||0); const goal=Number(u.dailyStudyGoalHours||3);
+      const sessions=(this.app?.data?.sessions||[]).filter(s=>s?.concluida||s?.status==='concluida');
+      const totalMin=sessions.reduce((n,s)=>n+(Number(s.duracaoReal||s.duracao)||0),0);
+      return `<section class="slc-profile-page"><div class="slc-profile-hero"><div class="slc-avatar-xl">${esc(initials)}</div><div><span class="slc-eyebrow">MINHA CONTA</span><h2>${esc(u.nome||a?.displayName||'Usuário')}</h2><p>${esc(a?.email||'')} · ${esc(perfil)}</p></div><button class="btn-secondary" data-slcnavigate="configuracoes"><i class="fas fa-cog"></i> Configurações</button></div><div class="slc-profile-stats"><div><strong>${level}</strong><span>Nível</span></div><div><strong>${xp}</strong><span>XP</span></div><div><strong>${streak}</strong><span>Dias seguidos</span></div><div><strong>${(totalMin/60).toFixed(1)}h</strong><span>Estudadas</span></div></div><div class="slc-profile-grid"><div class="card"><div class="card-header"><h3><i class="fas fa-user-graduate"></i> Perfil acadêmico</h3></div><div class="card-body"><div class="slc-profile-row"><span>Perfil</span><strong>${esc(perfil)}</strong></div><div class="slc-profile-row"><span>Objetivo</span><strong>${esc(u.objetivo||u.curso||u.concurso||'Não definido')}</strong></div><div class="slc-profile-row"><span>Universidade</span><strong>${esc(u.universidade||'Não definida')}</strong></div><div class="slc-profile-row"><span>Semestre atual</span><strong>${esc(u.semestre||'Não definido')}</strong></div><div class="slc-profile-row"><span>Matérias ativas</span><strong>${this.app?.data?.subjects?.length||0}</strong></div><div class="slc-profile-row"><span>Meta diária</span><strong>${goal.toFixed(1)}h</strong></div></div></div><div class="card"><div class="card-header"><h3><i class="fas fa-bolt"></i> Ações rápidas</h3></div><div class="card-body slc-profile-actions"><button data-slcnavigate="configuracoes"><i class="fas fa-user-edit"></i> Editar perfil</button><button data-slcnavigate="estatisticas"><i class="fas fa-chart-line"></i> Meu desempenho</button><button data-slcnavigate="mapa-aprendizado"><i class="fas fa-map"></i> Meu mapa de aprendizado</button><button data-slcnavigate="sessoes"><i class="fas fa-clock"></i> Histórico de estudos</button><button data-slcnavigate="biblioteca"><i class="fas fa-layer-group"></i> Minha biblioteca</button></div></div></div></section>`;
     };
   }
 
@@ -140,17 +143,58 @@
     nav.append(section('Conta'),make('configuracoes','fa-cog','Configurações'),make('ajuda','fa-question-circle','Ajuda'));
   }
 
+  const MOBILE_MORE_GROUPS = [
+    { label:'Organizar', items:[
+      ['tarefas','fa-check-square','Tarefas'],['provas','fa-graduation-cap','Provas e trabalhos'],['calendario','fa-calendar-alt','Calendário'],['grade-horaria','fa-calendar-week','Grade Horária']
+    ]},
+    { label:'Aprender', items:[
+      ['materias','fa-book','Matérias'],['sessoes','fa-clock','Sessões de estudo'],['biblioteca','fa-layer-group','Biblioteca'],['mapa-aprendizado','fa-map','Mapa de aprendizado'],['foco','fa-bullseye','Modo Foco']
+    ]},
+    { label:'Acompanhar', items:[
+      ['estatisticas','fa-chart-line','Estatísticas'],['grade-curricular','fa-sitemap','Grade curricular'],['previsao-notas','fa-chart-line','Notas e previsão'],['situacao-academica','fa-heartbeat','Situação acadêmica']
+    ]},
+    { label:'Conta', items:[
+      ['perfil','fa-user','Perfil'],['configuracoes','fa-cog','Configurações'],['ajuda','fa-question-circle','Ajuda']
+    ]}
+  ];
+
+  function closeMobileMore(){
+    document.getElementById('slc-mobile-more')?.classList.remove('open');
+    document.body.classList.remove('slc-mobile-more-open');
+  }
+
+  function openMobileMore(){
+    const panel=document.getElementById('slc-mobile-more');
+    if(!panel) return;
+    panel.classList.add('open');
+    document.body.classList.add('slc-mobile-more-open');
+  }
+
+  function ensureMobileMore(){
+    let panel=document.getElementById('slc-mobile-more');
+    if(panel) return panel;
+    panel=document.createElement('aside');
+    panel.id='slc-mobile-more';
+    panel.setAttribute('aria-label','Todas as funções do SLCampus');
+    panel.innerHTML=`<div class="slc-mobile-more-backdrop" data-mobile-more-close></div><div class="slc-mobile-more-sheet"><div class="slc-mobile-more-head"><div><span>SL CAMPUS</span><h3>Mais funções</h3></div><button type="button" class="btn-icon" data-mobile-more-close aria-label="Fechar"><i class="fas fa-times"></i></button></div><div class="slc-mobile-more-content">${MOBILE_MORE_GROUPS.map(g=>`<section><h4>${g.label}</h4><div class="slc-mobile-more-grid">${g.items.map(([v,i,l])=>`<button type="button" data-mobile-more-view="${v}"><i class="fas ${i}"></i><span>${l}</span></button>`).join('')}</div></section>`).join('')}</div></div>`;
+    document.body.appendChild(panel);
+    panel.querySelectorAll('[data-mobile-more-close]').forEach(el=>el.addEventListener('click',closeMobileMore));
+    panel.querySelectorAll('[data-mobile-more-view]').forEach(el=>el.addEventListener('click',()=>{const view=el.dataset.mobileMoreView;closeMobileMore();navigate(view);}));
+    return panel;
+  }
+
   function mobileNav(){
     const shouldShow = () => window.innerWidth <= 768 && !!document.getElementById('view-container') && !document.getElementById('login-screen')?.offsetParent && !document.getElementById('setup-screen')?.offsetParent;
     let b=document.getElementById('slc-product-bottom-nav');
-    if(!shouldShow()){ b?.remove(); return; }
+    if(!shouldShow()){ b?.remove(); document.getElementById('slc-mobile-more')?.classList.remove('open'); return; }
+    ensureMobileMore();
     if(!b){
       b=document.createElement('nav');
       b.id='slc-product-bottom-nav';
       b.setAttribute('aria-label','Navegação principal');
-      b.innerHTML=`<button type="button" data-v="dashboard" aria-label="Início"><i class="fas fa-house"></i><span>Início</span></button><button type="button" data-v="estudar" aria-label="Estudar"><i class="fas fa-compass"></i><span>Estudar</span></button><button type="button" class="primary" data-v="foco" aria-label="Modo Foco"><i class="fas fa-play"></i><span>Foco</span></button><button type="button" data-v="mentor-ia" aria-label="Mentor IA"><i class="fas fa-robot"></i><span>Mentor</span></button><button type="button" data-v="perfil" aria-label="Perfil"><i class="fas fa-user"></i><span>Perfil</span></button>`;
+      b.innerHTML=`<button type="button" data-v="dashboard" aria-label="Início"><i class="fas fa-house"></i><span>Início</span></button><button type="button" data-v="estudar" aria-label="Estudar"><i class="fas fa-compass"></i><span>Estudar</span></button><button type="button" class="primary" data-v="foco" aria-label="Modo Foco"><i class="fas fa-play"></i><span>Foco</span></button><button type="button" data-v="mentor-ia" aria-label="Mentor IA"><i class="fas fa-robot"></i><span>Mentor</span></button><button type="button" data-v="__more" aria-label="Mais funções"><i class="fas fa-th-large"></i><span>Mais</span></button>`;
       document.body.appendChild(b);
-      b.querySelectorAll('button[data-v]').forEach(x=>x.addEventListener('click',()=>navigate(x.dataset.v)));
+      b.querySelectorAll('button[data-v]').forEach(x=>x.addEventListener('click',()=>x.dataset.v==='__more'?openMobileMore():navigate(x.dataset.v)));
     }
     b.style.display='grid';
     b.querySelectorAll('button[data-v]').forEach(x=>x.classList.toggle('active', x.dataset.v===window.app?.currentView));

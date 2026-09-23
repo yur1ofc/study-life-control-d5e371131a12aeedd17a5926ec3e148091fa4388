@@ -131,6 +131,31 @@
     return window.dbService.saveData('settings', settings);
   }
 
+  async function testNotification() {
+    if (!isSupported()) throw new Error('Esse navegador não suporta notificações push.');
+    const subscription = await getExistingSubscription();
+    if (!subscription) throw new Error('Este dispositivo ainda não está inscrito. Ative os alarmes primeiro.');
+    const user = window.auth?.currentUser || window.firebase?.auth?.()?.currentUser;
+    if (!user) throw new Error('Faça login novamente para testar a notificação.');
+    const token = await user.getIdToken(true);
+    const response = await fetch('/api/push-test', {
+      method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint: subscription.endpoint })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'O servidor não conseguiu enviar o teste.');
+    return data;
+  }
+
+  function startWatchdog() {
+    if (window.__slcPushWatchdogStarted) return;
+    window.__slcPushWatchdogStarted = true;
+    const run = () => syncSubscription().catch(() => null);
+    run();
+    setInterval(run, 6 * 60 * 60 * 1000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) run(); });
+  }
+
   async function isEnabledOnThisDevice() {
     if (!isSupported()) return false;
     try {
@@ -212,6 +237,11 @@
     disable,
     saveReminderPrefs,
     isEnabledOnThisDevice,
-    syncSubscription
+    testNotification,
+    syncSubscription,
+    startWatchdog
   };
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startWatchdog, { once: true });
+  else startWatchdog();
 })();

@@ -6226,3 +6226,24 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif}
 .v18-plan-rank{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;background:rgba(59,130,246,.15);color:#8bbcff;font-weight:800}.v18-plan-copy{min-width:0;display:grid;gap:3px}.v18-plan-copy strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.v18-plan-copy small,.v18-plan-copy span{color:var(--text-secondary);font-size:.8rem}.v18-plan-copy span{color:#cbd5e1}.v18-brain-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.v18-brain-foot{margin-top:12px;color:var(--text-secondary);font-size:.82rem;line-height:1.45}.v18-empty{padding:18px;color:var(--text-secondary);text-align:center}
 .v18-q-block{border:1px solid rgba(148,163,184,.16);border-radius:13px;padding:14px;margin:12px 0;background:rgba(2,6,23,.25);display:grid;gap:8px}.v18-q-block>span{font-size:.75rem;color:#7db1ff;text-transform:uppercase;letter-spacing:.08em}.v18-q-block textarea{width:100%;resize:vertical}.v18-q-actions{display:flex;flex-wrap:wrap;gap:7px}.v18-q-result.selected{outline:2px solid rgba(59,130,246,.65);border-color:rgba(59,130,246,.7)}.v18-q-progress{color:var(--text-secondary);font-size:.86rem}.slc-v18-question-card{max-width:760px;width:min(760px,94vw)}
 @media(max-width:700px){.v18-plan-item{grid-template-columns:28px 1fr}.v18-plan-item .v18-focus{grid-column:2;justify-self:start}.v18-brain-actions{display:grid;grid-template-columns:1fr}.v18-brain-actions button{width:100%}}
+
+/* SLCampus V19 — mobile navigation: all features without duplicating Início/Perfil */
+.slc-profile-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 0 18px}
+.slc-profile-stats>div{padding:14px;border:1px solid var(--border);border-radius:15px;background:var(--bg-secondary);text-align:center}
+.slc-profile-stats strong,.slc-profile-stats span{display:block}.slc-profile-stats strong{font-size:1.25rem}.slc-profile-stats span{margin-top:3px;color:var(--text-secondary);font-size:.72rem}
+#slc-mobile-more{display:none}.slc-mobile-more-open{overflow:hidden}
+@media(max-width:768px){
+  #slc-mobile-more{display:block;position:fixed;inset:0;z-index:1001;pointer-events:none}
+  #slc-mobile-more.open{pointer-events:auto}
+  .slc-mobile-more-backdrop{position:absolute;inset:0;background:rgba(2,6,23,.58);opacity:0;transition:opacity .2s}
+  .slc-mobile-more.open .slc-mobile-more-backdrop{opacity:1}
+  .slc-mobile-more-sheet{position:absolute;left:0;right:0;bottom:0;max-height:min(86vh,760px);overflow:auto;background:var(--bg-secondary);border:1px solid var(--border);border-bottom:0;border-radius:24px 24px 0 0;transform:translateY(105%);transition:transform .24s cubic-bezier(.22,1,.36,1);padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+  .slc-mobile-more.open .slc-mobile-more-sheet{transform:translateY(0)}
+  .slc-mobile-more-head{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;align-items:center;padding:17px 18px 13px;background:color-mix(in srgb,var(--bg-secondary) 94%,transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--border)}
+  .slc-mobile-more-head span{font-size:.65rem;letter-spacing:.12em;color:var(--accent-primary);font-weight:800}.slc-mobile-more-head h3{margin:2px 0 0;font-size:1.2rem}
+  .slc-mobile-more-content{padding:14px 14px 20px}.slc-mobile-more-content section{margin-bottom:18px}.slc-mobile-more-content h4{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary);margin:0 4px 8px}
+  .slc-mobile-more-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.slc-mobile-more-grid button{min-height:58px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);border-radius:14px;padding:10px;text-align:left;display:flex;align-items:center;gap:10px;font:inherit;cursor:pointer}.slc-mobile-more-grid button i{width:20px;text-align:center;color:var(--accent-primary)}
+  .slc-profile-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .main-content,.content-area{padding-bottom:92px!important}
+}
+@media(max-width:390px){.slc-mobile-more-grid{grid-template-columns:1fr}.slc-profile-stats{gap:7px}.slc-profile-stats>div{padding:11px 7px}}

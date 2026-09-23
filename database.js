@@ -27,6 +27,8 @@ const DEFAULT_APP_DATA = () => ({
     learningEvidence: [],
     questionAttempts: [],
     focusPushSchedule: null,
+    telegram: null,
+    telegramInbox: [],
     settings: {
         heavyMode: false,
         autoPlan: true,
