@@ -12,28 +12,48 @@
       const reviews=Array.isArray(d.reviews)?d.reviews.filter(x=>!x.completed&&!x.concluida):[];
       const sessions=Array.isArray(d.sessions)?d.sessions:[];
       const today=new Date();
-      const soon=exams.filter(x=>{const dt=new Date(x.data||x.date||x.dataProva);return !isNaN(dt)&&dt>=new Date(today.getFullYear(),today.getMonth(),today.getDate())}).sort((a,b)=>new Date(a.data||a.date||a.dataProva)-new Date(b.data||b.date||b.dataProva))[0];
+      const start=new Date(today.getFullYear(),today.getMonth(),today.getDate());
+      const soon=exams.filter(x=>{const dt=new Date(x.data||x.date||x.dataProva);return !isNaN(dt)&&dt>=start})
+        .sort((a,b)=>new Date(a.data||a.date||a.dataProva)-new Date(b.data||b.date||b.dataProva))[0];
+      const recent=sessions.slice().sort((a,b)=>new Date(b.data||b.date||0)-new Date(a.data||a.date||0)).slice(0,3);
       const user=d.user||{};
-      return `<section class="slc-study-home">
-        <div class="slc-hero slc-study-hero">
-          <div><span class="slc-eyebrow">CENTRAL DE ESTUDO</span><h2>Estude com um plano, não no improviso.</h2><p>O SLCampus reúne foco, revisão, materiais e suas prioridades em um único lugar.</p></div>
-          <div class="slc-hero-actions"><button class="btn-primary" data-slcnavigate="foco"><i class="fas fa-play"></i> Começar estudo</button><button class="btn-secondary" data-slcnavigate="biblioteca"><i class="fas fa-book-open"></i> Abrir biblioteca</button></div>
+      return `<section class="slc-study-home slc-study-v14">
+        <div class="slc-study-head">
+          <div><span class="slc-eyebrow">CENTRAL DE ESTUDO</span><h2>Seu espaço para estudar</h2><p>Aqui você decide <strong>como</strong> vai estudar. O Início mostra o que está acontecendo; esta área concentra as ferramentas para executar.</p></div>
+          <button class="btn-primary slc-study-main-cta" data-slcnavigate="foco"><i class="fas fa-play"></i> Começar uma sessão</button>
         </div>
-        <div class="slc-action-grid">
-          <button class="slc-action-card" data-slcnavigate="foco"><span class="slc-action-icon blue"><i class="fas fa-bullseye"></i></span><strong>Modo Foco</strong><small>Inicie uma sessão agora</small></button>
-          <button class="slc-action-card" data-slcnavigate="mentor-ia"><span class="slc-action-icon violet"><i class="fas fa-robot"></i></span><strong>O que estudar?</strong><small>Receba uma prioridade</small></button>
-          <button class="slc-action-card" data-slcnavigate="biblioteca"><span class="slc-action-icon green"><i class="fas fa-layer-group"></i></span><strong>Biblioteca</strong><small>PDFs, vídeos e links</small></button>
-          <button class="slc-action-card" data-slcnavigate="mapa-aprendizado"><span class="slc-action-icon amber"><i class="fas fa-map"></i></span><strong>Revisar</strong><small>${reviews.length ? reviews.length+' revisão(ões) pendente(s)' : 'Nenhuma revisão pendente'}</small></button>
+
+        <div class="slc-study-launch-grid">
+          <button class="slc-study-launch primary" data-slcnavigate="foco"><span><i class="fas fa-bullseye"></i></span><div><strong>Modo Foco</strong><small>Escolha uma matéria e comece</small></div><i class="fas fa-arrow-right"></i></button>
+          <button class="slc-study-launch" data-slcnavigate="mapa-aprendizado"><span><i class="fas fa-repeat"></i></span><div><strong>Revisões</strong><small>${reviews.length ? reviews.length+' pendente(s) para revisar' : 'Nenhuma pendência agora'}</small></div><i class="fas fa-arrow-right"></i></button>
+          <button class="slc-study-launch" data-slcnavigate="biblioteca"><span><i class="fas fa-book-open"></i></span><div><strong>Materiais</strong><small>PDFs, vídeos, e-books e links</small></div><i class="fas fa-arrow-right"></i></button>
+          <button class="slc-study-launch" data-slcnavigate="mentor-ia"><span><i class="fas fa-robot"></i></span><div><strong>Mentor IA</strong><small>Descubra o próximo passo</small></div><i class="fas fa-arrow-right"></i></button>
         </div>
-        <div class="slc-study-columns">
-          <div class="card"><div class="card-header"><h3><i class="fas fa-route"></i> Próximo passo</h3></div><div class="card-body">
-            ${soon?`<div class="slc-next-study"><div><span class="slc-muted">Próxima avaliação</span><strong>${esc(soon.titulo||soon.nome||soon.materia||'Avaliação')}</strong><span>${esc(soon.materia||soon.subject||'')} ${soon.data||soon.date?`• ${new Date(soon.data||soon.date||soon.dataProva).toLocaleDateString('pt-BR')}`:''}</span></div><button class="btn-primary btn-sm" data-slcnavigate="provas">Ver provas</button></div>`:`<div class="slc-empty-inline"><i class="fas fa-check-circle"></i><div><strong>Nenhuma avaliação próxima cadastrada.</strong><span>Cadastre uma prova para o planejamento ficar mais preciso.</span></div><button class="btn-secondary btn-sm" data-slcnavigate="provas">Adicionar prova</button></div>`}
-          </div></div>
-          <div class="card"><div class="card-header"><h3><i class="fas fa-layer-group"></i> Seu ambiente</h3></div><div class="card-body slc-study-stats">
-            <div><strong>${subjects.length}</strong><span>matérias</span></div><div><strong>${tasks.length}</strong><span>tarefas abertas</span></div><div><strong>${sessions.length}</strong><span>sessões registradas</span></div>
-          </div></div>
+
+        <div class="slc-study-main-grid">
+          <div class="card slc-study-plan-card">
+            <div class="card-header"><div><span class="slc-card-kicker">EXECUÇÃO</span><h3><i class="fas fa-list-check"></i> Seu próximo estudo</h3></div><button class="btn-secondary btn-sm" data-slcnavigate="mentor-ia">Pedir ao Mentor</button></div>
+            <div class="card-body">
+              ${soon ? `<div class="slc-study-focus-item"><div class="slc-study-focus-icon"><i class="fas fa-graduation-cap"></i></div><div class="slc-study-focus-copy"><span>Próxima avaliação</span><strong>${esc(soon.titulo||soon.nome||soon.materia||'Avaliação')}</strong><small>${esc(soon.materia||soon.subject||'')} ${soon.data||soon.date?`• ${new Date(soon.data||soon.date||soon.dataProva).toLocaleDateString('pt-BR')}`:''}</small></div><button class="btn-primary btn-sm" data-slcnavigate="foco">Estudar</button></div>` : `<div class="slc-empty-study"><i class="fas fa-sparkles"></i><div><strong>Você ainda não tem uma próxima avaliação cadastrada.</strong><span>Use o Mentor para definir uma prioridade ou cadastre uma prova.</span></div><div class="slc-inline-actions"><button class="btn-primary btn-sm" data-slcnavigate="mentor-ia">O que estudar?</button><button class="btn-secondary btn-sm" data-slcnavigate="provas">Adicionar prova</button></div></div>`}
+              <div class="slc-study-mini-grid"><div><strong>${subjects.length}</strong><span>matérias</span></div><div><strong>${tasks.length}</strong><span>tarefas abertas</span></div><div><strong>${reviews.length}</strong><span>revisões pendentes</span></div><div><strong>${sessions.length}</strong><span>sessões registradas</span></div></div>
+            </div>
+          </div>
+
+          <div class="card slc-study-recent-card">
+            <div class="card-header"><div><span class="slc-card-kicker">HISTÓRICO</span><h3><i class="fas fa-clock-rotate-left"></i> Estudos recentes</h3></div><button class="btn-secondary btn-sm" data-slcnavigate="sessoes">Ver tudo</button></div>
+            <div class="card-body">
+              ${recent.length ? recent.map(s=>`<div class="slc-recent-study"><span class="slc-recent-icon"><i class="fas fa-book"></i></span><div><strong>${esc(s.materia||s.subject||'Sessão de estudo')}</strong><small>${esc(s.duracao||s.duration||'')} ${s.data||s.date?'• '+new Date(s.data||s.date).toLocaleDateString('pt-BR'):''}</small></div></div>`).join('') : `<div class="slc-empty-compact"><i class="fas fa-hourglass-start"></i><span>Nenhuma sessão registrada ainda.</span></div>`}
+            </div>
+          </div>
         </div>
-        <div class="card slc-study-path"><div class="card-header"><h3><i class="fas fa-compass"></i> Caminho rápido</h3><span class="tag">${esc(user.perfil==='faculdade'?'Acadêmico':'Estudos')}</span></div><div class="card-body"><div class="slc-path-row"><button data-slcnavigate="materias"><i class="fas fa-book"></i><span>Matérias</span></button><i class="fas fa-chevron-right"></i><button data-slcnavigate="tarefas"><i class="fas fa-tasks"></i><span>Tarefas</span></button><i class="fas fa-chevron-right"></i><button data-slcnavigate="foco"><i class="fas fa-bullseye"></i><span>Foco</span></button><i class="fas fa-chevron-right"></i><button data-slcnavigate="estatisticas"><i class="fas fa-chart-line"></i><span>Resultado</span></button></div></div></div>
+
+        <div class="card slc-study-tools-card"><div class="card-header"><div><span class="slc-card-kicker">FERRAMENTAS</span><h3>Escolha o que precisa agora</h3></div></div><div class="card-body slc-study-tools">
+          <button data-slcnavigate="materias"><i class="fas fa-book"></i><span><strong>Matérias</strong><small>Conteúdos e desempenho</small></span></button>
+          <button data-slcnavigate="tarefas"><i class="fas fa-check-square"></i><span><strong>Tarefas</strong><small>O que precisa ser entregue</small></span></button>
+          <button data-slcnavigate="provas"><i class="fas fa-file-signature"></i><span><strong>Provas</strong><small>Avaliações e trabalhos</small></span></button>
+          <button data-slcnavigate="biblioteca"><i class="fas fa-layer-group"></i><span><strong>Biblioteca</strong><small>Seus materiais</small></span></button>
+          <button data-slcnavigate="estatisticas"><i class="fas fa-chart-line"></i><span><strong>Desempenho</strong><small>Veja sua evolução</small></span></button>
+        </div></div>
       </section>`;
     };
   }

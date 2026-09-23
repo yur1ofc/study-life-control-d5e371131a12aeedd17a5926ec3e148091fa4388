@@ -419,6 +419,7 @@ class StudyLifeControl {
 
         switch (view) {
             case 'dashboard': html = this.viewRenderer.renderDashboard(); break;
+            case 'estudar': html = this.viewRenderer.renderEstudar ? this.viewRenderer.renderEstudar() : this.viewRenderer.renderDashboard(); break;
             case 'mentor-ia': html = this.viewRenderer.renderMentorIA(); break;
             case 'grade-horaria': html = this.viewRenderer.renderGradeHoraria(); break;
             case 'sessoes': html = this.viewRenderer.renderSessoes(); break;
