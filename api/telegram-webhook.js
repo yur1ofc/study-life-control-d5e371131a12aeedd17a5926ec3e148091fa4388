@@ -2,6 +2,8 @@
 // naturais em português sem precisar chamar uma IA paga.
 const admin=require('firebase-admin');
 const AcademicCore=require('../shared/academic-context.js');
+const AI=require('./_lib/ai-core');
+const quota=require('./_lib/gemini-admin-quota');
 let app;
 function init(){if(app)return app;const raw=process.env.FIREBASE_SERVICE_ACCOUNT_KEY;if(!raw)throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY não configurada.');const service=JSON.parse(Buffer.from(raw,'base64').toString('utf8'));app=admin.apps.length?admin.app():admin.initializeApp({credential:admin.credential.cert(service)});return app;}
 const DAY={dom:0,domingo:0,seg:1,segunda:1,"segunda-feira":1,ter:2,terça:2,terca:2,"terça-feira":2,"terca-feira":2,qua:3,quarta:3,"quarta-feira":3,qui:4,quinta:4,"quinta-feira":4,sex:5,sexta:5,"sexta-feira":5,sab:6,sábado:6,sabado:6,"sábado-feira":6};
@@ -274,6 +276,78 @@ function parseNatural(text,data){
   if(/^\s*(anota|anote|salva|salve|registr[ae])\b/i.test(text)){return {kind:'note',text:text.replace(/^\s*(anota|anote|salva|salve|registre|registra)\s*:?[-\s]*/i,'').trim()||text};}
   return null;
 }
+function compactForAI(data){
+  const current=AcademicCore.current(data);
+  const clean=v=>String(v??'').slice(0,500);
+  const grades=(current.grades||[]).slice().sort((a,b)=>String(b.data||'').localeCompare(String(a.data||''))).slice(0,60).map(g=>({materia:clean(g.materia),avaliacao:clean(g.nome),nota:g.valor,peso:g.peso,data:g.data}));
+  const exams=(current.exams||[]).filter(e=>String(e.data||'')>=todayBR()).sort((a,b)=>String(a.data||'').localeCompare(String(b.data||''))).slice(0,40).map(e=>({materia:clean(e.materia),titulo:clean(e.titulo),data:e.data,peso:e.peso,conteudo:clean(e.conteudo)}));
+  const tasks=(current.tasks||[]).filter(t=>!t.concluida).sort((a,b)=>String(a.dataLimite||a.data||'').localeCompare(String(b.dataLimite||b.data||''))).slice(0,40).map(t=>({materia:clean(t.materia),titulo:clean(t.titulo),prazo:t.dataLimite||t.data,prioridade:t.prioridade}));
+  const sessions=(current.sessions||[]).slice(-40).map(x=>({materia:clean(x.materia),topico:clean(x.topico),min:Number(x.duracaoReal||x.duracaoMin||0),data:x.data||x.inicio}));
+  const evidence=(Array.isArray(data.learningEvidence)?data.learningEvidence:[]).slice(-50).map(x=>({materia:clean(x.materia),topico:clean(x.topico),resultado:clean(x.resultado||x.status||x.feedback),confianca:x.confianca,dificuldade:x.dificuldade,data:x.data||x.createdAt}));
+  const learning=(Array.isArray(data.learningMap)?data.learningMap:[]).slice(0,80).map(x=>({materia:clean(x.materia),topico:clean(x.topico),status:x.status,confianca:x.confianca,dificuldade:x.dificuldade,proximaRevisao:x.proximaRevisao}));
+  const archived=(Array.isArray(data.archivedSemesters)?data.archivedSemesters:[]).map(a=>({periodo:a.periodo,numero:a.numero,materias:(a.subjects||a.curriculum||[]).slice(0,80).map(s=>({nome:clean(s.nome),codigo:s.codigo,status:s.status,nota:s.notaFinal??s.nota,tentativas:s.tentativas?.length||0}))}));
+  const user=data.user||{};
+  return {
+    agora:todayBR(),
+    perfil:{nome:user.nome||user.name||'',curso:user.curso||'',instituicao:user.instituicao||'',semestre:user.semestre||null},
+    atual:{subjects:current.subjects.map(s=>({nome:clean(s.nome),codigo:s.codigo,status:s.status,dificuldade:s.dificuldade,notaDesejada:s.notaDesejada})),grades,exams,tasks,classSchedule:current.classSchedule||[]},
+    aprendizagem:{learning,evidence,adaptive:user.adaptiveLearning||{}},
+    execucao:{sessions},
+    historico:archived
+  };
+}
+function mentorLikeTelegram(text){
+  const n=normalize(text);
+  return /\b(como estou|como eu estou|como foi minha evolucao|evolucao|desempenho|risco academico|riscos|o que devo estudar|qual materia devo estudar|o que estudar|prioridade|prioridades|por que .*prioridade|por que .*dificil|materia mais dificil|materias mais dificeis|quanto preciso|media necessaria|ja reprovei|reprovei|historico|diagnostico|raio x|plano de estudos|plano semanal|organizar meus estudos|me ajude a estudar)\b/.test(n);
+}
+function telegramSystemInstruction(){return `Você é o Mentor IA do SLCampus no Telegram. Você é a mesma inteligência acadêmica disponível no site, não um bot separado. Use somente os dados fornecidos no CONTEXTO ACADÊMICO. Diferencie SEMESTRE ATUAL de HISTÓRICO. Histórico serve para explicar padrões, reprovações e tentativas anteriores, mas não deve virar prova, tarefa ou compromisso atual. Não invente datas, notas, matérias, horários ou fatos. Se faltar dado, diga claramente. Quando fizer uma recomendação de estudo, explique brevemente quais dados objetivos levaram à prioridade. Responda em português do Brasil, de forma natural e útil para Telegram, sem tabelas largas e sem mencionar APIs, provedores ou detalhes internos. Se a pergunta pedir cálculo de média, use somente os valores e pesos disponíveis. Se houver conflito entre dados, prefira o semestre atual e avise sobre a inconsistência.`;}
+async function askTelegramMentor({uid,email,text,data}){
+  const context=compactForAI(data);
+  const prompt=`PERGUNTA DO ALUNO:\n${String(text).slice(0,4000)}\n\nCONTEXTO ACADÊMICO REAL:\n${JSON.stringify(context).slice(0,30000)}`;
+  const requestId=AI.requestId('tg');
+  const usage=await quota.reserveUserOperation({uid,email,operation:'mentor',requestId});
+  if(usage.blocked) return {ok:false,limit:true};
+  try{
+    const result=await AI.callAI({messages:[{role:'user',content:prompt}],systemInstruction:telegramSystemInstruction(),operation:'mentor',uid,email,requestId,maxTokens:1200,reasoningEffort:'medium'});
+    if(result.ok) return {ok:true,text:result.text,provider:result.provider,model:result.modelUsed};
+    try{await quota.releaseUserOperation({uid,operation:'mentor'});}catch(_){ }
+    return {ok:false,error:result.error,code:result.code};
+  }catch(err){try{await quota.releaseUserOperation({uid,operation:'mentor'});}catch(_){ }return {ok:false,error:err.message};}
+}
+async function downloadTelegramFile(fileId){
+  const t=token();
+  const metaR=await fetch(`https://api.telegram.org/bot${t}/getFile?file_id=${encodeURIComponent(fileId)}`); const meta=await metaR.json().catch(()=>({}));
+  if(!metaR.ok||!meta.ok||!meta.result?.file_path)throw new Error(meta.description||'Não consegui localizar o arquivo no Telegram.');
+  const r=await fetch(`https://api.telegram.org/file/bot${t}/${meta.result.file_path}`); if(!r.ok)throw new Error('Não consegui baixar o arquivo recebido.');
+  const buf=Buffer.from(await r.arrayBuffer()); if(buf.length>12*1024*1024)throw new Error('O arquivo excede o limite de 12 MB.');
+  return {buf,filePath:meta.result.file_path};
+}
+function mergeTelegramHistory(data,result){
+  const archives=Array.isArray(data.archivedSemesters)?data.archivedSemesters:[];
+  const groups=Array.isArray(result?.periodos)?result.periodos:[];
+  let added=0,updated=0;
+  for(const g of groups){
+    const periodo=String(g.periodo||'').trim(); if(!periodo)continue;
+    const subjects=(g.disciplinas||[]).map(d=>({id:id('hist-sub'),codigo:String(d.codigo||'').trim().toUpperCase(),nome:String(d.nome||'').trim(),semestre:periodo,status:String(d.status||d.situacao||'concluida').toLowerCase().startsWith('reprov')?'reprovada':String(d.status||d.situacao||'concluida').toLowerCase().includes('curs')?'cursando':'concluida',notaFinal:Number.isFinite(Number(d.notaFinal??d.nota??d.media))?Number(d.notaFinal??d.nota??d.media):null,nota:Number.isFinite(Number(d.notaFinal??d.nota??d.media))?Number(d.notaFinal??d.nota??d.media):null,tentativas:Array.isArray(d.tentativas)?d.tentativas:[]})).filter(x=>x.nome);
+    if(!subjects.length)continue;
+    const numero=Number(String(g.periodo).match(/^(\d+)/)?.[1]||0)||null;
+    const incoming={id:id('hist-tg'),tipo:'manual',origem:'TELEGRAM-SIGAA',numero,semestre:numero,periodo,titulo:`${numero?numero+'º semestre — ':''}${periodo}`,subjects,curriculum:subjects,materias:subjects.map(x=>x.nome),grades:[],sessions:[],tasks:[],exams:[],materials:[],learningMap:[],classDiaries:[],reviews:[],classSchedule:[],attendance:{}};
+    const idx=archives.findIndex(a=>String(a.periodo||'')===periodo);
+    if(idx<0){archives.push(incoming);added++;continue;}
+    const old=archives[idx]||{}; const map=new Map((old.subjects||old.curriculum||[]).map(s=>[String(s.codigo||s.nome).toLowerCase(),s])); subjects.forEach(s=>map.set(String(s.codigo||s.nome).toLowerCase(),{...(map.get(String(s.codigo||s.nome).toLowerCase())||{}),...s}));
+    archives[idx]={...old,origem:'TELEGRAM-SIGAA',subjects:[...map.values()],curriculum:[...map.values()],materias:[...map.values()].map(x=>x.nome)}; updated++;
+  }
+  data.archivedSemesters=archives; return {added,updated,periods:groups.length};
+}
+async function processTelegramHistory(ref,data,inboxItem){
+  const {buf}=await downloadTelegramFile(inboxItem.fileId);
+  if(!/^application\/pdf$/i.test(inboxItem.mimeType||'') && !/\.pdf$/i.test(inboxItem.fileName||''))throw new Error('Para importar histórico pelo Telegram, envie um PDF.');
+  const pdfParse=require('pdf-parse'); const parsed=await pdfParse(buf); const text=String(parsed.text||'');
+  const result=AI.parseSigaaHistoryText(text);
+  if(!result.periodos?.length)throw new Error('Não consegui identificar períodos do SIGAA nesse PDF. Envie o histórico oficial ou use a importação de histórico no site.');
+  const merged=mergeTelegramHistory(data,result); await ref.set({archivedSemesters:data.archivedSemesters,telegramInbox:addInbox(data,{...inboxItem,type:'document-history-processed',processedAt:new Date().toISOString(),text:`Histórico processado: ${merged.periods} período(s).`})},{merge:true}); return merged;
+}
+
 function help(){return `SLCampus conectado.\n\nFale comigo naturalmente; comandos são opcionais.\n\nConsultas:\n• O que tenho amanhã?\n• Que aulas tenho quinta?\n• Qual é minha próxima aula?\n• Quais tarefas tenho essa semana?\n• Quando é minha próxima prova?\n• Tenho alguma prova de GA?\n• Minhas notas de Cálculo / GA / FI\n• Quanto estudei hoje / essa semana?\n• Como está meu dia amanhã?\n\nAções:\n• Tenho aula de GA quarta 7:30 às 9:10 sala PD04\n• P1 de Cálculo é sexta\n• Tirei 8,5 em GA na P1 valendo 20%\n• Me lembra da lista de Física sexta\n• Estudei FI por 1h30\n• Anota: revisar regra da cadeia\n\nEntendo nomes, abreviações, siglas e códigos cadastrados para as matérias. Se uma sigla for ambígua, prefiro pedir confirmação a escolher errado.\n\nComandos: /aula, /tarefa, /prova, /nota, /anotar, /agenda, /status, /ajuda, /desvincular.\n\nFotos e PDFs enviados ao bot entram na Caixa de Entrada do SLCampus.`;}
 async function saveArray(ref,data,key,item){
   await ref.firestore.runTransaction(async tx=>{
@@ -306,7 +380,19 @@ module.exports=async function(req,res){
     let inboxItem={id:id('tg'),receivedAt:new Date().toISOString(),chatId,type:'message',caption:msg.caption||'',text:msg.text||''};
     if(msg.document){inboxItem.type='document';inboxItem.fileId=msg.document.file_id;inboxItem.fileName=msg.document.file_name||'arquivo';inboxItem.mimeType=msg.document.mime_type||'';}
     else if(msg.photo?.length){const ph=msg.photo[msg.photo.length-1];inboxItem.type='photo';inboxItem.fileId=ph.file_id;inboxItem.fileName='foto.jpg';inboxItem.mimeType='image/jpeg';}
-    if(msg.document||msg.photo){await ref.set({telegramInbox:addInbox(data,inboxItem)},{merge:true});await reply(chatId,'Recebido. O arquivo foi registrado na caixa de entrada do SLCampus.');await mark();return res.status(200).json({ok:true});}
+    if(msg.document||msg.photo){
+      await ref.set({telegramInbox:addInbox(data,inboxItem)},{merge:true});
+      const fileText=normalize(`${msg.caption||''} ${msg.document?.file_name||''}`);
+      if(msg.document && /historico|histórico|sigaa/.test(fileText) && (/\.pdf$/i.test(msg.document.file_name||'') || /application\/pdf/i.test(msg.document.mime_type||''))){
+        try{
+          const processed=await processTelegramHistory(ref,data,inboxItem);
+          await reply(chatId,`Histórico processado pelo SLCampus. ${processed.added} período(s) novo(s) e ${processed.updated} atualizado(s) foram incorporados ao histórico. Ele já pode ser usado pelo Mentor, pelo planejamento e pelas consultas do Telegram.`);
+        }catch(err){await reply(chatId,`Recebi o PDF, mas não consegui importá-lo automaticamente: ${err.message}`);}
+      }else{
+        await reply(chatId,'Recebido. O arquivo foi registrado na Caixa de Entrada. Se for um histórico SIGAA em PDF, envie novamente com a legenda “histórico” para eu incorporar os semestres ao contexto acadêmico.');
+      }
+      await mark();return res.status(200).json({ok:true});
+    }
     if(lower.startsWith('/aula')){const p=parts(text.replace(/^\/aula\s*/i,''));if(p.length<4){await reply(chatId,'Formato: /aula | Matéria | seg | 08:00 | 10:00 | Sala');await mark();return res.status(200).json({ok:true});}const day=DAY[normalize(p[1])];if(day==null){await reply(chatId,'Dia inválido. Use seg, ter, qua, qui, sex ou sáb.');await mark();return res.status(200).json({ok:true});}const aula={id:id('aula'),materia:p[0],dia:day,inicio:p[2],fim:p[3],sala:p[4]||'',origem:'telegram'};const dup=findExistingClass(data,aula);if(dup){await reply(chatId,`Essa aula já existe no SLCampus: ${formatClass(dup)}.`);await mark();return res.status(200).json({ok:true,duplicate:true});}const conflict=findClassConflict(data,aula);if(conflict){await reply(chatId,`Não adicionei porque há conflito de horário com ${formatClass(conflict)}.`);await mark();return res.status(200).json({ok:true,conflict:true});}await saveArray(ref,data,'classSchedule',aula);await reply(chatId,`Aula adicionada: ${formatClass(aula)}.`);await mark();return res.status(200).json({ok:true});}
     if(lower.startsWith('/tarefa')){const p=parts(text.replace(/^\/tarefa\s*/i,''));if(p.length<3){await reply(chatId,'Formato: /tarefa | Matéria | Título | 2026-09-30');await mark();return res.status(200).json({ok:true});}const item={id:id('task'),materia:p[0],titulo:p[1],dataLimite:p[2],concluida:false,criadaEm:new Date().toISOString(),origem:'telegram'};await saveArray(ref,data,'tasks',item);await reply(chatId,`Tarefa adicionada: ${item.titulo}.`);await mark();return res.status(200).json({ok:true});}
     if(lower.startsWith('/prova')){const p=parts(text.replace(/^\/prova\s*/i,''));if(p.length<3){await reply(chatId,'Formato: /prova | Matéria | Título | 2026-10-02');await mark();return res.status(200).json({ok:true});}const item={id:id('exam'),materia:p[0],titulo:p[1],data:p[2],concluida:false,criadaEm:new Date().toISOString(),origem:'telegram'};await saveArray(ref,data,'exams',item);await reply(chatId,`Prova/trabalho adicionado: ${item.titulo}.`);await mark();return res.status(200).json({ok:true});}
@@ -400,6 +486,15 @@ ${formatDateBR(x.data)}`);}
     if(natural?.kind==='grade'){const dup=duplicateBy(data,'grades',x=>sameSubject(x.materia,natural.item.materia)&&normalize(x.nome)===normalize(natural.item.nome)&&Number(x.valor)===Number(natural.item.valor)&&Number(x.peso)===Number(natural.item.peso)&&x.data===natural.item.data);if(dup){await reply(chatId,'Essa nota já está registrada hoje.');await mark();return res.status(200).json({ok:true,duplicate:true});}await saveArray(ref,data,'grades',natural.item);await reply(chatId,`Nota registrada: ${natural.item.valor.toFixed(1)} em ${natural.item.materia} · ${natural.item.nome} · peso ${natural.item.peso}%.`);await mark();return res.status(200).json({ok:true});}
     if(natural?.kind==='session'){await saveArray(ref,data,'sessions',natural.item);await reply(chatId,`Sessão registrada: ${natural.item.materia} · ${natural.item.duracaoReal} min. Ela já entra no histórico de estudos.`);await mark();return res.status(200).json({ok:true});}
     if(natural?.kind==='note'){inboxItem.type='note';inboxItem.text=natural.text;await ref.set({telegramInbox:addInbox(data,inboxItem)},{merge:true});await reply(chatId,'Anotação salva na caixa de entrada do SLCampus.');await mark();return res.status(200).json({ok:true});}
-    await ref.set({telegramInbox:addInbox(data,inboxItem)},{merge:true});await reply(chatId,'Recebi. Deixei a mensagem na Caixa de entrada do SLCampus. Se quiser que eu registre automaticamente, escreva a ação de forma natural, por exemplo: “me lembra de fazer a lista de Física sexta”.');await mark();return res.status(200).json({ok:true});
+    // Perguntas abertas passam pelo mesmo AI Router do Mentor do site. Isso faz do Telegram
+    // uma segunda interface do mesmo cérebro, usando o mesmo histórico/contexto do usuário.
+    if(mentorLikeTelegram(text)){
+      const answer=await askTelegramMentor({uid:q.docs[0].id,email:String(data.email||''),text,data});
+      if(answer.ok){await reply(chatId,answer.text);await mark();return res.status(200).json({ok:true,provider:answer.provider,model:answer.model});}
+      if(answer.limit){await reply(chatId,'O limite diário do Mentor IA foi atingido. As consultas acadêmicas básicas continuam disponíveis pelo Telegram.');await mark();return res.status(200).json({ok:true,limited:true});}
+      // Se os provedores de IA estiverem indisponíveis, a mensagem ainda fica registrada.
+      console.warn('[telegram-webhook] AI fallback:',answer.error||answer.code||'indisponível');
+    }
+    await ref.set({telegramInbox:addInbox(data,inboxItem)},{merge:true});await reply(chatId,'Recebi. Deixei a mensagem na Caixa de Entrada do SLCampus. Se quiser que eu registre automaticamente, escreva a ação de forma natural, por exemplo: “me lembra de fazer a lista de Física sexta”.');await mark();return res.status(200).json({ok:true});
   }catch(e){console.error('[telegram-webhook]',e);try{if(req.body?.message?.chat?.id)await reply(req.body.message.chat.id,'O SLCampus encontrou um erro ao processar isso. Tente novamente.');}catch(_){}return res.status(200).json({ok:false,error:e.message});}
 };
