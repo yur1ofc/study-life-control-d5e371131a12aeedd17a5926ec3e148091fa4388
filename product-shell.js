@@ -59,7 +59,23 @@
   }
 
   function navigate(view){
-    if(window.app?.loadView){ window.app.loadView(view); document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.view===view)); }
+    const app = window.app;
+    let handled = false;
+    if (app && typeof app.loadView === 'function') {
+      app.loadView(view);
+      handled = true;
+    } else if (app && window.StudyLifeControl?.prototype && typeof window.StudyLifeControl.prototype.loadView === 'function') {
+      // Algumas camadas antigas substituem temporariamente o método na instância.
+      // O método de protótipo continua sendo a fonte segura para a navegação.
+      window.StudyLifeControl.prototype.loadView.call(app, view);
+      handled = true;
+    }
+    if (handled) {
+      document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.view===view));
+      document.querySelectorAll('#slc-product-bottom-nav [data-v]').forEach(n=>n.classList.toggle('active',n.dataset.v===view));
+      updateTitle(titleFor(view));
+      setTimeout(mobileNav, 0);
+    }
     document.body.classList.remove('sidebar-open');
   }
 
@@ -74,24 +90,32 @@
   }
 
   function patchLoadView(){
-    if(!window.app || window.app.__slcProductShell) return;
-    const original=window.app.loadView.bind(window.app);
-    window.app.loadView=function(view){
-      if(view==='perfil'){
+    const proto = window.StudyLifeControl?.prototype;
+    if (!proto || typeof proto.loadView !== 'function' || proto.__slcProductShellLoadView) return;
+    const original = proto.loadView;
+    proto.loadView = function(view, ...rest){
+      if (view === 'perfil') {
+        if (!this.viewRenderer) this.viewRenderer = new ViewRenderer(this);
         this.currentView='perfil'; document.body.dataset.view='perfil';
         const c=document.getElementById('view-container');
         if(c && this.viewRenderer?.renderPerfil) c.innerHTML=this.viewRenderer.renderPerfil();
-        this.setupViewEvents?.(view); window.aiAssistant?.updateContext(this.data); updateTitle('Perfil'); bindStudyActions(); updateActive('perfil'); return;
+        this.setupViewEvents?.(view); window.aiAssistant?.updateContext(this.data);
+        updateTitle('Perfil'); bindStudyActions(); updateActive('perfil'); mobileNav(); return;
       }
-      if(view==='estudar'){
+      if (view === 'estudar') {
+        if (!this.viewRenderer) this.viewRenderer = new ViewRenderer(this);
         this.currentView='estudar'; document.body.dataset.view='estudar';
         const c=document.getElementById('view-container');
-        if(c && this.viewRenderer?.renderEstudar){ c.innerHTML=this.viewRenderer.renderEstudar(); }
-        this.setupViewEvents?.(view); window.aiAssistant?.updateContext(this.data); updateTitle('Estudar'); bindStudyActions(); updateActive('estudar'); return;
+        if(c && this.viewRenderer?.renderEstudar) c.innerHTML=this.viewRenderer.renderEstudar();
+        this.setupViewEvents?.(view); window.aiAssistant?.updateContext(this.data);
+        updateTitle('Estudar'); bindStudyActions(); updateActive('estudar'); mobileNav(); return;
       }
-      const r=original(view); updateTitle(titleFor(view)); updateActive(view); return r;
+      const result = original.call(this, view, ...rest);
+      updateTitle(titleFor(view)); updateActive(view);
+      setTimeout(()=>{ bindStudyActions(); mobileNav(); }, 0);
+      return result;
     };
-    window.app.__slcProductShell=true;
+    proto.__slcProductShellLoadView = true;
   }
   function titleFor(v){return ({dashboard:'Início',perfil:'Perfil','estudar':'Estudar','mentor-ia':'Mentor IA',tarefas:'Tarefas',provas:'Provas e trabalhos',biblioteca:'Biblioteca',configuracoes:'Configurações',materias:'Matérias',calendario:'Calendário',foco:'Modo Foco',sessoes:'Sessões de estudo',estatisticas:'Estatísticas','grade-horaria':'Grade horária','grade-curricular':'Grade curricular','mapa-aprendizado':'Mapa de aprendizado'}[v]||'SLCampus');}
   function updateTitle(t){const e=document.getElementById('page-title');if(e)e.textContent=t;}
