@@ -138,116 +138,176 @@ function checkpointsDevidos(itemMs, prefixo, id, tipoLabel, corpo, now, already)
 
 // Descobre quais itens de um usuário "vencem" dentro da janela de aviso e
 // ainda não foram notificados.
+function currentSubjectKeys(data){
+  const curriculum=Array.isArray(data?.curriculum)?data.curriculum:[];
+  const controlled=curriculum.filter(x=>x?.nome);
+  const active=controlled.filter(x=>String(x.status||'').toLowerCase()==='cursando');
+  if (active.length) return new Set(active.map(x=>String(x.nome).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()));
+  const subjects=Array.isArray(data?.subjects)?data.subjects.filter(x=>x?.nome):[];
+  return new Set(subjects.map(x=>String(x.nome).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()));
+}
+function normSubject(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
+function isCurrentSubject(data,materia){
+  const n=normSubject(materia); if(!n) return true;
+  const keys=currentSubjectKeys(data); return !keys.size || keys.has(n);
+}
+function timeMin(v){const m=String(v||'').match(/^(\d{1,2}):(\d{2})$/);return m?Number(m[1])*60+Number(m[2]):null;}
+function localParts(now){
+  const p=new Intl.DateTimeFormat('en-GB',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(new Date(now));
+  const get=t=>p.find(x=>x.type===t)?.value||'';
+  const weekdayMap={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6};
+  return {date:`${get('year')}-${get('month')}-${get('day')}`,weekday:weekdayMap[get('weekday')] ?? 0,hour:Number(get('hour')||0),minute:Number(get('minute')||0)};
+}
+function formatDateBR(date){const p=String(date||'').split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:String(date||'');}
+function dateOffset(date,delta){const [y,m,d]=String(date).split('-').map(Number);const x=new Date(Date.UTC(y,m-1,d));x.setUTCDate(x.getUTCDate()+delta);return x.toISOString().slice(0,10);}
+function scheduleForDate(data,date){
+  const wd=new Date(`${date}T00:00:00Z`).getUTCDay();
+  return (data.classSchedule||[]).filter(a=>Number(a?.dia)===wd&&a?.inicio&&a?.fim&&isCurrentSubject(data,a.materia)).sort((a,b)=>(timeMin(a.inicio)||0)-(timeMin(b.inicio)||0));
+}
+function freeWindowNow(data,now,minMinutes=10){
+  const p=localParts(now); const intervals=scheduleForDate(data,p.date).map(a=>({start:timeMin(a.inicio),end:timeMin(a.fim)})).filter(x=>x.start!=null&&x.end!=null&&x.end>x.start);
+  intervals.sort((a,b)=>a.start-b.start);
+  const merged=[]; for(const x of intervals){const last=merged.at(-1);if(last&&x.start<=last.end)last.end=Math.max(last.end,x.end);else merged.push({...x});}
+  const dayStart=5*60, dayEnd=23*60+30;
+  let cursor=dayStart;
+  const gaps=[];
+  for(const x of merged){if(x.start>cursor)gaps.push({start:cursor,end:Math.min(x.start,dayEnd)});cursor=Math.max(cursor,x.end);if(cursor>=dayEnd)break;}
+  if(cursor<dayEnd)gaps.push({start:cursor,end:dayEnd});
+  const minute=p.hour*60+p.minute;
+  const active=gaps.find(g=>minute>=g.start&&minute<g.end&&g.end-minute>=minMinutes);
+  if(!active)return null;
+  const preferred=String(data?.user?.adaptiveLearning?.preferredStudyWindow||'').toLowerCase();
+  const h=p.hour;
+  const bucket=h>=5&&h<12?'manha':h>=12&&h<18?'tarde':h>=18?'noite':'madrugada';
+  let quality=1;
+  if(active.end-active.start>=30)quality+=2; else if(active.end-active.start>=15)quality+=1;
+  if(preferred&&preferred===bucket)quality+=2;
+  if(h>=12&&h<14&&active.end-active.start>=30)quality+=1; // bom intervalo de almoço quando existir
+  return {date:p.date,minute,remaining:active.end-minute,quality,bucket};
+}
+function classCaptureState(data){
+  const state=data.smartReminderState&&typeof data.smartReminderState==='object'?data.smartReminderState:{};
+  state.classCapture=state.classCapture&&typeof state.classCapture==='object'?state.classCapture:{};
+  state.review=state.review&&typeof state.review==='object'?state.review:{};
+  return state;
+}
+function diaryExistsForClass(data,materia,date){return (data.classDiaries||[]).some(d=>String(d?.data||'').slice(0,10)===date&&normSubject(d?.materia)===normSubject(materia));}
+function captureCandidates(data,now){
+  const p=localParts(now), state=classCaptureState(data), candidates=[];
+  for(let ago=0;ago<=7;ago++){
+    const date=dateOffset(p.date,-ago);
+    const classes=scheduleForDate(data,date);
+    for(const aula of classes){
+      const end=timeMin(aula.fim); if(end==null)continue;
+      const key=`${aula.id||normSubject(aula.materia)}:${date}`;
+      const record=state.classCapture[key]||{};
+      if(diaryExistsForClass(data,aula.materia,date)){delete state.classCapture[key];continue;}
+      const occurrenceMs=localDateTimeToMs(`${date}T${aula.fim}`); if(occurrenceMs==null||now<occurrenceMs)continue;
+      const ageDays=Math.floor((Date.parse(`${p.date}T00:00:00${FUSO_BRASIL}`)-Date.parse(`${date}T00:00:00${FUSO_BRASIL}`))/86400000);
+      if(ageDays>7)continue;
+      const count=Number(record.count||0);
+      const last=record.lastSentAt?Date.parse(record.lastSentAt):0;
+      const hoursSince=last?((now-last)/3600000):999;
+      let eligible=false;
+      if(count===0 && ageDays===0) eligible=true;
+      else if(count===1 && ageDays===0 && p.hour>=18 && hoursSince>=4) eligible=true;
+      else if(count===1 && ageDays>=1) eligible=true;
+      else if(count===2 && ageDays>=3) eligible=true;
+      else if(count===3 && ageDays>=7) eligible=true;
+      if(!eligible)continue;
+      const free=freeWindowNow(data,now,10); if(!free)continue;
+      // O primeiro aviso precisa ser depois da própria aula. Nos dias seguintes
+      // basta estar em um intervalo livre, mas nunca depois de uma semana.
+      if(ageDays===0 && p.hour*60+p.minute<end)continue;
+      const reason=count===0?'primeiro horário livre após a aula':count===1?'segunda chance no mesmo dia/seguinte':count===2?'relembrando sem pressionar':'último lembrete da semana';
+      candidates.push({key,title:`📚 Registre a aula de ${aula.materia}`,body:`Você teve ${aula.materia}${aula.inicio?` das ${aula.inicio} às ${aula.fim}`:''} e ainda não há Diário de Aula salvo para ${formatDateBR(date)}. ${reason}.`,captureKey:key,quality:free.quality,freeRemaining:free.remaining,count,materia:aula.materia,date});
+    }
+  }
+  candidates.sort((a,b)=>b.quality-a.quality||a.count-b.count);
+  return {candidates,state};
+}
+function reviewCandidates(data,now){
+  const p=localParts(now), state=classCaptureState(data), due=(data.reviews||[]).filter(r=>!r?.concluida&&r?.data&&String(r.data).slice(0,10)===p.date&&isCurrentSubject(data,r.materia));
+  if(!due.length)return {item:null,state};
+  const free=freeWindowNow(data,now,10); if(!free)return {item:null,state};
+  const fresh=due.filter(r=>{const key=`${r.id}:${p.date}`;return !state.review[key];});
+  if(!fresh.length)return {item:null,state};
+  const grouped=new Map();
+  fresh.forEach(r=>{const k=r.materia||'Sem matéria';if(!grouped.has(k))grouped.set(k,[]);grouped.get(k).push(r);});
+  const lines=[]; let count=0; const keys=[];
+  for(const [materia,items] of grouped){
+    lines.push(`• ${materia}: ${items.slice(0,3).map(x=>x.topico||'revisão').join(', ')}`);
+    items.forEach(x=>keys.push(`${x.id}:${p.date}`)); count+=items.length;
+    if(lines.length>=4)break;
+  }
+  return {item:{key:`review-bundle:${p.date}`,title:`🔁 Revisões de hoje (${count})`,body:`Você tem conteúdo para revisar hoje, em um intervalo livre.\n${lines.join('\n')}`,reviewKeys:keys,quality:free.quality},state};
+}
 function findDueReminders(data, now) {
   const prefs = data?.settings?.studyReminders || {};
   const already = new Set(data.sentReminders || []);
   const due = [];
+  const scopedExams=(data.exams||[]).filter(e=>isCurrentSubject(data,e?.materia));
+  const scopedTasks=(data.tasks||[]).filter(t=>isCurrentSubject(data,t?.materia));
+  scopedExams.forEach(e => { if(e.concluida)return; const ms=dateOnlyToMs(e.data); if(ms==null)return; const corpo=`${e.titulo}${e.materia?` — ${e.materia}`:''}`; due.push(...checkpointsDevidos(ms,'exam',e.id,'📝 Prova/trabalho',corpo,now,already)); });
+  scopedTasks.forEach(t => { if(t.concluida)return; const ms=dateOnlyToMs(t.dataLimite); if(ms==null)return; const corpo=`${t.titulo}${t.materia?` — ${t.materia}`:''}`; due.push(...checkpointsDevidos(ms,'task',t.id,'✅ Tarefa',corpo,now,already)); });
 
-  (data.exams || []).forEach(e => {
-    if (e.concluida) return;
-    const examMs = dateOnlyToMs(e.data);
-    if (examMs == null) return;
-    const corpo = `${e.titulo}${e.materia ? ` — ${e.materia}` : ''}`;
-    due.push(...checkpointsDevidos(examMs, 'exam', e.id, '📝 Prova/trabalho', corpo, now, already));
+  // Sessões agendadas continuam usando o horário configurado; são compromissos
+  // explícitos e não entram no filtro de "tempo livre".
+  const sessionsMinutesBefore=Number(prefs.sessionsMinutesBefore??15), FOLGA_JANELA_CURTA_MS=20*60000;
+  (data.sessions||[]).filter(s=>isCurrentSubject(data,s?.materia)).forEach(s=>{
+    if(s.concluida)return; const key=`session:${s.id}`; if(already.has(key))return; const ms=localDateTimeToMs(s.data); if(ms==null)return; const trigger=ms-sessionsMinutesBefore*60000-FOLGA_JANELA_CURTA_MS; if(now>=trigger&&now<ms)due.push({key,title:'📚 Sessão de estudo já já',body:`${s.materia}${s.topico?` — ${s.topico}`:''}`});
   });
 
-  (data.tasks || []).forEach(t => {
-    if (t.concluida) return;
-    const taskMs = dateOnlyToMs(t.dataLimite);
-    if (taskMs == null) return;
-    const corpo = `${t.titulo}${t.materia ? ` — ${t.materia}` : ''}`;
-    due.push(...checkpointsDevidos(taskMs, 'task', t.id, '✅ Tarefa', corpo, now, already));
+  // Aula: aviso antes do início continua sendo um compromisso, portanto não
+  // é bloqueado por janelas livres. O lembrete de registrar o conteúdo é outro
+  // fluxo e só aparece depois da aula em uma janela livre.
+  const classMinutesBefore=Number(prefs.classMinutesBefore??15), pa=localParts(now), hoje=pa.date, dia=pa.weekday;
+  (data.classSchedule||[]).filter(a=>isCurrentSubject(data,a?.materia)).forEach(a=>{
+    if(a.dia==null||!a.inicio)return; if(Number(a.dia)!==dia)return; const key=`aula:${a.id}:${hoje}`; if(already.has(key))return; const ms=localDateTimeToMs(`${hoje}T${a.inicio}`); if(ms==null)return; const trigger=ms-classMinutesBefore*60000-FOLGA_JANELA_CURTA_MS; if(now>=trigger&&now<ms)due.push({key,title:'🎓 Aula já já',body:`${a.materia}${a.sala?` — Sala ${a.sala}`:''}`});
   });
 
-  // Revisão espaçada: essa preferência (reviewsHoursBefore) já existia na
-  // tela de Configurações e era salva, mas nunca tinha sido lida aqui —
-  // por isso a notificação nunca disparava, em nenhuma hipótese. Segue o
-  // mesmo padrão de "X horas antes" que sessão/aula já usam.
-  const reviewsHoursBefore = Number(prefs.reviewsHoursBefore ?? 24);
-  (data.reviews || []).forEach(r => {
-    if (r.concluida) return;
-    const key = `review:${r.id}`;
-    if (already.has(key)) return;
-    const reviewMs = dateOnlyToMs(r.data);
-    if (reviewMs == null) return;
-    const triggerMs = reviewMs - reviewsHoursBefore * 3600000;
-    // janela vai até 24h depois do dia da revisão, não só até o instante
-    // exato — como reviewMs é meia-noite do dia, sem essa folga o aviso
-    // teria que disparar exatamente à 00h pra não perder a janela.
-    if (now >= triggerMs && now < reviewMs + JANELA_CHECKPOINT_MS) {
-      due.push({ key, title: '🔁 Revisão espaçada', body: `${r.materia}${r.topico ? ` — ${r.topico}` : ''}` });
-    }
-  });
-
-  const sessionsMinutesBefore = Number(prefs.sessionsMinutesBefore ?? 15);
-  // Além dos X minutos configurados, dá uma folga extra pra trás na janela.
-  // Sem isso, a janela de disparo tem exatamente X minutos de largura — e
-  // se o cron rodar de tempos em tempos maiores que isso (ex: só 1x por dia
-  // no plano Hobby da Vercel sem cron externo configurado), a chance da
-  // execução cair bem dentro desses X minutos é baixíssima, e o aviso nunca
-  // sai. Provas/tarefas não sofrem disso porque a janela delas já é de 24h.
-  const FOLGA_JANELA_CURTA_MS = 20 * 60000;
-  (data.sessions || []).forEach(s => {
-    if (s.concluida) return;
-    const key = `session:${s.id}`;
-    if (already.has(key)) return;
-    const sessionMs = localDateTimeToMs(s.data);
-    if (sessionMs == null) return;
-    const triggerMs = sessionMs - sessionsMinutesBefore * 60000 - FOLGA_JANELA_CURTA_MS;
-    if (now >= triggerMs && now < sessionMs) {
-      due.push({ key, title: '📚 Sessão de estudo já já', body: `${s.materia}${s.topico ? ` — ${s.topico}` : ''}` });
-    }
-  });
-
-  // Aulas da grade horária (classSchedule): recorrentes por dia da semana,
-  // então o dedupe precisa incluir a DATA de hoje (não só o id da aula),
-  // senão a mesma aula de toda terça, por exemplo, só avisaria na primeira
-  // terça e nunca mais. Isso nunca tinha sido implementado aqui — só
-  // existia a preferência salva em Configurações, sem nada no cron pra
-  // realmente usá-la.
-  const classMinutesBefore = Number(prefs.classMinutesBefore ?? 15);
-  const bAgoraAulas = agoraBrasilia(now);
-  const hojeBrAulas = bAgoraAulas.toISOString().slice(0, 10);
-  const diaSemanaHoje = bAgoraAulas.getUTCDay();
-  (data.classSchedule || []).forEach(a => {
-    if (a.dia == null || !a.inicio) return;
-    if (parseInt(a.dia, 10) !== diaSemanaHoje) return;
-    const key = `aula:${a.id}:${hojeBrAulas}`;
-    if (already.has(key)) return;
-    const aulaMs = localDateTimeToMs(`${hojeBrAulas}T${a.inicio}`);
-    if (aulaMs == null) return;
-    const triggerMs = aulaMs - classMinutesBefore * 60000 - FOLGA_JANELA_CURTA_MS;
-    if (now >= triggerMs && now < aulaMs) {
-      due.push({ key, title: '🎓 Aula já já', body: `${a.materia}${a.local ? ` — ${a.local}` : ''}` });
-    }
-  });
-
-  // Diário: se a hora configurada já passou (fuso Brasília) e o usuário
-  // ainda não registrou nada hoje (nem "Meu dia" nem diário de aula),
-  // manda 1 aviso — dedupe por dia (`diario:AAAA-MM-DD`), então mesmo o
-  // cron rodando várias vezes só dispara uma vez por dia, e some sozinho
-  // no dia seguinte por não bater mais a condição de horário.
-  const diarioHora = Number(prefs.diaryReminderHour ?? 20);
-  const bAgora = agoraBrasilia(now);
-  const hojeBr = bAgora.toISOString().slice(0, 10);
-  const diarioKey = `diario:${hojeBr}`;
-  if (!already.has(diarioKey) && bAgora.getUTCHours() >= diarioHora) {
-    const jaRegistrouHoje =
-      (data.dailyLogs || []).some(l => l.data === hojeBr) ||
-      (data.classDiaries || []).some(d => d.data === hojeBr);
-    if (!jaRegistrouHoje) {
-      const streak = calcularStreakDiario(data.dailyLogs, hojeBr);
-      due.push({
-        key: diarioKey,
-        title: streak > 0 ? `🔥 ${streak} dia${streak === 1 ? '' : 's'} seguido${streak === 1 ? '' : 's'} — não perca hoje!` : '📖 Registre seu dia',
-        body: 'Você ainda não preencheu o Diário hoje. Leva menos de 1 minuto no modo rápido.'
-      });
-    }
+  // Registro de aula: no máximo 4 lembretes em até 7 dias, sempre em uma
+  // janela livre. O segundo pode ocorrer no fim do mesmo dia; depois a cadência
+  // desacelera para não transformar o sistema em cobrança diária.
+  const capture=captureCandidates(data,now);
+  const bestCapture=capture.candidates[0];
+  if(bestCapture){
+    const group=capture.candidates.slice(0,2);
+    due.push({key:`class-capture-bundle:${pa.date}`,title:group.length>1?`📚 Registre suas aulas (${group.length})`:group[0].title,body:group.map(x=>x.body).join('\n\n'),captureRecords:group.map(x=>({key:x.captureKey,count:x.count})),quality:bestCapture.quality});
   }
 
+  // Revisões: não avisamos 24h antes nem no dia seguinte. Só notificamos no
+  // próprio dia marcado e apenas se o usuário estiver realmente em uma janela
+  // livre. Vários conteúdos do mesmo momento são agrupados em uma única mensagem.
+  const review=reviewCandidates(data,now);
+  if(review.item){
+    const captureItem=due.find(x=>Array.isArray(x.captureRecords));
+    if(captureItem){
+      // Uma única notificação reúne ações de aprendizagem do mesmo intervalo
+      // livre. Assim o usuário não recebe uma sequência de avisos separados.
+      const idx=due.indexOf(captureItem);
+      due[idx]={
+        key:`learning-window:${pa.date}`,
+        title:'🧠 Aproveite este intervalo',
+        body:`${captureItem.body}\n\n${review.item.body}`,
+        captureRecords:captureItem.captureRecords,
+        reviewKeys:review.item.reviewKeys,
+        quality:Math.max(captureItem.quality||0,review.item.quality||0)
+      };
+    } else due.push(review.item);
+  }
+
+  // Diário geral continua uma vez por dia, mas só é disparado em horário livre
+  // quando possível. Se não houver janela após o horário configurado, não invade
+  // um bloco de aula para cobrar o usuário.
+  const diaryHour=Number(prefs.diaryReminderHour??20), b=pa;
+  if(!already.has(`diario:${b.date}`)&&b.hour>=diaryHour){
+    const logged=(data.dailyLogs||[]).some(l=>l.data===b.date)||(data.classDiaries||[]).some(d=>d.data===b.date);
+    const free=freeWindowNow(data,now,10);
+    if(!logged&&free)due.push({key:`diario:${b.date}`,title:'📖 Registre seu dia',body:'Você ainda não registrou seu dia. Estou te lembrando agora porque você está em um intervalo livre.',quality:free.quality});
+  }
   return due;
 }
-
 module.exports = async function handler(req, res) {
   const expected = process.env.CRON_SECRET;
   const authHeader = req.headers.authorization || '';
@@ -348,7 +408,29 @@ module.exports = async function handler(req, res) {
       sentTelegram.forEach(key => { if (!alreadyTelegram.has(key)) telegramSentKeys.push(key); });
       const mergedSent = [...(data.sentReminders || []), ...sentKeys].slice(-DEDUPE_LIMIT);
       const mergedTelegram = [...(data.sentTelegramReminders || []), ...telegramSentKeys].slice(-DEDUPE_LIMIT);
-      const update = { sentReminders: mergedSent, sentTelegramReminders: mergedTelegram, pushSubscriptions: stillValidSubs };
+      const smartState = classCaptureState(data);
+      const fullyDelivered = item => {
+        const pushOk = !hasPushGeneral || sentPush.has(item.key) || alreadyPush.has(item.key);
+        const tgOk = !telegramEnabled || sentTelegram.has(item.key) || alreadyTelegram.has(item.key);
+        return pushOk && tgOk;
+      };
+      for (const item of due) {
+        if (!fullyDelivered(item)) continue;
+        if (Array.isArray(item.captureRecords)) {
+          for (const record of item.captureRecords) {
+            const prev = smartState.classCapture[record.key] || {};
+            smartState.classCapture[record.key] = {
+              count: Number(prev.count || 0) + 1,
+              firstSentAt: prev.firstSentAt || new Date().toISOString(),
+              lastSentAt: new Date().toISOString()
+            };
+          }
+        }
+        if (Array.isArray(item.reviewKeys)) item.reviewKeys.forEach(k => { smartState.review[k] = new Date().toISOString(); });
+      }
+      smartState.classCapture = Object.fromEntries(Object.entries(smartState.classCapture).slice(-160));
+      smartState.review = Object.fromEntries(Object.entries(smartState.review).slice(-250));
+      const update = { sentReminders: mergedSent, sentTelegramReminders: mergedTelegram, pushSubscriptions: stillValidSubs, smartReminderState: smartState };
       // O término do foco só é encerrado no servidor depois que todos os
       // canais habilitados entregarem. Assim, se o Push falhar mas Telegram
       // funcionar (ou vice-versa), o canal que falhou ainda terá outra chance.
