@@ -50,6 +50,58 @@ function listAgenda(data,date){return agendaText(data,date);}
 function formatDateBR(date){if(!date)return '';const [y,m,d]=date.split('-');return `${d}/${m}/${y}`;}
 function nowMinBR(){const p=new Intl.DateTimeFormat('en-GB',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(new Date());const h=Number(p.find(x=>x.type==='hour')?.value||0),m=Number(p.find(x=>x.type==='minute')?.value||0);return h*60+m;}
 function nextClass(data){const d=dateObjBR();const current=nowMinBR();for(let offset=0;offset<=7;offset++){const date=isoDate(new Date(d.getTime()+offset*86400000));const day=dayFromDate(date);const items=(data.classSchedule||[]).filter(a=>Number(a.dia)===day).sort((a,b)=>(timeMin(a.inicio)||0)-(timeMin(b.inicio)||0));for(const item of items){if(offset>0||(timeMin(item.inicio)!=null&&timeMin(item.inicio)>=current))return {item,date};}}return null;}
+
+// O Firestore guarda o estado do semestre atual nos arrays principais. Sem uma
+// etiqueta de semestre em cada tarefa/prova/nota antiga, o filtro mais seguro é:
+// 1) usar as matérias atualmente ativas como escopo; e
+// 2) retirar itens que também aparecem explicitamente dentro de um arquivo
+// histórico. Isso evita que consultas do Telegram misturem 2025/2026.1 com o
+// semestre em andamento.
+function currentSubjectKeys(data){
+  const active=Array.isArray(data.subjects)?data.subjects.filter(s=>s&&s.nome):[];
+  if(active.length)return new Set(active.map(s=>normalize(s.nome)).filter(Boolean));
+  const curriculum=Array.isArray(data.curriculum)?data.curriculum.filter(s=>s&&s.nome&&normalize(s.status)==='cursando'):[];
+  return new Set(curriculum.map(s=>normalize(s.nome)).filter(Boolean));
+}
+function historicalItemKeys(data,key){
+  const out=new Set();
+  const archives=Array.isArray(data.archivedSemesters)?data.archivedSemesters:[];
+  for(const archive of archives){
+    const items=Array.isArray(archive?.[key])?archive[key]:[];
+    for(const item of items){
+      if(key==='exams')out.add(`${normalize(item?.materia)}|${normalize(item?.titulo)}|${String(item?.data||'')}`);
+      else if(key==='grades')out.add(`${normalize(item?.materia)}|${normalize(item?.nome)}|${Number(item?.valor)}|${Number(item?.peso)}|${String(item?.data||'')}`);
+      else if(key==='tasks')out.add(`${normalize(item?.materia)}|${normalize(item?.titulo)}|${String(item?.dataLimite||'')}`);
+      else if(key==='sessions')out.add(`${normalize(item?.materia)}|${String(item?.data||item?.inicio||'')}|${Number(item?.duracaoReal||item?.duracaoMin||0)}`);
+    }
+  }
+  return out;
+}
+function scopedAcademicItems(data,key){
+  const raw=Array.isArray(data?.[key])?data[key]:[];
+  const subjects=currentSubjectKeys(data);
+  const hasSubjectScope=subjects.size>0;
+  const historical=historicalItemKeys(data,key);
+  return raw.filter(item=>{
+    const materia=normalize(item?.materia||'');
+    if(key==='exams'||key==='grades'||key==='tasks'||key==='sessions'){
+      if(hasSubjectScope && materia && !subjects.has(materia))return false;
+      // Itens sem matéria continuam visíveis, pois podem ser compromissos gerais.
+      let fingerprint='';
+      if(key==='exams')fingerprint=`${materia}|${normalize(item?.titulo)}|${String(item?.data||'')}`;
+      if(key==='grades')fingerprint=`${materia}|${normalize(item?.nome)}|${Number(item?.valor)}|${Number(item?.peso)}|${String(item?.data||'')}`;
+      if(key==='tasks')fingerprint=`${materia}|${normalize(item?.titulo)}|${String(item?.dataLimite||'')}`;
+      if(key==='sessions')fingerprint=`${materia}|${String(item?.data||item?.inicio||'')}|${Number(item?.duracaoReal||item?.duracaoMin||0)}`;
+      if(fingerprint && historical.has(fingerprint))return false;
+    }
+    return true;
+  });
+}
+function formatGroupedBySubject(items, formatter){
+  const groups=new Map();
+  for(const item of items){const key=item?.materia||'Sem matéria';if(!groups.has(key))groups.set(key,[]);groups.get(key).push(item);}
+  return [...groups.entries()].map(([materia,list])=>`${materia}\n${list.map(formatter).join('\n')}`).join('\n\n');
+}
 function daysUntil(date){if(!date)return null;const a=dateObjBR(),b=new Date(`${date}T00:00:00Z`);return Math.round((b-a)/86400000);}
 function naturalQuery(text,data){
   const n=normalize(text);
@@ -65,8 +117,10 @@ function naturalQuery(text,data){
   if(asksClasses&&!classAction){return {kind:'agenda',date:date||todayBR()};}
   if(/\b(que|quais|qual|mostra|mostrar|ver|minhas|meus)\b.*\b(tarefas?|lembretes?|pendencias?|pendências?)\b/.test(n)
     || /\b(o que|oq)\s+(eu\s+)?tenho\s+(para\s+)?(fazer|entregar)\b/.test(n)) return {kind:'tasks',date};
-  if(/\b(que|quais|qual|quando|mostra|mostrar|ver|minhas|meus|proxima|próxima)\b.*\b(provas?|avaliacoes?|avaliações?|trabalhos?)\b/.test(n)
-    || /\bquando\s+(é|e)\s+(minha|a)\s+prova\b/.test(n)) return {kind:'exams',date};
+  const asksNextExam=/\b(proxima|próxima)\b.*\b(prova|avaliacao|avaliação|trabalho)\b/.test(n)
+    || /\bquando\s+(é|e)\s+(minha|a)\s+(prova|avaliacao|avaliação)\b/.test(n);
+  if(asksNextExam)return {kind:'exams',date,nextOnly:true};
+  if(/\b(que|quais|qual|mostra|mostrar|ver|minhas|meus)\b.*\b(provas?|avaliacoes?|avaliações?|trabalhos?)\b/.test(n)) return {kind:'exams',date,nextOnly:false};
   const gradeAction=/\b(minha|minhas)\s+nota\b.*\b(foi|é|e)\b.*\d/.test(n) || /\b(tirei|fiquei\s+com)\b.*\d/.test(n);
   if(!gradeAction && (/\b(minhas|meus|quais|qual|mostra|mostrar|ver)\b.*\b(notas?|medias?|médias?|boletim)\b/.test(n)
     || /\bnota\s+(de|em|do|da)\b/.test(n))) return {kind:'grades'};
@@ -174,25 +228,35 @@ module.exports=async function(req,res){
       await mark();return res.status(200).json({ok:true});
     }
     if(natural?.kind==='tasks'){
-      let items=(data.tasks||[]).filter(x=>!x.concluida);
+      let items=scopedAcademicItems(data,'tasks').filter(x=>!x.concluida);
       if(natural.date)items=items.filter(x=>x.dataLimite===natural.date);
       items.sort((a,b)=>String(a.dataLimite||'').localeCompare(String(b.dataLimite||'')));
       if(!items.length){await reply(chatId,natural.date?`Não encontrei tarefas pendentes para ${formatDateBR(natural.date)}.`:'Não encontrei tarefas pendentes.');}
-      else await reply(chatId,(natural.date?`Tarefas de ${formatDateBR(natural.date)}:`:'Tarefas pendentes:')+'\n'+items.slice(0,20).map(x=>`• ${x.titulo||'Tarefa'}${x.materia?' · '+x.materia:''}${x.dataLimite?' · '+formatDateBR(x.dataLimite):''}`).join('\n'));
+      else await reply(chatId,(natural.date?`Tarefas de ${formatDateBR(natural.date)}:`:'Tarefas pendentes:')+'\n'+formatGroupedBySubject(items.slice(0,20),x=>`• ${x.titulo||'Tarefa'}${x.dataLimite?' · '+formatDateBR(x.dataLimite):''}`));
       await mark();return res.status(200).json({ok:true});
     }
     if(natural?.kind==='exams'){
-      let items=(data.exams||[]).filter(x=>!x.concluida);
+      let items=scopedAcademicItems(data,'exams').filter(x=>!x.concluida);
+      const today=todayBR();
+      // Consultas de "próxima prova" nunca retornam avaliações já passadas.
+      // A mesma regra vale para a listagem de próximas avaliações.
+      items=items.filter(x=>String(x.data||'')>=today);
       if(natural.date)items=items.filter(x=>x.data===natural.date);
       items.sort((a,b)=>String(a.data||'').localeCompare(String(b.data||'')));
-      if(!items.length){await reply(chatId,natural.date?`Não encontrei avaliações pendentes para ${formatDateBR(natural.date)}.`:'Não encontrei provas, avaliações ou trabalhos pendentes.');}
-      else await reply(chatId,(natural.date?`Avaliações de ${formatDateBR(natural.date)}:`:'Próximas avaliações:')+'\n'+items.slice(0,20).map(x=>`• ${x.titulo||'Avaliação'}${x.materia?' · '+x.materia:''}${x.data?' · '+formatDateBR(x.data):''}`).join('\n'));
+      if(natural.nextOnly)items=items.slice(0,1);
+      if(!items.length){await reply(chatId,natural.date?`Não encontrei avaliações pendentes para ${formatDateBR(natural.date)}.`:natural.nextOnly?'Não encontrei nenhuma próxima prova ou avaliação cadastrada.':'Não encontrei provas, avaliações ou trabalhos futuros cadastrados.');}
+      else if(natural.nextOnly){const x=items[0];await reply(chatId,`Sua próxima avaliação é:
+
+${x.titulo||'Avaliação'}
+${x.materia||'Sem matéria'}
+${formatDateBR(x.data)}`);}
+      else await reply(chatId,'Próximas avaliações:\n\n'+formatGroupedBySubject(items.slice(0,20),x=>`• ${x.titulo||'Avaliação'} · ${formatDateBR(x.data)}`));
       await mark();return res.status(200).json({ok:true});
     }
     if(natural?.kind==='grades'){
-      const items=(data.grades||[]).slice().sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')));
-      if(!items.length)await reply(chatId,'Ainda não encontrei notas registradas no SLCampus.');
-      else await reply(chatId,'Notas registradas:\n'+items.slice(0,30).map(x=>`• ${x.materia||'Matéria'} · ${x.nome||'Avaliação'}: ${Number(x.valor).toFixed(1)}${x.peso?' · peso '+x.peso+'%':''}`).join('\n'));
+      const items=scopedAcademicItems(data,'grades').slice().sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')));
+      if(!items.length)await reply(chatId,'Ainda não encontrei notas registradas no semestre atual do SLCampus.');
+      else await reply(chatId,'Notas do semestre atual:\n\n'+formatGroupedBySubject(items.slice(0,30),x=>`• ${x.nome||'Avaliação'}: ${Number(x.valor).toFixed(1)}${x.peso?' · peso '+x.peso+'%':''}`));
       await mark();return res.status(200).json({ok:true});
     }
     if(natural?.kind==='studySummary'){
