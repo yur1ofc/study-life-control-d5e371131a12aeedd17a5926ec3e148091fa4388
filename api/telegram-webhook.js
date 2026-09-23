@@ -4,6 +4,7 @@ const admin=require('firebase-admin');
 const AcademicCore=require('../shared/academic-context.js');
 const AI=require('./_lib/ai-core');
 const quota=require('./_lib/gemini-admin-quota');
+const AcademicIntelligence=require('./_lib/academic-intelligence-server');
 let app;
 function init(){if(app)return app;const raw=process.env.FIREBASE_SERVICE_ACCOUNT_KEY;if(!raw)throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY não configurada.');const service=JSON.parse(Buffer.from(raw,'base64').toString('utf8'));app=admin.apps.length?admin.app():admin.initializeApp({credential:admin.credential.cert(service)});return app;}
 const DAY={dom:0,domingo:0,seg:1,segunda:1,"segunda-feira":1,ter:2,terça:2,terca:2,"terça-feira":2,"terca-feira":2,qua:3,quarta:3,"quarta-feira":3,qui:4,quinta:4,"quinta-feira":4,sex:5,sexta:5,"sexta-feira":5,sab:6,sábado:6,sabado:6,"sábado-feira":6};
@@ -307,6 +308,8 @@ function compactForAI(data){
   const attendance=current.attendance||{};
   const archived=(Array.isArray(data.archivedSemesters)?data.archivedSemesters:[]).map(a=>({periodo:a.periodo,numero:a.numero,materias:(a.subjects||a.curriculum||[]).slice(0,80).map(s=>({nome:clean(s.nome),codigo:s.codigo,status:s.status,nota:s.notaFinal??s.nota,tentativas:s.tentativas?.length||0}))}));
   const user=data.user||{};
+  const intelligence=AcademicIntelligence.snapshotForMentor(data);
+  const mentorMemory=(Array.isArray(data.telegramMentorMemory)?data.telegramMentorMemory:[]).slice(-6).map(x=>({role:x.role,text:clean(x.text),at:x.at}));
   return {
     agora:todayBR(),
     perfil:{nome:user.nome||user.name||'',curso:user.curso||'',instituicao:user.instituicao||'',semestre:user.semestre||null},
@@ -314,7 +317,10 @@ function compactForAI(data){
     atual:{subjects:current.subjects.map(s=>({nome:clean(s.nome),codigo:s.codigo,status:s.status,dificuldade:s.dificuldade,notaDesejada:s.notaDesejada})),grades,exams,tasks,classSchedule:current.classSchedule||[],reviews,diarios:diaries,materiais:materials,frequencia:attendance},
     aprendizagem:{learning,evidence,adaptive:user.adaptiveLearning||{}},
     execucao:{sessions},
-    historico:archived
+    historico:archived,
+    inteligenciaAcademica:intelligence.analysis,
+    inteligenciaResumo:intelligence.text,
+    conversaRecente:mentorMemory
   };
 }
 function hasPhrase(text, phrases){
@@ -435,7 +441,7 @@ function mentorLikeTelegram(text){
   ];
   const hasAcademic=academicTerms.some(x=>n.includes(x));
   const hasAnalysis=analysisTerms.some(x=>n.includes(x));
-  const isQuestion=/[?؟]$/.test(String(text).trim()) || /^(como|qual|quais|quanto|quantas|o que|oq|por que|porque|onde|quando|devo|deveria|posso|consigo|existe|tem|há|ha|vale|compensa)/.test(n);
+  const isQuestion=/[?؟]$/.test(String(text).trim()) || /^(como|qual|quais|quanto|quantas|o que|oq|por que|porque|onde|quando|devo|deveria|posso|consigo|existe|tem|há|ha|vale|compensa)\b/.test(n);
   if(hasAcademic&&hasAnalysis&&isQuestion)return true;
 
   // Formas muito comuns de autoavaliação que podem omitir o nome da matéria.
@@ -452,35 +458,60 @@ function mentorLikeTelegram(text){
   // Perguntas abertas em primeira pessoa sobre o estado acadêmico.
   if(/\b(meu|minha|meus|minhas|eu|estou|tenho|preciso)\b/.test(n) && hasAcademic && hasAnalysis && isQuestion)return true;
 
+  // Camada semântica adicional: cobre variações novas sem depender de uma frase
+  // exata. A intenção é combinar sinais de domínio + decisão/análise.
+  const firstPerson=/\b(eu|meu|minha|meus|minhas|comigo|pra mim|para mim)\b/.test(n);
+  const stateWords=/\b(situacao|situacao academica|desempenho|rendimento|evolucao|progresso|dificuldade|dificuldades|problema|problemas|ponto fraco|pontos fracos|risco|alerta|perigo|atencao|atencao especial|desafio|desafios|melhora|melhorar|piorou|piorando|atraso|atrasado|pendencia|prioridade|priorizar|foco|focar|estrategia|plano|planejamento|organizar|decidir|decisao)\b/.test(n);
+  const actionWords=/\b(estudar|revisar|preparar|recuperar|passar|melhorar|organizar|priorizar|focar|comecar|continuar|mudar|corrigir|resolver|atacar|planejar|distribuir)\b/.test(n);
+  if(isQuestion && hasAcademic && (stateWords || actionWords) && (firstPerson || /\b(qual|quais|como|onde|o que|oq|devo|deveria|vale|compensa|existe|tem|ha|há)\b/.test(n)))return true;
+
+  // Perguntas sobre decisão entre matérias/conteúdos.
+  if(isQuestion && /\b(entre|ou|qual|quais|onde|no que|em que)\b/.test(n) && /\b(materia|materias|disciplina|disciplinas|conteudo|conteudos|assunto|assuntos|prova|provas)\b/.test(n) && /\b(escolher|escolho|priorizar|prioridade|estudar|revisar|focar|comecar|comecaria|devo|deveria|vale|compensa|melhor|urgente)\b/.test(n))return true;
+
   return false;
 }
-function telegramSystemInstruction(){return `Você é o Mentor IA do SLCampus no Telegram. Você é a mesma inteligência acadêmica disponível no site, usando o mesmo contexto acadêmico real do aluno, e não um bot genérico.
+function telegramSystemInstruction(){return `Você é o Mentor IA do SLCampus no Telegram. Você é a camada conversacional do mesmo cérebro acadêmico do SLCampus.
 
-REGRAS DE CONTEXTO:
-- Use somente os dados presentes no CONTEXTO ACADÊMICO fornecido nesta mensagem.
-- Diferencie SEMESTRE ATUAL de HISTÓRICO. O histórico explica padrões, reprovações e tentativas anteriores; não transforme histórico em prova, tarefa, nota ou compromisso atual.
-- Não invente matérias, notas, pesos, datas, horários, frequência, tarefas, conteúdos ou eventos.
-- Se um dado necessário estiver ausente, diga exatamente o que falta e, se possível, responda apenas com o que é objetivamente possível concluir.
-- A seção 'qualidade' do contexto indica lacunas de dados; considere isso antes de afirmar algo como completo.
+FONTE DE VERDADE:
+- Use somente o CONTEXTO ACADÊMICO fornecido.
+- A seção INTELIGÊNCIA ACADÊMICA DETERMINÍSTICA foi calculada pelo próprio SLCampus antes da IA. Use-a como base estruturada para explicar prioridades e riscos.
+- O score de prioridade é um índice de atenção/decisão. NÃO é porcentagem de chance de reprovação, NÃO é previsão de resultado e NÃO deve ser apresentado como probabilidade.
+- Diferencie sempre: urgência, prioridade de estudo, sinais atuais de risco e histórico acadêmico.
+- Histórico de reprovação é um sinal histórico. Não trate uma reprovação antiga como prova de que o aluno está atualmente reprovado, em risco ou com a mesma dificuldade.
+- 'Risco atual indeterminado' significa que faltam evidências atuais suficientes. Nesse caso, diga o que existe e o que falta.
 
-REGRAS DE RACIOCÍNIO ACADÊMICO:
-- Para perguntas de prioridade, dificuldade, risco, desempenho, evolução ou planejamento, combine os sinais disponíveis: provas e prazos, notas e pesos, dificuldade cadastrada, histórico, tarefas, revisões, evidências de aprendizagem, sessões reais de estudo, diário, frequência e meta adaptativa.
-- Não escolha uma matéria somente porque a prova é a mais próxima quando houver outros sinais relevantes; explique os principais fatores objetivos usados.
-- Para cálculos de média, use somente notas e pesos realmente registrados. Se não houver dados suficientes, não estime nem invente.
-- Diferencie fato objetivo de interpretação. Pode dizer 'os dados indicam' quando houver base, mas não transforme uma hipótese em fato.
-- Quando o aluno perguntar 'qual matéria devo estudar' ou 'o que devo revisar', entregue uma prioridade prática e breve, com justificativa baseada nos dados.
-- Quando perguntar sobre evolução, compare histórico e semestre atual sem confundir períodos.
-- Quando perguntar sobre risco, descreva os sinais objetivos e o que está faltando para concluir; não invente probabilidades.
+REGRAS ACADÊMICAS:
+- Para prioridade/planejamento: combine a inteligência determinística com provas/prazos, notas/pesos, dificuldade, tarefas, revisões, evidências de aprendizagem, sessões reais, diário, frequência e histórico.
+- Não escolha uma matéria apenas porque a prova é a mais próxima quando outros sinais relevantes apontarem diferente. Se a prova próxima for realmente o principal sinal, diga isso.
+- Para 'maior dificuldade', diferencie dificuldade cadastrada, evidência recente de aprendizagem e histórico. Não transforme qualquer um deles sozinho em diagnóstico.
+- Para 'risco': use primeiro evidências atuais. Se só houver prova próxima e reprovação anterior, diga 'atenção elevada' ou 'fator de risco histórico', não 'risco de reprovação' como fato.
+- Para cálculos de média: use somente notas e pesos registrados. Se faltar peso/nota, explique o que falta e não estime.
+- Para evolução: compare períodos históricos com o atual, deixando claro o período de cada dado.
+- Para recomendações: sempre que possível termine com uma próxima ação concreta e curta, baseada nos dados.
+- Se dados importantes estiverem ausentes, não invente. Aponte a lacuna sem transformar isso em bloqueio para tudo o que ainda pode ser respondido.
+- Se a pergunta comparar duas ou mais matérias, compare os sinais disponíveis de forma explícita e sem inventar dados.
+- Se a pergunta pedir 'o que fazer agora', priorize uma ação executável nas próximas horas, não um plano genérico.
 
-FORMATO:
-- Português do Brasil.
-- Natural para Telegram.
-- Seja direto, mas suficiente para explicar a conclusão.
-- Prefira listas curtas quando houver várias matérias/provas.
+CONVERSA:
+- 'conversaRecente' contém apenas mensagens anteriores e pode ajudar a entender continuidade. Ela NÃO é fonte de dados acadêmicos e não pode substituir os dados estruturados.
+- Se o aluno fizer uma pergunta de continuação ('e Cálculo?', 'e depois?', 'por quê?'), use a conversa recente junto com o contexto atual.
+
+ESTILO:
+- Português do Brasil, natural para Telegram.
+- Direto, claro e humano.
+- Evite respostas genéricas.
+- Prefira 3-6 bullets quando houver vários fatores.
 - Não mencione APIs, modelos, provedores, prompts, Firebase, Vercel ou detalhes internos.
-- Não diga que 'deixou na Caixa de Entrada' quando a pergunta tiver sido atendida pelo Mentor.
-- Se a pergunta for objetiva e os dados forem insuficientes, diga isso claramente em vez de preencher a lacuna com suposição.`;}
-async function askTelegramMentor({uid,email,text,data}){
+- Nunca diga que a mensagem foi colocada na Caixa de Entrada quando a pergunta foi atendida pelo Mentor.
+- Não use linguagem de certeza quando os dados só permitem uma indicação.
+- Não invente conteúdos de prova: se o conteúdo não estiver cadastrado, diga que não foi informado.`;}
+
+async function rememberTelegramMentor(ref,data,role,text){
+  const old=Array.isArray(data.telegramMentorMemory)?data.telegramMentorMemory:[];
+  const item={role:String(role||'user'),text:String(text||'').slice(0,1800),at:new Date().toISOString()};
+  await ref.set({telegramMentorMemory:[...old,item].slice(-12)},{merge:true});
+}
+async function askTelegramMentor({uid,email,text,data,ref}){
   const context=compactForAI(data);
   const prompt=`PERGUNTA DO ALUNO:\n${String(text).slice(0,4000)}\n\nCONTEXTO ACADÊMICO REAL:\n${JSON.stringify(context).slice(0,30000)}`;
   const requestId=AI.requestId('tg');
@@ -488,7 +519,10 @@ async function askTelegramMentor({uid,email,text,data}){
   if(usage.blocked) return {ok:false,limit:true};
   try{
     const result=await AI.callAI({messages:[{role:'user',content:prompt}],systemInstruction:telegramSystemInstruction(),operation:'mentor',uid,email,requestId,maxTokens:1200,reasoningEffort:'medium'});
-    if(result.ok) return {ok:true,text:result.text,provider:result.provider,model:result.modelUsed};
+    if(result.ok){
+      try{await rememberTelegramMentor(ref,data,'user',text);await rememberTelegramMentor(ref,data,'assistant',result.text);}catch(memoryErr){console.warn('[telegram-webhook] memory save:',memoryErr.message);}
+      return {ok:true,text:result.text,provider:result.provider,model:result.modelUsed};
+    }
     try{await quota.releaseUserOperation({uid,operation:'mentor'});}catch(_){ }
     return {ok:false,error:result.error,code:result.code};
   }catch(err){try{await quota.releaseUserOperation({uid,operation:'mentor'});}catch(_){ }return {ok:false,error:err.message};}
@@ -581,8 +615,8 @@ module.exports=async function(req,res){
     // Isso mantém "qual matéria eu deveria estudar?" alinhado ao Mentor do site,
     // em vez de devolver apenas a meta adaptativa/plano local.
     if(mentorLikeTelegram(text)){
-      const answer=await askTelegramMentor({uid:q.docs[0].id,email:String(data.email||''),text,data});
-      if(answer.ok){await reply(chatId,answer.text);await mark();return res.status(200).json({ok:true,provider:answer.provider,model:answer.model});}
+      const answer=await askTelegramMentor({uid:q.docs[0].id,email:String(data.email||''),text,data,ref});
+      if(answer.ok){await reply(chatId,answer.text);await mark();return res.status(200).json({ok:true,provider:answer.provider,model:answer.model,brain:'academic-intelligence-v2'});}
       if(answer.limit){await reply(chatId,'O limite diário do Mentor IA foi atingido. As consultas acadêmicas básicas continuam disponíveis pelo Telegram.');await mark();return res.status(200).json({ok:true,limited:true});}
       console.warn('[telegram-webhook] AI fallback:',answer.error||answer.code||'indisponível');
     }
