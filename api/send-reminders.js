@@ -293,6 +293,7 @@ module.exports = async function handler(req, res) {
 
       const stillValidSubs = [];
       const sentKeys = [];
+      const itemSent = new Map();
       let focusSent = false;
 
       for (const subscription of subscriptions) {
@@ -307,6 +308,7 @@ module.exports = async function handler(req, res) {
               requireInteraction: true
             }));
             summary.notificationsSent++;
+            itemSent.set(item.key, true);
             if (item.focusPush) focusSent = true;
           } catch (err) {
             if (err.statusCode === 404 || err.statusCode === 410) {
@@ -320,15 +322,28 @@ module.exports = async function handler(req, res) {
         else summary.subscriptionsRemoved++;
       }
 
-      due.forEach(item => { if (!item.focusPush) sentKeys.push(item.key); });
+      due.forEach(item => { if (!item.focusPush && itemSent.get(item.key)) sentKeys.push(item.key); });
       const mergedSent = [...(data.sentReminders || []), ...sentKeys].slice(-DEDUPE_LIMIT);
       const update = { sentReminders: mergedSent, pushSubscriptions: stillValidSubs };
+      // Só considera o lembrete entregue quando pelo menos um dispositivo recebeu.
+      // Assim uma falha transitória do web-push não "queima" o lembrete para sempre.
       if (focusDue && focusSent) update.focusPushSchedule = null;
       await doc.ref.update(update);
     }
 
+    try {
+      await db.collection('system').doc('notificationScheduler').set({
+        lastRunAt: new Date().toISOString(),
+        summary,
+        error: summary.errors.length ? summary.errors.slice(0, 10).join(' | ') : null,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    } catch (_) {}
     return res.status(200).json(summary);
   } catch (err) {
+    try {
+      if (db) await db.collection('system').doc('notificationScheduler').set({ lastRunAt:new Date().toISOString(), error:err.message, summary, updatedAt:new Date().toISOString() }, { merge:true });
+    } catch (_) {}
     return res.status(500).json({ error: err.message, ...summary });
   }
 };
