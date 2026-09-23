@@ -18,6 +18,29 @@ const CHUNK_CHARS = 10000;
 
 function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 function requestId(prefix='ai'){ return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2,9)}`; }
+
+// O frontend histórico do SLCampus envia systemInstruction no formato nativo
+// do Gemini ({ parts: [{ text: '...' }] }). O Groq/OpenAI espera uma string
+// em messages[].content. Normalizamos aqui para que os dois provedores recebam
+// exatamente o formato que cada API espera.
+function normalizeSystemInstruction(value){
+  if(value == null) return '';
+  if(typeof value === 'string') return value;
+  if(Array.isArray(value)){
+    return value.map(normalizeSystemInstruction).filter(Boolean).join('\n');
+  }
+  if(typeof value === 'object'){
+    if(typeof value.text === 'string') return value.text;
+    if(Array.isArray(value.parts)){
+      return value.parts.map(part=>{
+        if(typeof part === 'string') return part;
+        return part && typeof part.text === 'string' ? part.text : '';
+      }).filter(Boolean).join('\n');
+    }
+    if(typeof value.content === 'string') return value.content;
+  }
+  return String(value);
+}
 function isRetryable(status, data){
   const msg=String(data?.error?.message||data?.error?.status||'').toLowerCase();
   return [408,429,500,502,503,504].includes(status) || /overload|temporar|unavailable|timeout|rate.?limit|capacity|resource.?exhausted/.test(msg);
@@ -87,6 +110,7 @@ function geminiPayload({messages,systemInstruction='',json=false,maxTokens=1400,
 }
 
 async function callGemini({messages,systemInstruction='',json=false,model=GEMINI_MODEL,operation='mentor',uid,email,requestId:rid,maxTokens=1400,reasoningEffort='medium'}){
+  systemInstruction=normalizeSystemInstruction(systemInstruction);
   const key=process.env.GEMINI_API_KEY;
   if(!key) return {ok:false,status:503,error:'GEMINI_API_KEY não configurada no Vercel.',code:'GEMINI_NOT_CONFIGURED',provider:'gemini',retryable:true};
   const current=model || GEMINI_MODEL;
@@ -127,6 +151,7 @@ async function callGemini({messages,systemInstruction='',json=false,model=GEMINI
 }
 
 async function callGroq({messages,systemInstruction='',json=false,model=TEXT_MODEL,operation='mentor',uid,email,requestId:rid,maxTokens=1400,reasoningEffort='medium'}){
+  systemInstruction=normalizeSystemInstruction(systemInstruction);
   const key=process.env.GROQ_API_KEY;
   if(!key) return {ok:false,status:503,error:'GROQ_API_KEY não configurada no Vercel.',code:'GROQ_NOT_CONFIGURED',provider:'groq',retryable:true};
   const models = model===VISION_MODEL ? [VISION_MODEL] : [model, SMALL_TEXT_MODEL].filter((v,i,a)=>v && a.indexOf(v)===i);
@@ -175,6 +200,7 @@ async function callGroq({messages,systemInstruction='',json=false,model=TEXT_MOD
 }
 
 async function callAI({messages,systemInstruction='',json=false,operation='mentor',uid,email,requestId:rid,maxTokens=1400,reasoningEffort='medium',model,geminiModel}){
+  systemInstruction=normalizeSystemInstruction(systemInstruction);
   const order=providerOrder();
   let last=null;
   for(const provider of order){
