@@ -85,11 +85,29 @@ async function callGroq({messages, systemInstruction='', json=false, model=TEXT_
   return {ok:false,status,error:status===429?'A IA atingiu o limite temporário de requisições. Aguarde alguns segundos e tente novamente.':status===503?'A IA está temporariamente indisponível. Tente novamente em alguns segundos.':raw||`Erro HTTP ${status} da IA.`,code:status===429?'GROQ_429':status===504?'GROQ_504':'GROQ_ERROR'};
 }
 
+function sniffMimeFromBase64(data, declared=''){
+  const raw=String(data||'').replace(/\s/g,'');
+  const declaredMime=String(declared||'').toLowerCase().split(';')[0].trim();
+  try{
+    const b=Buffer.from(raw,'base64');
+    if(!b.length) return null;
+    const head=b.subarray(0,16).toString('ascii');
+    if(head.startsWith('%PDF-')) return 'application/pdf';
+    if(b[0]===0x89&&b[1]===0x50&&b[2]===0x4e&&b[3]===0x47) return 'image/png';
+    if(b[0]===0xff&&b[1]===0xd8&&b[2]===0xff) return 'image/jpeg';
+    if(b.subarray(0,4).toString('ascii')==='RIFF'&&b.subarray(8,12).toString('ascii')==='WEBP') return 'image/webp';
+  }catch(_){}
+  return declaredMime||null;
+}
+
 function dataUrlFromPart(part){
   const d=part?.inline_data||part?.inlineData;
   if(!d?.data) return null;
-  const mime=String(d.mime_type||d.mimeType||'image/jpeg');
-  return {mime,dataUrl:`data:${mime};base64,${d.data}`};
+  const detected=sniffMimeFromBase64(d.data,d.mime_type||d.mimeType||'');
+  if(!detected || !/^image\/(png|jpeg|webp)$/i.test(detected)) return null;
+  const raw=String(d.data).replace(/\s/g,'');
+  try{ if(!Buffer.from(raw,'base64').length) return null; }catch(_){ return null; }
+  return {mime:detected,dataUrl:`data:${detected};base64,${raw}`};
 }
 
 function splitIntoChunks(text, size=CHUNK_CHARS){
@@ -115,7 +133,8 @@ async function extractPdfText(contents){
   for(const c of (contents||[])){
     for(const part of (c?.parts||[])){
       const d=part?.inline_data||part?.inlineData;
-      if(d?.data && /^application\/pdf$/i.test(String(d.mime_type||d.mimeType||''))){
+      const detected=sniffMimeFromBase64(d?.data,d?.mime_type||d?.mimeType||'');
+      if(d?.data && detected==='application/pdf'){
         pdfCount++;
         const buffer=Buffer.from(String(d.data),'base64');
         if(buffer.length>12*1024*1024) throw new Error('PDF muito grande. Envie um arquivo de até 12 MB.');
@@ -191,4 +210,4 @@ function mergeJsonObjects(objects){
   return out;
 }
 
-module.exports={TEXT_MODEL,SMALL_TEXT_MODEL,VISION_MODEL,requestId,geminiContentsToGroq,buildMessagesFromGemini,callGroq,splitIntoChunks,parseJsonResponse,mergeJsonObjects,CHUNK_CHARS};
+module.exports={TEXT_MODEL,SMALL_TEXT_MODEL,VISION_MODEL,requestId,geminiContentsToGroq,buildMessagesFromGemini,callGroq,splitIntoChunks,parseJsonResponse,mergeJsonObjects,CHUNK_CHARS,sniffMimeFromBase64};

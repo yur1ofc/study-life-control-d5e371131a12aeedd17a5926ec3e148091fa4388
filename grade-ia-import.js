@@ -60,6 +60,36 @@ Regras:
     return map[ext] || 'application/octet-stream';
   }
 
+  async function imageToSafeBase64(file) {
+    const allowed = ['image/png', 'image/jpeg', 'image/webp'];
+    const mime = getMimeType(file).toLowerCase();
+    if (!mime.startsWith('image/')) return { mime, data: await fileToBase64(file) };
+    if (allowed.includes(mime) && file.size <= 6 * 1024 * 1024) {
+      return { mime, data: await fileToBase64(file) };
+    }
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((resolve, reject) => {
+        const el = new Image();
+        el.onload = () => resolve(el);
+        el.onerror = () => reject(new Error('Não consegui ler a imagem selecionada.'));
+        el.src = url;
+      });
+      const maxSide = 2200;
+      const scale = Math.min(1, maxSide / Math.max(img.naturalWidth || img.width, img.naturalHeight || img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round((img.naturalWidth || img.width) * scale));
+      canvas.height = Math.max(1, Math.round((img.naturalHeight || img.height) * scale));
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Seu navegador não conseguiu preparar a imagem para a IA.');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.86);
+      return { mime: 'image/jpeg', data: dataUrl.split(',')[1] };
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
   // ─── Chamada ao Gemini ─────────────────────────────────────────────────────
 
   function wait(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
@@ -448,11 +478,11 @@ Regras:
           if (!isPdf && !isImg) throw new Error('Formato não suportado. Use PDF, PNG, JPG ou WEBP.');
 
           setStatus('<i class="fas fa-spinner fa-spin"></i> Lendo o arquivo com IA...', 'loading');
-          const b64 = await fileToBase64(selectedFile);
+          const prepared = isImg ? await imageToSafeBase64(selectedFile) : { mime, data: await fileToBase64(selectedFile) };
 
           parts = [
             { text: GRADE_PROMPT },
-            { inline_data: { mime_type: mime, data: b64 } }
+            { inline_data: { mime_type: prepared.mime, data: prepared.data } }
           ];
         } else {
           const text = modal.querySelector('#slc-gim-texto').value.trim();
@@ -511,11 +541,11 @@ Regras:
     // da importação de grade.
     async analyzeFile(file, prompt, onRetryStatus) {
       if (!file) throw new Error('Nenhum arquivo selecionado.');
-      const data = await fileToBase64(file);
       const mime = getMimeType(file);
+      const prepared = mime.startsWith('image/') ? await imageToSafeBase64(file) : { mime, data: await fileToBase64(file) };
       return callGemini([
         { text: String(prompt || '') },
-        { inline_data: { mime_type: mime, data } }
+        { inline_data: { mime_type: prepared.mime, data: prepared.data } }
       ], onRetryStatus);
     }
   };
