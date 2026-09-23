@@ -426,6 +426,7 @@ class StudyLifeControl {
             case 'provas': html = this.viewRenderer.renderProvas(); break;
             case 'mapa-aprendizado': html = this.viewRenderer.renderMapaAprendizado(); break;
             case 'materiais': html = this.viewRenderer.renderMateriais(); break;
+            case 'biblioteca': html = window.ResourceLibrary?.renderView?.() || '<div class="card"><p>Biblioteca carregando...</p></div>'; break;
             case 'calendario': html = this.viewRenderer.renderCalendario(); break;
             case 'previsao-notas': html = this.viewRenderer.renderPrevisaoNotas(); break;
             case 'habitos': html = this.viewRenderer.renderHabitos(); break;

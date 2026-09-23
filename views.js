@@ -1587,9 +1587,16 @@ class ViewRenderer {
             <div class="config-item">
                 <div class="config-info"><h4>Conectado como</h4><p>${email}</p></div>
             </div>
-            <button class="btn-danger" id="config-logout-btn" style="margin-top:12px;">
+            <button class="btn-secondary" id="config-logout-btn" style="margin-top:12px;">
                 <i class="fas fa-sign-out-alt"></i> Sair da conta
-            </button>`;
+            </button>
+            <div class="account-danger-box">
+                <div>
+                    <strong>Excluir minha conta</strong>
+                    <p>Apaga permanentemente seu login, dados, materiais e arquivos privados.</p>
+                </div>
+                <button class="btn-danger" id="btn-delete-account"><i class="fas fa-user-xmark"></i> Excluir conta</button>
+            </div>`;
         }
 
         if (aba === 'calendario') {
@@ -1791,7 +1798,7 @@ class ViewRenderer {
             <div style="display:flex;flex-direction:column;gap:12px;">
                 <div class="card" style="padding:18px;">
                     <strong style="font-size:1.1rem">SLCampus</strong>
-                    <p style="color:var(--text-secondary);margin-top:4px">Sistema inteligente de planejamento acadêmico para universitários</p>
+                    <p style="color:var(--text-secondary);margin-top:4px">Seu espaço inteligente para estudar, organizar materiais e acompanhar sua evolução</p>
                     <p style="margin-top:8px;font-size:.88rem;color:var(--text-tertiary)">Versão 3.0.0 • Open Source</p>
                 </div>
                 <div class="card" style="padding:18px;">

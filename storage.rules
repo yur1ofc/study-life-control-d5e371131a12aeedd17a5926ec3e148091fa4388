@@ -1,0 +1,20 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Arquivos privados: somente o próprio usuário pode ler/gravar/apagar.
+    match /users/{userId}/resources/{resourceId}/{fileName} {
+      allow read, delete: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size <= 26214400
+        && request.resource.contentType == 'application/pdf';
+      allow update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size <= 26214400
+        && request.resource.contentType == 'application/pdf';
+    }
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

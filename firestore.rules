@@ -28,8 +28,8 @@ service cloud.firestore {
         && strLen(d.updatedAt, 30);
     }
 
-    // Validação de tamanho do documento do usuário (máx ~2 MB serializado)
-    // O Firestore tem limite de 1 MB por documento; essa regra impede payloads
+    // Validação de tamanho do documento do usuário (o limite real do Firestore é 1 MiB)
+    // Essas regras limitam crescimento dos arrays principais; o tamanho final do documento também é validado pelo Firestore.
     // malformados antes mesmo de chegar ao servidor.
     function validUserDocSize() {
       // Limita arrays principais para evitar crescimento ilimitado
@@ -54,6 +54,21 @@ service cloud.firestore {
       allow write: if isOwner(userId) && validUserDocSize();
     }
 
+    match /users/{userId}/resources/{resourceId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.titulo is string
+        && request.resource.data.titulo.size() <= 180
+        && request.resource.data.tipo in ['pdf','video','ebook','link','site']
+        && request.resource.data.materia is string
+        && request.resource.data.materia.size() <= 120
+        && request.resource.data.descricao is string
+        && request.resource.data.descricao.size() <= 800
+        && request.resource.data.url is string
+        && request.resource.data.url.size() <= 2000
+        && request.resource.data.tags is list
+        && request.resource.data.tags.size() <= 10;
+    }
     match /users/{userId}/{document=**} {
       allow read: if isOwner(userId);
       allow write: if isOwner(userId);
