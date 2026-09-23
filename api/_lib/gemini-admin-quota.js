@@ -25,14 +25,14 @@ function todayKey() {
 // IMPORTANTE: este número é um orçamento interno do SLCampus, NÃO uma afirmação
 // sobre a quota do Google. Em produção, configure GEMINI_TOTAL_DAILY_LIMIT com
 // um valor abaixo do RPD efetivo que aparece no AI Studio para os modelos usados.
-const configuredTotal = parseInt(process.env.SLC_AI_TOTAL_DAILY_LIMIT || process.env.GEMINI_TOTAL_DAILY_LIMIT || '40', 10);
+const configuredTotal = parseInt(process.env.SLC_AI_TOTAL_DAILY_LIMIT || process.env.GEMINI_TOTAL_DAILY_LIMIT || '200', 10);
 const TOTAL_DAILY_LIMIT = Number.isFinite(configuredTotal) && configuredTotal > 0 ? configuredTotal : 20;
 
 const configuredReserve = parseInt(process.env.SLC_AI_IMPORT_RESERVE || process.env.GEMINI_IMPORT_RESERVE || '10', 10);
-const IMPORT_RESERVE = Math.max(0, Math.min(TOTAL_DAILY_LIMIT - 1, Number.isFinite(configuredReserve) ? configuredReserve : 8));
+const IMPORT_RESERVE = Math.max(0, Math.min(TOTAL_DAILY_LIMIT - 1, Number.isFinite(configuredReserve) ? configuredReserve : 40));
 const CHAT_CEILING = Math.max(0, TOTAL_DAILY_LIMIT - IMPORT_RESERVE);
 
-const USER_IMPORT_LIMIT = parseInt(process.env.SLC_AI_USER_IMPORT_LIMIT || process.env.GEMINI_USER_IMPORT_LIMIT || '8', 10);
+const USER_IMPORT_LIMIT = parseInt(process.env.SLC_AI_USER_IMPORT_LIMIT || process.env.GEMINI_USER_IMPORT_LIMIT || '20', 10);
 const MENTOR_DAILY_LIMIT = parseInt(process.env.SLC_AI_MENTOR_DAILY_LIMIT || process.env.MENTOR_DAILY_LIMIT || '60', 10);
 
 function globalRef(db) {

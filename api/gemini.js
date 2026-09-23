@@ -13,78 +13,79 @@ module.exports=async function handler(req,res){
   let body;try{body=typeof req.body==='string'?JSON.parse(req.body||'{}'):(req.body||{});}catch{return res.status(400).json({error:'JSON inválido.'});}
   if(!Array.isArray(body.contents)||!body.contents.length)return res.status(400).json({error:'Requisição inválida: falta "contents".'});
   const rid=AI.requestId('imp');
-  try{const usage=await quota.reserveUserOperation({uid:user.uid,email:user.email,operation:'import',requestId:rid});if(usage.blocked)return res.status(429).json({error:`Limite de ${quota.USER_IMPORT_LIMIT} importações por dia atingido. Tente novamente amanhã.`,code:'LOCAL_USER_LIMIT'});}catch(err){console.error('[api/gemini] quota:',err);return res.status(503).json({error:'O controle de uso da IA está temporariamente indisponível.',code:'QUOTA_STORE_UNAVAILABLE'});}
   try{
+    // Primeiro extraímos o arquivo. Histórico SIGAA estruturado não precisa gastar
+    // uma chamada de LLM: o parser determinístico é mais confiável e também evita
+    // que testes/reimportações sejam bloqueados pelo orçamento diário da IA.
     const built=await AI.buildMessagesFromGemini(body.contents);
     if(!built.messages.length)return res.status(400).json({error:'Nenhum conteúdo utilizável foi encontrado no arquivo.'});
-    const model=built.hasImage?AI.VISION_MODEL:AI.TEXT_MODEL;
-    const prompt=built.hasImage?'Extraia e organize os dados visíveis nas imagens para a finalidade solicitada pelo usuário. Retorne JSON válido e não invente dados.':'Extraia e organize fielmente os dados do conteúdo fornecido para a finalidade solicitada pelo usuário. Retorne JSON válido e não invente dados.';
-
-    // PDFs/textos longos são divididos em blocos para respeitar o limite gratuito
-    // de tokens por minuto do Groq. Cada bloco retorna JSON e os resultados são
-    // mesclados no servidor, evitando pedir ao usuário que divida o arquivo.
-    let results=[];
-    const chunks=built.pdfChunks?.length ? built.pdfChunks : null;
-    if(chunks && chunks.length>1 && !built.hasImage){
-      for(let i=0;i<chunks.length;i++){
-        const chunkMessages=[
-          ...(built.messages.filter(m=>m.content && typeof m.content==='string' && !m.content.startsWith('CONTEÚDO EXTRAÍDO DE PDF(S):'))),
-          {role:'user',content:`BLOCO ${i+1} DE ${chunks.length} DO PDF:\n${chunks[i]}\n\nExtraia somente os dados que realmente aparecem neste bloco. Preserve exatamente a estrutura JSON solicitada no conteúdo/prompt. Não invente dados.`}
-        ];
-        const result=await AI.callGroq({messages:chunkMessages,systemInstruction:prompt,operation:'import',uid:user.uid,email:user.email,requestId:`${rid}_b${i+1}`,maxTokens:3500,reasoningEffort:'low',model,json:true});
-        if(!result.ok)return res.status(result.status||503).json({error:result.error,code:result.code,provider:'groq',requestId:rid,chunk:i+1});
-        const parsed=AI.parseJsonResponse(result.text);
-        if(!parsed)return res.status(502).json({error:`A IA retornou um JSON inválido no bloco ${i+1}.`,code:'AI_BAD_JSON',provider:'groq',requestId:rid});
-        results.push(parsed);
-      }
-    }else{
-      const result=await AI.callGroq({messages:built.messages,systemInstruction:prompt,operation:'import',uid:user.uid,email:user.email,requestId:rid,maxTokens:5000,reasoningEffort:'low',model,json:true});
-      if(!result.ok)return res.status(result.status||503).json({error:result.error,code:result.code,provider:'groq',requestId:rid});
-      const parsed=AI.parseJsonResponse(result.text);
-      if(!parsed)return res.status(502).json({error:'A IA retornou um formato JSON inesperado. Tente novamente.',code:'AI_BAD_JSON',provider:'groq',requestId:rid});
-      results=[parsed];
-    }
-
-    let merged=AI.mergeJsonObjects(results);
-
-    // Histórico SIGAA: se a IA não respeitar o schema ou retornar períodos vazios,
-    // usa o parser determinístico sobre o mesmo texto já extraído do PDF.
     const requestPromptText=(body.contents||[]).flatMap(c=>Array.isArray(c?.parts)?c.parts:[]).map(p=>p?.text||'').join('\n');
     const looksLikeHistory=/hist[oó]rico escolar|Componentes Curriculares Cursados\/Cursando|periodoAtualDetectado|situa[cç][oõ]es devem usar as siglas do SIGAA/i.test(requestPromptText);
-    if(!built.hasImage && looksLikeHistory && built.pdfChunks?.length){
+
+    if(looksLikeHistory && !built.hasImage && built.pdfChunks?.length){
       const deterministic=AI.parseSigaaHistoryText(built.pdfChunks.join('\n\n'));
-      const aiHasHistory=Array.isArray(merged?.periodos) && merged.periodos.some(p=>Array.isArray(p?.disciplinas)&&p.disciplinas.length);
-      if(!aiHasHistory && deterministic.periodos.length){
-        merged={...merged,...deterministic};
-      }else if(deterministic.periodos.length){
-        const byPeriod=new Map((merged.periodos||[]).map(p=>[String(p.periodo),p]));
-        deterministic.periodos.forEach(dp=>{ if(!byPeriod.has(dp.periodo)||!(byPeriod.get(dp.periodo)?.disciplinas||[]).length) byPeriod.set(dp.periodo,dp); });
-        merged={...merged,periodos:[...byPeriod.values()].sort((a,b)=>String(a.periodo).localeCompare(String(b.periodo)))};
-        if(!merged.periodoAtualDetectado) merged.periodoAtualDetectado=deterministic.periodoAtualDetectado;
+      if(deterministic.periodos.length){
+        return res.status(200).json({
+          candidates:[{content:{role:'model',parts:[{text:JSON.stringify(deterministic)}]}}],
+          meta:{provider:'local-sigaa-parser',model:'deterministic',requestId:rid,pdfCount:built.pdfCount,chunks:built.pdfChunks.length,extractedTextChars:String(built.pdfChunks.join('')).length}
+        });
       }
     }
 
-    // Alguns PDFs acadêmicos são extraídos pelo pdf-parse em uma ordem de leitura
-    // ruim (especialmente fluxogramas e tabelas). Se a primeira passada não achar
-    // nenhuma disciplina, fazemos uma segunda passada mais focada no texto bruto.
-    if(!built.hasImage && (!Array.isArray(merged.disciplinas) || merged.disciplinas.length===0) && built.pdfChunks?.length){
-      const rawPdfText=String(built.pdfChunks.join('\n\n')).slice(0,28000);
-      const rescuePrompt=`Você está fazendo uma segunda tentativa de extração de uma grade curricular acadêmica. O PDF pode ter sido extraído de um fluxograma/tabela e a ordem do texto pode estar quebrada.
+    // Só depois da extração/fallback local reservamos uma chamada de IA.
+    let usage;try{
+      usage=await quota.reserveUserOperation({uid:user.uid,email:user.email,operation:'import',requestId:rid});
+      if(usage.blocked)return res.status(429).json({error:`Limite de ${quota.USER_IMPORT_LIMIT} importações por dia atingido. Tente novamente amanhã.`,code:'LOCAL_USER_LIMIT'});
+    }catch(err){console.error('[api/gemini] quota:',err);return res.status(503).json({error:'O controle de uso da IA está temporariamente indisponível.',code:'QUOTA_STORE_UNAVAILABLE'});}
 
-Retorne SOMENTE JSON no formato:
-{"faculdade":"","curso":"","disciplinas":[{"nome":"","codigo":"","semestre":0,"cargaHoraria":0,"creditos":0,"prerequisitos":[],"tipo":"obrigatoria"}]}
-
-Extraia todas as disciplinas que conseguir identificar no texto. Não invente nomes. Considere como disciplina linhas/itens que tenham nomes acadêmicos, códigos de componentes, carga horária, créditos ou indicação de semestre. Preserve nomes em português. Se uma informação não estiver disponível, use 0 ou string vazia.
-
-TEXTO EXTRAÍDO DO PDF:
-${rawPdfText}`;
-      const rescue=await AI.callGroq({messages:[{role:'user',content:rescuePrompt}],systemInstruction:'Faça extração estruturada de dados acadêmicos. Retorne apenas JSON válido.',operation:'import',uid:user.uid,email:user.email,requestId:`${rid}_rescue`,maxTokens:5000,reasoningEffort:'medium',model:AI.TEXT_MODEL,json:true});
-      if(rescue.ok){
-        const rescued=AI.parseJsonResponse(rescue.text);
-        if(rescued?.disciplinas?.length) merged=AI.mergeJsonObjects([merged,rescued]);
+    let results=[];
+    const model=built.hasImage?AI.VISION_MODEL:AI.TEXT_MODEL;
+    const prompt=built.hasImage?'Extraia e organize os dados visíveis nas imagens para a finalidade solicitada pelo usuário. Retorne JSON válido e não invente dados.':'Extraia e organize fielmente os dados do conteúdo fornecido para a finalidade solicitada pelo usuário. Retorne JSON válido e não invente dados.';
+    const chunks=built.pdfChunks?.length ? built.pdfChunks : null;
+    try{
+      if(chunks && chunks.length>1 && !built.hasImage){
+        for(let i=0;i<chunks.length;i++){
+          const chunkMessages=[
+            ...(built.messages.filter(m=>m.content && typeof m.content==='string' && !m.content.startsWith('CONTEÚDO EXTRAÍDO DE PDF(S):'))),
+            {role:'user',content:`BLOCO ${i+1} DE ${chunks.length} DO PDF:\n${chunks[i]}\n\nExtraia somente os dados que realmente aparecem neste bloco. Preserve exatamente a estrutura JSON solicitada no conteúdo/prompt. Não invente dados.`}
+          ];
+          const result=await AI.callGroq({messages:chunkMessages,systemInstruction:prompt,operation:'import',uid:user.uid,email:user.email,requestId:`${rid}_b${i+1}`,maxTokens:3500,reasoningEffort:'low',model,json:true});
+          if(!result.ok) return res.status(result.status||503).json({error:result.error,code:result.code,provider:'groq',requestId:rid,chunk:i+1});
+          const parsed=AI.parseJsonResponse(result.text);
+          if(!parsed)return res.status(502).json({error:`A IA retornou um JSON inválido no bloco ${i+1}.`,code:'AI_BAD_JSON',provider:'groq',requestId:rid});
+          results.push(parsed);
+        }
+      }else{
+        const result=await AI.callGroq({messages:built.messages,systemInstruction:prompt,operation:'import',uid:user.uid,email:user.email,requestId:rid,maxTokens:5000,reasoningEffort:'low',model,json:true});
+        if(!result.ok)return res.status(result.status||503).json({error:result.error,code:result.code,provider:'groq',requestId:rid});
+        const parsed=AI.parseJsonResponse(result.text);
+        if(!parsed)return res.status(502).json({error:'A IA retornou um formato JSON inesperado. Tente novamente.',code:'AI_BAD_JSON',provider:'groq',requestId:rid});
+        results=[parsed];
       }
-    }
 
-    return res.status(200).json({candidates:[{content:{role:'model',parts:[{text:JSON.stringify(merged)}]}}],meta:{provider:'groq',model,requestId:rid,pdfCount:built.pdfCount,chunks:results.length,extractedTextChars:String(built.pdfChunks?.join('')||'').length}});
-  }catch(err){console.error('[api/gemini] internal:',err);return res.status(500).json({error:err.message||'Erro interno na IA.',code:'AI_INTERNAL_ERROR',requestId:rid});}
+      let merged=AI.mergeJsonObjects(results);
+      if(!built.hasImage && looksLikeHistory && built.pdfChunks?.length){
+        const deterministic=AI.parseSigaaHistoryText(built.pdfChunks.join('\n\n'));
+        const aiHasHistory=Array.isArray(merged?.periodos) && merged.periodos.some(p=>Array.isArray(p?.disciplinas)&&p.disciplinas.length);
+        if(!aiHasHistory && deterministic.periodos.length){merged={...merged,...deterministic};}
+        else if(deterministic.periodos.length){
+          const byPeriod=new Map((merged.periodos||[]).map(p=>[String(p.periodo),p]));
+          deterministic.periodos.forEach(dp=>{if(!byPeriod.has(dp.periodo)||!(byPeriod.get(dp.periodo)?.disciplinas||[]).length)byPeriod.set(dp.periodo,dp);});
+          merged={...merged,periodos:[...byPeriod.values()].sort((a,b)=>String(a.periodo).localeCompare(String(b.periodo)))};
+          if(!merged.periodoAtualDetectado)merged.periodoAtualDetectado=deterministic.periodoAtualDetectado;
+        }
+      }
+      if(!built.hasImage && (!Array.isArray(merged.disciplinas)||merged.disciplinas.length===0) && built.pdfChunks?.length){
+        const rawPdfText=String(built.pdfChunks.join('\n\n')).slice(0,28000);
+        const rescuePrompt=`Você está fazendo uma segunda tentativa de extração de uma grade curricular acadêmica. O PDF pode ter sido extraído de um fluxograma/tabela e a ordem do texto pode estar quebrada.\n\nRetorne SOMENTE JSON no formato:\n{"faculdade":"","curso":"","disciplinas":[{"nome":"","codigo":"","semestre":0,"cargaHoraria":0,"creditos":0,"prerequisitos":[],"tipo":"obrigatoria"}]}\n\nExtraia todas as disciplinas que conseguir identificar no texto. Não invente nomes. Considere como disciplina linhas/itens que tenham nomes acadêmicos, códigos de componentes, carga horária, créditos ou indicação de semestre. Preserve nomes em português. Se uma informação não estiver disponível, use 0 ou string vazia.\n\nTEXTO EXTRAÍDO DO PDF:\n${rawPdfText}`;
+        const rescue=await AI.callGroq({messages:[{role:'user',content:rescuePrompt}],systemInstruction:'Faça extração estruturada de dados acadêmicos. Retorne apenas JSON válido.',operation:'import',uid:user.uid,email:user.email,requestId:`${rid}_rescue`,maxTokens:5000,reasoningEffort:'medium',model:AI.TEXT_MODEL,json:true});
+        if(rescue.ok){const rescued=AI.parseJsonResponse(rescue.text);if(rescued?.disciplinas?.length)merged=AI.mergeJsonObjects([merged,rescued]);}
+      }
+      return res.status(200).json({candidates:[{content:{role:'model',parts:[{text:JSON.stringify(merged)}]}}],meta:{provider:'groq',model,requestId:rid,pdfCount:built.pdfCount,chunks:results.length,extractedTextChars:String(built.pdfChunks?.join('')||'').length}});
+    }catch(err){
+      // Uma tentativa que falhou não deve gastar permanentemente a vaga diária do usuário.
+      try{await quota.releaseUserOperation({uid:user.uid,operation:'import'});}catch(releaseErr){console.warn('[api/gemini] falha ao devolver quota:',releaseErr.message);}
+      throw err;
+    }
+  }catch(err){console.error('[api/gemini] internal:',err);return res.status(err?.status||500).json({error:err.message||'Erro interno na IA.',code:err.code||'AI_INTERNAL_ERROR',requestId:rid});}
 };
