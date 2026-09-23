@@ -38,7 +38,7 @@
     return reg.pushManager.getSubscription();
   }
 
-  async function saveSubscription(subscription) {
+  async function saveSubscription(subscription, options = {}) {
     const settings = window.app?.data?.settings;
     if (!settings) return false;
 
@@ -51,7 +51,8 @@
     // No máximo 10 dispositivos (bate com o limite em firestore.rules).
     const limitado = semDuplicata.slice(-10);
 
-    settings.studyReminders = { ...settings.studyReminders, enabled: true };
+    if (options.general !== false) settings.studyReminders = { ...settings.studyReminders, enabled: true };
+    settings.focusPushEnabled = true;
     const ok1 = await window.dbService.saveData('pushSubscriptions', limitado);
     const ok2 = await window.dbService.saveData('settings', settings);
     return ok1 && ok2;
@@ -86,6 +87,22 @@
     return true;
   }
 
+  // Ativa Push especificamente para o término do Modo Foco, sem ligar
+  // automaticamente os demais lembretes acadêmicos.
+  async function enableFocus() {
+    if (!isSupported()) throw new Error('Esse navegador não suporta notificações push.');
+    const key = vapidPublicKey();
+    if (!key) throw new Error('Push do foco não está configurado no servidor.');
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') throw new Error('Permissão de notificação negada.');
+    const reg = await navigator.serviceWorker.ready;
+    let subscription = await reg.pushManager.getSubscription();
+    if (!subscription) subscription = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(key) });
+    const ok = await saveSubscription(subscription, { general: false });
+    if (!ok) throw new Error('Não foi possível salvar a assinatura de notificações.');
+    return true;
+  }
+
   // Desativa só neste navegador/dispositivo.
   async function disable() {
     const settings = window.app?.data?.settings;
@@ -101,6 +118,7 @@
 
     if (settings) {
       settings.studyReminders = { ...settings.studyReminders, enabled: false };
+      settings.focusPushEnabled = false;
       await window.dbService.saveData('settings', settings);
     }
     return true;
@@ -137,6 +155,7 @@
     if (!isSupported()) return;
     const settings = window.app?.data?.settings;
     const remindersEnabled = !!settings?.studyReminders?.enabled;
+    const focusPushEnabled = !!settings?.focusPushEnabled;
 
     // 1) Existe uma assinatura renovada esperando pra ser sincronizada?
     try {
@@ -149,7 +168,7 @@
       }
     } catch (_) { /* Cache Storage indisponível — segue pro próximo passo */ }
 
-    if (!remindersEnabled) return; // usuário não tinha ativado — nada a recuperar
+    if (!remindersEnabled && !focusPushEnabled) return; // nenhum Push ativo — nada a recuperar
 
     // 2) Reminders marcados como ativos, mas sem assinatura válida agora?
     // Só tenta recriar sozinho se a permissão ainda estiver concedida —
@@ -189,6 +208,7 @@
     permissionStatus,
     vapidPublicKey,
     enable,
+    enableFocus,
     disable,
     saveReminderPrefs,
     isEnabledOnThisDevice,

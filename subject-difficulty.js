@@ -31,6 +31,9 @@
     const failedHistory = Number(history?.failedAttempts || 0);
     const required = history?.grade?.required;
     const evidenceScores = { explain: 5, exercise: 4, doubt: 2, review: 2 };
+    const questionRows = (app?.data?.questionAttempts || []).filter(x => norm(x?.materia) === norm(name)).slice(-12);
+    const questionValues = questionRows.map(x => x.result === 'acerto' ? 5 : x.result === 'partial' ? 3 : 1);
+    const questionAvg = questionValues.length ? questionValues.reduce((a,b)=>a+b,0)/questionValues.length : null;
     const evidence = (app?.data?.sessions || [])
       .filter(x => norm(x?.materia) === norm(name) && x?.learningEvidence?.level)
       .slice(-8);
@@ -54,6 +57,8 @@
     // reage ao que o aluno demonstrou conseguir recuperar nas sessões.
     if (evidenceValues.length >= 2 && evidenceAvg <= 2.5) value = Math.min(5, value + 1);
     if (evidenceValues.length >= 3 && evidenceAvg >= 4.5 && trend >= -0.5) value = Math.max(1, value - 1);
+    if (questionValues.length >= 3 && questionAvg <= 2.2) value = Math.min(5, value + 1);
+    if (questionValues.length >= 4 && questionAvg >= 4.3 && trend >= -0.5) value = Math.max(1, value - 1);
 
     // Uma melhora consistente pode reduzir a dificuldade mesmo após um histórico ruim.
     if (trend >= 1.2 && recentAvg >= 7.5 && failedHistory === 0) value = Math.max(1, value - 1);
@@ -66,7 +71,8 @@
     if (values.length >= 2 && Math.abs(trend) >= 0.5) reason += trend > 0 ? `, desempenho em melhora (+${trend.toFixed(1)})` : `, desempenho em queda (${trend.toFixed(1)})`;
     if (failedHistory) reason += `, ${failedHistory} reprovação(ões) no histórico`;
     if (evidenceAvg !== null) reason += `, evidência de aprendizagem média ${evidenceAvg.toFixed(1)}/5`;
-    return { value, label: labels[value], confidence, source: 'automática', reason, evidenceCount: evidenceValues.length, evidenceAverage: evidenceAvg };
+    if (questionAvg !== null) reason += `, recuperação ativa ${questionAvg.toFixed(1)}/5`;
+    return { value, label: labels[value], confidence, source: 'automática', reason, evidenceCount: evidenceValues.length, evidenceAverage: evidenceAvg, questionCount: questionValues.length, questionAverage: questionAvg };
   }
 
   function recalc(app, force=false) {

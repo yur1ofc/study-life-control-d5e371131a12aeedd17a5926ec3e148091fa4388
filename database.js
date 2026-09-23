@@ -23,9 +23,14 @@ const DEFAULT_APP_DATA = () => ({
     // de novo a cada vez que o cron roda. Ver push-notifications.js.
     pushSubscriptions: [],
     sentReminders: [],
+    // Evidências e desempenho em recuperação ativa usados pelo motor adaptativo V18.
+    learningEvidence: [],
+    questionAttempts: [],
+    focusPushSchedule: null,
     settings: {
         heavyMode: false,
         autoPlan: true,
+        focusPushEnabled: false,
         // Token do feed de calendário (.ics) assinável — ver calendar-feed.js.
         calendarToken: null,
         // Tema personalizado (cores, tamanho de fonte, arredondamento) —

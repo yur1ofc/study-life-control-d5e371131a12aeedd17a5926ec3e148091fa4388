@@ -8,6 +8,7 @@
   const VERSION = 3;
   const STORAGE_PREFIX = 'slc-focus-v3:';
   const EVIDENCE_PREFIX = 'slc-learning-evidence-v1:';
+  const FOCUS_PUSH_KEY = 'slc-focus-push-v1';
   const TICK_MS = 250;
 
   const safe = (fn, fallback = null) => { try { return fn(); } catch (_) { return fallback; } };
@@ -161,6 +162,11 @@
     });
     if (!success) return false;
     Object.assign(existingSession, updatedSession);
+    // Espelho resumido para o motor adaptativo (não substitui o histórico dentro da sessão).
+    app.data.learningEvidence = Array.isArray(app.data.learningEvidence) ? app.data.learningEvidence : [];
+    app.data.learningEvidence.push({ ...evidence, materia: session.materia, sessaoId: session.id });
+    app.data.learningEvidence = app.data.learningEvidence.slice(-200);
+    await dbService.saveData('learningEvidence', app.data.learningEvidence);
 
     // Atualiza o Mapa de Aprendizado pela evidência real da sessão.
     if (topic) {
@@ -491,7 +497,12 @@
           if (!('Notification' in window)) throw new Error('Este navegador não suporta notificações.');
           const result = await Notification.requestPermission();
           if (result !== 'granted') throw new Error('Permissão não concedida.');
-          showToast?.('Avisos de foco ativados neste dispositivo.', 'success');
+          if (window.pushNotifications?.enableFocus && window.pushNotifications?.vapidPublicKey?.()) {
+            await window.pushNotifications.enableFocus();
+            showToast?.('Avisos de foco ativados. O término também será agendado no servidor.', 'success');
+          } else {
+            showToast?.('Avisos locais de foco ativados neste dispositivo.', 'success');
+          }
           setFocusStatusUI();
         } catch (e) { showToast?.(e.message || 'Não foi possível ativar as notificações.', 'info'); }
       }, { once: true });
@@ -531,6 +542,8 @@
     save(state);
     const elapsed = focusElapsed(state);
     if (elapsed < 60) {
+      state.finalizing = false;
+      save(state);
       showToast?.('Estude pelo menos 1 minuto antes de concluir para registrar a sessão.', 'info');
       return false;
     }
@@ -601,6 +614,38 @@
     return success;
   }
 
+  async function syncServerFocusSchedule(state, action = 'upsert') {
+    try {
+      const user = window.auth?.currentUser;
+      if (!user) return;
+      const token = await user.getIdToken();
+      const targetSec = Number(state.focusTargetSec) || 1500;
+      const elapsed = focusElapsed(state);
+      const remainingSec = Math.max(0, targetSec - elapsed);
+      const scheduleId = state.serverScheduleId || `${uid()}-${state.startedAt || now()}`;
+      state.serverScheduleId = scheduleId;
+      await fetch('/api/focus-schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          action,
+          scheduleId,
+          subject: state.subject || '',
+          topic: state.topic || '',
+          targetAt: new Date(now() + remainingSec * 1000).toISOString(),
+          durationSec: targetSec,
+          enabled: action === 'upsert'
+        })
+      });
+    } catch (error) {
+      console.warn('[SLC Focus Push] não foi possível sincronizar o término no servidor:', error?.message || error);
+    }
+  }
+
+  function cancelServerFocusSchedule(state) {
+    syncServerFocusSchedule(state, 'cancel').catch(() => null);
+  }
+
   function startFocus(targetSec) {
     const state = getState();
     if (state.status === 'running-focus' || state.status === 'overtime') return;
@@ -622,6 +667,7 @@
     state.lastActivityAt = now();
     save(state);
     setFocusStatusUI();
+    syncServerFocusSchedule(state, 'upsert');
   }
 
   function pause() {
@@ -637,6 +683,8 @@
     } else return;
     save(state);
     setFocusStatusUI();
+    if (state.status === 'paused') cancelServerFocusSchedule(state);
+    else syncServerFocusSchedule(state, 'upsert');
   }
 
   function startBreak() {
@@ -668,6 +716,7 @@
       state.status = state.focusAccumulatedSec >= state.focusTargetSec ? 'overtime' : 'running-focus';
       state.focusEndNotified = state.status === 'overtime';
       save(state);
+      if (state.status === 'overtime') cancelServerFocusSchedule(state); else syncServerFocusSchedule(state, 'upsert');
       setFocusStatusUI();
     } else {
       startFocus(durationFromUI());
@@ -675,6 +724,7 @@
   }
 
   function reset() {
+    cancelServerFocusSchedule(getState());
     clearSaved();
     window.__SLCFocusState = defaultState();
     const app = window.app;
@@ -696,6 +746,7 @@
     if (state.status === 'running-focus') {
       const elapsed = focusElapsed(state, t);
       if (elapsed >= state.focusTargetSec && !state.focusEndNotified) {
+        cancelServerFocusSchedule(state);
         state.focusEndNotified = true;
         state.status = 'overtime';
         state.focusAccumulatedSec = elapsed;
@@ -768,6 +819,9 @@
 
     const subject = document.getElementById('timer-materia');
     subject?.addEventListener('change', () => { const s=getState(); s.subject=subject.value||''; save(s); });
+    document.addEventListener('input', e => {
+      if (e.target?.id === 'timer-topico') { const s=getState(); s.topic=e.target.value||''; save(s); }
+    });
 
     window.setInterval(tick, TICK_MS);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
@@ -789,12 +843,23 @@
     const state = getState();
     const select = document.getElementById('timer-materia');
     const pending = window.app.pendingFocusMateria || state.subject || '';
+    const pendingTopic = window.app.pendingFocusTopic || state.topic || '';
     if (select && pending) {
       const exists = [...select.options].some(o => o.value === pending);
       if (exists) { select.value = pending; state.subject = pending; save(state); }
       window.app.pendingFocusMateria = '';
     }
+    const topicInput = document.getElementById('timer-topico');
+    if (topicInput && pendingTopic) { topicInput.value = pendingTopic; state.topic = pendingTopic; save(state); window.app.pendingFocusTopic = ''; }
 
+    const controls = document.querySelector('.focus-cycle-card .timer-controls');
+    if (controls && !document.getElementById('focus-break-start')) {
+      const resetBtn = controls.querySelector('#timer-reset');
+      const btn = document.createElement('button');
+      btn.type='button'; btn.className='timer-btn'; btn.id='focus-break-start';
+      btn.innerHTML='<i class="fas fa-mug-hot"></i> Descanso 5 min';
+      resetBtn ? controls.insertBefore(btn, resetBtn) : controls.appendChild(btn);
+    }
     const card = document.querySelector('.focus-cycle-card');
     if (card && !document.getElementById('focus-engine-meta')) {
       card.insertAdjacentHTML('beforeend', `

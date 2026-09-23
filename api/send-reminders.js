@@ -264,21 +264,36 @@ module.exports = async function handler(req, res) {
   const summary = { usersChecked: 0, notificationsSent: 0, subscriptionsRemoved: 0, errors: [] };
 
   try {
-    const snapshot = await db.collection('users')
-      .where('settings.studyReminders.enabled', '==', true)
-      .get();
+    // Dois conjuntos: lembretes gerais e término de foco. O segundo é
+    // separado para que ativar Push para o Modo Foco não obrigue o usuário a
+    // ativar todos os outros alarmes acadêmicos.
+    const [generalSnapshot, focusSnapshot] = await Promise.all([
+      db.collection('users').where('settings.studyReminders.enabled', '==', true).get(),
+      db.collection('users').where('settings.focusPushEnabled', '==', true).get()
+    ]);
+    const docs = new Map();
+    [...generalSnapshot.docs, ...focusSnapshot.docs].forEach(d => docs.set(d.id, d));
 
-    for (const doc of snapshot.docs) {
+    for (const doc of docs.values()) {
       summary.usersChecked++;
       const data = doc.data();
       const subscriptions = Array.isArray(data.pushSubscriptions) ? data.pushSubscriptions : [];
       if (!subscriptions.length) continue;
 
       const due = findDueReminders(data, now);
+      const focus = data.focusPushSchedule;
+      const focusDue = !!(focus && !focus.sent && Number(focus.targetMs) && now >= Number(focus.targetMs));
+      if (focusDue) due.push({
+        key: `focus:${focus.id}`,
+        title: 'Foco concluído',
+        body: `${focus.subject || 'Seu estudo'}${focus.topic ? ` — ${focus.topic}` : ''}: o bloco terminou. Você pode continuar estudando ou iniciar o descanso recomendado.`,
+        focusPush: true
+      });
       if (!due.length) continue;
 
       const stillValidSubs = [];
       const sentKeys = [];
+      let focusSent = false;
 
       for (const subscription of subscriptions) {
         let subOk = true;
@@ -288,12 +303,14 @@ module.exports = async function handler(req, res) {
               title: item.title,
               body: item.body,
               url: './',
-              tag: item.key
+              tag: item.key,
+              requireInteraction: true
             }));
             summary.notificationsSent++;
+            if (item.focusPush) focusSent = true;
           } catch (err) {
             if (err.statusCode === 404 || err.statusCode === 410) {
-              subOk = false; // assinatura expirada/revogada — descarta
+              subOk = false;
             } else {
               summary.errors.push(`push ${doc.id}: ${err.message}`);
             }
@@ -303,13 +320,11 @@ module.exports = async function handler(req, res) {
         else summary.subscriptionsRemoved++;
       }
 
-      due.forEach(item => sentKeys.push(item.key));
+      due.forEach(item => { if (!item.focusPush) sentKeys.push(item.key); });
       const mergedSent = [...(data.sentReminders || []), ...sentKeys].slice(-DEDUPE_LIMIT);
-
-      await doc.ref.update({
-        sentReminders: mergedSent,
-        pushSubscriptions: stillValidSubs
-      });
+      const update = { sentReminders: mergedSent, pushSubscriptions: stillValidSubs };
+      if (focusDue && focusSent) update.focusPushSchedule = null;
+      await doc.ref.update(update);
     }
 
     return res.status(200).json(summary);

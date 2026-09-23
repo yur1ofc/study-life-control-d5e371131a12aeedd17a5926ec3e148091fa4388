@@ -182,10 +182,12 @@
       const averageEvidence = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
       const weakEvidence = (levels.doubt || 0) + (levels.review || 0);
       const errorEvidence = evidence.filter(x => String(x?.learningEvidence?.errorNote || '').trim()).length;
+      const questionAttempts = (d.questionAttempts || []).filter(x => norm(x?.materia) === norm(name));
+      const questionErrors = questionAttempts.filter(x => ['erro','partial'].includes(norm(x?.result))).length;
       const strongEvidence = (levels.explain || 0) + (levels.exercise || 0);
       const latestEvidence = evidence.slice().sort((a,b)=>new Date(b?.learningEvidence?.answeredAt || b?.data || 0)-new Date(a?.learningEvidence?.answeredAt || a?.data || 0))[0]?.learningEvidence || null;
       return { topics: topics.length, weakTopics: weak.length, pendingReviews: pendingReviews.length, unresolvedDoubts: doubts.length,
-        evidenceCount: evidence.length, evidenceLevels: levels, averageEvidence, weakEvidence, errorEvidence, strongEvidence, latestEvidence };
+        evidenceCount: evidence.length, evidenceLevels: levels, averageEvidence, weakEvidence, errorEvidence, questionAttempts: questionAttempts.length, questionErrors, strongEvidence, latestEvidence };
     }
 
     workload(name) {

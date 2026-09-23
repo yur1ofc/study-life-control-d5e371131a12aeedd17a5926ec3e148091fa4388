@@ -1378,6 +1378,10 @@ class ViewRenderer {
                             <option value="">Sem matéria específica</option>
                             ${optsMateria}
                         </select>
+                        <input id="timer-topico" class="timer-select" list="timer-topicos-list" placeholder="Tópico (opcional, ex.: Regra da cadeia)" autocomplete="off">
+                        <datalist id="timer-topicos-list">
+                            ${(this.app.data.learningMap || []).map(t => `<option value="${this.esc(t.nome)}"></option>`).join('')}
+                        </datalist>
                         <select id="timer-duracao" class="timer-select">
                             <option value="25">Pomodoro (25 min)</option>
                             <option value="50">Estudo longo (50 min)</option>
