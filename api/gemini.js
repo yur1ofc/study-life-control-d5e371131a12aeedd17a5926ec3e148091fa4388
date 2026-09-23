@@ -47,6 +47,23 @@ module.exports=async function handler(req,res){
 
     let merged=AI.mergeJsonObjects(results);
 
+    // Histórico SIGAA: se a IA não respeitar o schema ou retornar períodos vazios,
+    // usa o parser determinístico sobre o mesmo texto já extraído do PDF.
+    const requestPromptText=(body.contents||[]).flatMap(c=>Array.isArray(c?.parts)?c.parts:[]).map(p=>p?.text||'').join('\n');
+    const looksLikeHistory=/hist[oó]rico escolar|Componentes Curriculares Cursados\/Cursando|periodoAtualDetectado|situa[cç][oõ]es devem usar as siglas do SIGAA/i.test(requestPromptText);
+    if(!built.hasImage && looksLikeHistory && built.pdfChunks?.length){
+      const deterministic=AI.parseSigaaHistoryText(built.pdfChunks.join('\n\n'));
+      const aiHasHistory=Array.isArray(merged?.periodos) && merged.periodos.some(p=>Array.isArray(p?.disciplinas)&&p.disciplinas.length);
+      if(!aiHasHistory && deterministic.periodos.length){
+        merged={...merged,...deterministic};
+      }else if(deterministic.periodos.length){
+        const byPeriod=new Map((merged.periodos||[]).map(p=>[String(p.periodo),p]));
+        deterministic.periodos.forEach(dp=>{ if(!byPeriod.has(dp.periodo)||!(byPeriod.get(dp.periodo)?.disciplinas||[]).length) byPeriod.set(dp.periodo,dp); });
+        merged={...merged,periodos:[...byPeriod.values()].sort((a,b)=>String(a.periodo).localeCompare(String(b.periodo)))};
+        if(!merged.periodoAtualDetectado) merged.periodoAtualDetectado=deterministic.periodoAtualDetectado;
+      }
+    }
+
     // Alguns PDFs acadêmicos são extraídos pelo pdf-parse em uma ordem de leitura
     // ruim (especialmente fluxogramas e tabelas). Se a primeira passada não achar
     // nenhuma disciplina, fazemos uma segunda passada mais focada no texto bruto.

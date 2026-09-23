@@ -2423,6 +2423,7 @@ ${report.monthly}`;
 
       const data = await response.json();
       const texto = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      console.info('[MentorIA] resposta Groq:', data.meta?.provider || 'sem-provider', data.meta?.model || 'sem-modelo', data.meta?.requestId || '');
       return texto || null;
     } catch (err) {
       console.warn('[MentorIA] erro de rede na chamada de IA:', err.message);
@@ -2486,7 +2487,14 @@ ${report.monthly}`;
       return resposta;
     }
 
-    // 3) Trilha de estudo por tópico (puxa o Mapa de Aprendizado)
+    // 3) Perguntas abertas de decisão ('o que estudar hoje?') devem passar pela IA real.
+    // As respostas determinísticas continuam disponíveis para comandos explícitos de trilha/tópicos.
+    if (/\b(qual|o que|oque)\b.*\bmat[ée]ria(s)?\b.*\b(estudar|estudo|revisar)\b.*\b(hoje|agora)\b/.test(p)) {
+      const respostaIA = await this._askMentorAI(raw);
+      if (respostaIA) { this._rememberTurn(raw, respostaIA, { intent: 'ai-study-decision' }); return respostaIA; }
+    }
+
+    // 4) Trilha de estudo por tópico (puxa o Mapa de Aprendizado)
     if (this._detectLearningMapIntent(p)) {
       const trilha = this._buildLearningMapStudyPlan();
       const resposta = trilha || this.sugerirEstudoAgora();

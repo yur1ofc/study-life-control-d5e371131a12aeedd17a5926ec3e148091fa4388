@@ -186,6 +186,60 @@ async function buildMessagesFromGemini(contents){
   return {messages:normalized,hasImage,pdfCount:pdf.pdfCount,pdfChunks:pdf.pdfChunks};
 }
 
+
+
+// Parser determinístico de histórico SIGAA. Serve como rede de segurança para
+// PDFs cujo texto foi extraído corretamente, mas cuja resposta da IA não respeitou
+// o schema. Não inventa dados: só aceita registros com período, código e situação.
+function parseSigaaHistoryText(text){
+  const source=normalizeExtractedPdfText(text);
+  const statusRe='APR(?:N)?|CANC|DISP|MATR|REC|REP(?:F|MF|N|NF)?|TRANC|TRANS|INCORP|CUMP';
+  const blockRe=/(^|\n)(\d{4}\.\d)\s+([\s\S]*?)(?=\n\d{4}\.\d\s+|\nPágina\s+\d+\s+de\s+\d+|\nComponentes Curriculares Obrigatórios Pendentes|\nComponentes Extra Curriculares|\nLegenda\b|$)/g;
+  const periods={};
+  let match;
+  while((match=blockRe.exec(source))){
+    const periodo=match[2];
+    const block=match[3].replace(/\s+/g,' ').trim();
+    if(!block || /^(ENADE\b|SISU\b)/i.test(block)) continue;
+    const codeMatch=block.match(/\b([A-Z]{2,5}\s?\d{3,5})\b/);
+    if(!codeMatch) continue;
+    const codigo=codeMatch[1].replace(/\s+/g,'').toUpperCase();
+    // O SIGAA coloca docente antes do código. O nome da disciplina vem antes
+    // do primeiro docente; se não houver docente, usamos o trecho antes do código.
+    let before=block.slice(0,codeMatch.index).trim();
+    const teacherAt=before.search(/\s+(?:Dr|Dra|Prof|Profa|MSc|Esp|Me|Ma)\.?\s+/i);
+    if(teacherAt>0) before=before.slice(0,teacherAt).trim();
+    before=before.replace(/\s+e\s*$/i,'').trim();
+    if(!before) continue;
+    // Remove cabeçalhos que eventualmente ficaram no mesmo bloco.
+    before=before.replace(/^(?:Histórico Escolar.*?|Componentes Curriculares Cursados\/Cursando\s*)/i,'').trim();
+    const statusMatch=block.match(new RegExp('\\b('+statusRe+')\\b\\s*$','i'));
+    const situacao=statusMatch?statusMatch[1].toUpperCase():'';
+    if(!situacao) continue;
+    const tail=statusMatch?block.slice(codeMatch.index+codeMatch[0].length,statusMatch.index):'';
+    const nums=[...tail.matchAll(/(?:^|\s)(\d+(?:[.,]\d+)?|--)(?=\s|$)/g)].map(m=>m[1]);
+    const cleanNum=v=>v==='--'?null:Number(String(v).replace(',','.'));
+    // Depois do código, o SIGAA costuma trazer CH, hora-aula, turma, frequência,
+    // média e nota mínima. A média final é o penúltimo valor numérico antes da situação.
+    const numeric=nums.map(cleanNum).filter(v=>v!==null || nums.length);
+    let frequencia=null, notaFinal=null;
+    if(nums.length>=2){
+      const vals=nums.map(cleanNum);
+      // frequência é o valor que costuma aparecer antes da média; notas vêm no fim.
+      for(let i=vals.length-1;i>=0;i--){ if(vals[i]!==null){ notaFinal=vals[i]; break; } }
+      if(vals.length>=4 && vals[3]!==null && vals[3]>=0 && vals[3]<=100) frequencia=vals[3];
+      // Em registros MATR/sem nota, o bloco termina em -- --, portanto nota deve ser null.
+      if(/^(MATR|REC|TRANC|CANC)$/i.test(situacao)) notaFinal=null;
+    }
+    const row={codigo,nome:before.replace(/\s+/g,' ').trim(),cargaHoraria:nums.length?cleanNum(nums[0])||0:0,notaFinal,situacao,frequencia};
+    if(!periods[periodo]) periods[periodo]=[];
+    if(!periods[periodo].some(x=>x.codigo===row.codigo)) periods[periodo].push(row);
+  }
+  const periodos=Object.keys(periods).sort().map(periodo=>({periodo,disciplinas:periods[periodo]})).filter(p=>p.disciplinas.length);
+  const atual=[...periodos].reverse().find(p=>p.disciplinas.some(d=>d.situacao==='MATR'||d.situacao==='REC'))?.periodo||'';
+  return {periodos,periodoAtualDetectado:atual,equivalencias:[]};
+}
+
 function parseJsonResponse(text){
   const clean=String(text||'').replace(/```json|```/gi,'').trim();
   try{return JSON.parse(clean);}catch(_){
@@ -220,4 +274,4 @@ function mergeJsonObjects(objects){
   return out;
 }
 
-module.exports={TEXT_MODEL,SMALL_TEXT_MODEL,VISION_MODEL,requestId,geminiContentsToGroq,buildMessagesFromGemini,callGroq,splitIntoChunks,parseJsonResponse,mergeJsonObjects,CHUNK_CHARS,sniffMimeFromBase64,normalizeExtractedPdfText};
+module.exports={TEXT_MODEL,SMALL_TEXT_MODEL,VISION_MODEL,requestId,geminiContentsToGroq,buildMessagesFromGemini,callGroq,splitIntoChunks,parseJsonResponse,mergeJsonObjects,CHUNK_CHARS,sniffMimeFromBase64,normalizeExtractedPdfText,parseSigaaHistoryText};
