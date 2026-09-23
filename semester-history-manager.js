@@ -95,6 +95,9 @@
     // A única fonte realmente confiável nesse caso são as tentativas registradas
     // pela finalização; tarefas/notas sem identificador de semestre não são movidas.
     function migrateLegacy(app) {
+        // Contas novas podem chegar ao init antes de data ser hidratado.
+        // A migração é uma operação no-op nesse estado, não deve derrubar o app.
+        if (!app || !app.data || typeof app.data !== 'object') return { created: 0, skipped: true };
         const rawArchives = [];
         const candidateKeys = ['historicoSemestres', 'semestresAnteriores', 'semesterHistory', 'completedSemesters', 'finishedSemesters'];
         candidateKeys.forEach(key => {

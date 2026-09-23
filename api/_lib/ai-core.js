@@ -10,6 +10,8 @@ const SMALL_TEXT_MODEL = process.env.SLC_AI_FALLBACK_MODEL || 'openai/gpt-oss-20
 const VISION_MODEL = process.env.SLC_AI_VISION_MODEL || 'qwen/qwen3.8-27b';
 const MAX_RETRIES = 1;
 const TIMEOUT_MS = Number(process.env.SLC_AI_TIMEOUT_MS || 20000);
+const PDF_MAX_TEXT_CHARS = 64000;
+const CHUNK_CHARS = 10000;
 
 function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 function requestId(prefix='ai'){ return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2,9)}`; }
@@ -32,7 +34,6 @@ function geminiContentsToGroq(contents){
         const mime=String(d.mime_type||d.mimeType||'image/jpeg');
         media.push({type:'image_url',image_url:{url:`data:${mime};base64,${d.data}`}});
       }
-      // PDFs are handled by api/gemini.js before reaching this converter.
     }
     if(media.length) return {role,content:[{type:'text',text:textParts.join('\n')},...media]};
     return {role,content:textParts.join('\n')};
@@ -77,7 +78,6 @@ async function callGroq({messages, systemInstruction='', json=false, model=TEXT_
       }
       if(!last?.transient) break;
     }
-    // Vision has no text fallback because the fallback model cannot inspect images.
     if(current===VISION_MODEL) break;
   }
   const status=last?.status||503;
@@ -92,8 +92,26 @@ function dataUrlFromPart(part){
   return {mime,dataUrl:`data:${mime};base64,${d.data}`};
 }
 
+function splitIntoChunks(text, size=CHUNK_CHARS){
+  const source=String(text||'').replace(/\r/g,'').trim();
+  if(!source) return [];
+  const chunks=[];
+  let start=0;
+  while(start<source.length){
+    let end=Math.min(source.length,start+size);
+    if(end<source.length){
+      const candidates=[source.lastIndexOf('\n\n',end),source.lastIndexOf('\n',end),source.lastIndexOf(' ',end)];
+      const cut=candidates.find(v=>v>start+Math.floor(size*0.65));
+      if(cut>0) end=cut;
+    }
+    chunks.push(source.slice(start,end).trim());
+    start=end;
+  }
+  return chunks;
+}
+
 async function extractPdfText(contents){
-  let pdfCount=0; const out=[];
+  let pdfCount=0; const out=[]; let total=0;
   for(const c of (contents||[])){
     for(const part of (c?.parts||[])){
       const d=part?.inline_data||part?.inlineData;
@@ -104,12 +122,18 @@ async function extractPdfText(contents){
         try{
           const pdfParse=require('pdf-parse');
           const parsed=await pdfParse(buffer);
-          out.push(String(parsed.text||'').slice(0,24000));
+          const remaining=Math.max(0,PDF_MAX_TEXT_CHARS-total);
+          const text=String(parsed.text||'').slice(0,remaining);
+          if(text) out.push(text);
+          total+=text.length;
+          if(total>=PDF_MAX_TEXT_CHARS) break;
         }catch(err){ throw new Error(`Não consegui extrair o texto do PDF: ${err.message||'arquivo incompatível'}`); }
       }
     }
+    if(total>=PDF_MAX_TEXT_CHARS) break;
   }
-  return {pdfCount,text:out.join('\n\n--- NOVO PDF ---\n\n')};
+  const text=out.join('\n\n--- NOVO PDF ---\n\n');
+  return {pdfCount,text,pdfChunks:splitIntoChunks(text)};
 }
 
 async function buildMessagesFromGemini(contents){
@@ -130,7 +154,41 @@ async function buildMessagesFromGemini(contents){
   if(pdf.text){
     normalized.push({role:'user',content:`CONTEÚDO EXTRAÍDO DE PDF(S):\n${pdf.text}\n\nUse somente os dados presentes no conteúdo acima para a importação. Se algo não estiver legível ou presente, não invente.`});
   }
-  return {messages:normalized,hasImage,pdfCount:pdf.pdfCount};
+  return {messages:normalized,hasImage,pdfCount:pdf.pdfCount,pdfChunks:pdf.pdfChunks};
 }
 
-module.exports={TEXT_MODEL,SMALL_TEXT_MODEL,VISION_MODEL,requestId,geminiContentsToGroq,buildMessagesFromGemini,callGroq};
+function parseJsonResponse(text){
+  const clean=String(text||'').replace(/```json|```/gi,'').trim();
+  try{return JSON.parse(clean);}catch(_){
+    const first=clean.indexOf('{'), last=clean.lastIndexOf('}');
+    if(first>=0&&last>first){try{return JSON.parse(clean.slice(first,last+1));}catch(__){}}
+    return null;
+  }
+}
+
+function mergeJsonObjects(objects){
+  const out={};
+  for(const obj of objects){
+    if(!obj || typeof obj!=='object') continue;
+    for(const [key,value] of Object.entries(obj)){
+      if(Array.isArray(value)){
+        if(!Array.isArray(out[key])) out[key]=[];
+        out[key].push(...value);
+      }else if((out[key]===undefined || out[key]===null || out[key]==='') && value!==undefined && value!==null && value!=='') out[key]=value;
+    }
+  }
+  for(const [key,value] of Object.entries(out)){
+    if(!Array.isArray(value)) continue;
+    const seen=new Set();
+    out[key]=value.filter(item=>{
+      if(item===null || item===undefined) return false;
+      const norm=item&&typeof item==='object' ? Object.fromEntries(Object.entries(item).map(([k,v])=>[k,typeof v==='string'?v.trim():v])) : item;
+      const signature=JSON.stringify(norm);
+      if(seen.has(signature)) return false;
+      seen.add(signature); return true;
+    });
+  }
+  return out;
+}
+
+module.exports={TEXT_MODEL,SMALL_TEXT_MODEL,VISION_MODEL,requestId,geminiContentsToGroq,buildMessagesFromGemini,callGroq,splitIntoChunks,parseJsonResponse,mergeJsonObjects,CHUNK_CHARS};
