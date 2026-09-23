@@ -169,14 +169,22 @@
   ];
 
   function closeMobileMore(){
-    document.getElementById('slc-mobile-more')?.classList.remove('open');
+    const panel=document.getElementById('slc-mobile-more');
+    panel?.classList.remove('open');
+    if(panel){ panel.hidden=true; panel.setAttribute('aria-hidden','true'); }
+    document.getElementById('slc-product-bottom-nav')?.classList.remove('slc-more-hidden');
     document.body.classList.remove('slc-mobile-more-open');
   }
 
   function openMobileMore(){
-    const panel=document.getElementById('slc-mobile-more');
+    const panel=ensureMobileMore();
     if(!panel) return;
-    panel.classList.add('open');
+    const bottom=document.getElementById('slc-product-bottom-nav');
+    if(bottom) bottom.classList.add('slc-more-hidden');
+    panel.hidden=false;
+    panel.setAttribute('aria-hidden','false');
+    // Force a separate frame so Safari does not leave the drawer in its closed state.
+    requestAnimationFrame(()=>panel.classList.add('open'));
     document.body.classList.add('slc-mobile-more-open');
   }
 
@@ -185,11 +193,13 @@
     if(panel) return panel;
     panel=document.createElement('aside');
     panel.id='slc-mobile-more';
+    panel.hidden=true;
+    panel.setAttribute('aria-hidden','true');
     panel.setAttribute('aria-label','Todas as funções do SLCampus');
-    panel.innerHTML=`<div class="slc-mobile-more-backdrop" data-mobile-more-close></div><div class="slc-mobile-more-sheet"><div class="slc-mobile-more-head"><div><span>SL CAMPUS</span><h3>Mais funções</h3></div><button type="button" class="btn-icon" data-mobile-more-close aria-label="Fechar"><i class="fas fa-times"></i></button></div><div class="slc-mobile-more-content">${MOBILE_MORE_GROUPS.map(g=>`<section><h4>${g.label}</h4><div class="slc-mobile-more-grid">${g.items.map(([v,i,l])=>`<button type="button" data-mobile-more-view="${v}"><i class="fas ${i}"></i><span>${l}</span></button>`).join('')}</div></section>`).join('')}</div></div>`;
+    panel.innerHTML=`<div class="slc-mobile-more-backdrop" data-mobile-more-close></div><div class="slc-mobile-more-sheet" role="dialog" aria-modal="true"><div class="slc-mobile-more-head"><div><span>SL CAMPUS</span><h3>Mais funções</h3></div><button type="button" class="btn-icon" data-mobile-more-close aria-label="Fechar"><i class="fas fa-times"></i></button></div><div class="slc-mobile-more-content">${MOBILE_MORE_GROUPS.map(g=>`<section><h4>${g.label}</h4><div class="slc-mobile-more-grid">${g.items.map(([v,i,l])=>`<button type="button" data-mobile-more-view="${v}"><i class="fas ${i}"></i><span>${l}</span></button>`).join('')}</div></section>`).join('')}</div></div>`;
     document.body.appendChild(panel);
-    panel.querySelectorAll('[data-mobile-more-close]').forEach(el=>el.addEventListener('click',closeMobileMore));
-    panel.querySelectorAll('[data-mobile-more-view]').forEach(el=>el.addEventListener('click',()=>{const view=el.dataset.mobileMoreView;closeMobileMore();navigate(view);}));
+    panel.querySelectorAll('[data-mobile-more-close]').forEach(el=>el.addEventListener('click',(e)=>{e.preventDefault();e.stopPropagation();closeMobileMore();}));
+    panel.querySelectorAll('[data-mobile-more-view]').forEach(el=>el.addEventListener('click',(e)=>{e.preventDefault();e.stopPropagation();const view=el.dataset.mobileMoreView;closeMobileMore();navigate(view);}));
     return panel;
   }
 

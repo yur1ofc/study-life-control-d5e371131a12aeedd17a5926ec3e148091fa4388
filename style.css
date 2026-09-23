@@ -6231,18 +6231,21 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif}
 .slc-profile-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 0 18px}
 .slc-profile-stats>div{padding:14px;border:1px solid var(--border);border-radius:15px;background:var(--bg-secondary);text-align:center}
 .slc-profile-stats strong,.slc-profile-stats span{display:block}.slc-profile-stats strong{font-size:1.25rem}.slc-profile-stats span{margin-top:3px;color:var(--text-secondary);font-size:.72rem}
-#slc-mobile-more{display:none}.slc-mobile-more-open{overflow:hidden}
+#slc-mobile-more[hidden]{display:none!important}
+.slc-mobile-more-open{overflow:hidden}
 @media(max-width:768px){
-  #slc-mobile-more{display:block;position:fixed;inset:0;z-index:1001;pointer-events:none}
-  #slc-mobile-more.open{pointer-events:auto}
-  .slc-mobile-more-backdrop{position:absolute;inset:0;background:rgba(2,6,23,.58);opacity:0;transition:opacity .2s}
-  .slc-mobile-more.open .slc-mobile-more-backdrop{opacity:1}
-  .slc-mobile-more-sheet{position:absolute;left:0;right:0;bottom:0;max-height:min(86vh,760px);overflow:auto;background:var(--bg-secondary);border:1px solid var(--border);border-bottom:0;border-radius:24px 24px 0 0;transform:translateY(105%);transition:transform .24s cubic-bezier(.22,1,.36,1);padding-bottom:calc(76px + env(safe-area-inset-bottom))}
-  .slc-mobile-more.open .slc-mobile-more-sheet{transform:translateY(0)}
-  .slc-mobile-more-head{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;align-items:center;padding:17px 18px 13px;background:color-mix(in srgb,var(--bg-secondary) 94%,transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--border)}
+  /* V23: More is a real full-height side drawer. It is completely removed from the hit-test tree while closed. */
+  #slc-mobile-more{display:flex;position:fixed;inset:0;z-index:2147483646;pointer-events:auto;visibility:visible}
+  #slc-mobile-more:not(.open){visibility:hidden}
+  #slc-mobile-more .slc-mobile-more-backdrop{position:absolute;inset:0;background:rgba(2,6,23,.62);opacity:0;transition:opacity .18s}
+  #slc-mobile-more.open .slc-mobile-more-backdrop{opacity:1}
+  #slc-mobile-more .slc-mobile-more-sheet{position:absolute;top:0;right:0;bottom:0;left:auto;width:min(430px,92vw);max-height:none;overflow:auto;-webkit-overflow-scrolling:touch;background:var(--bg-secondary);border-left:1px solid var(--border);border-top:0;border-right:0;border-bottom:0;border-radius:24px 0 0 24px;transform:translateX(102%);transition:transform .22s cubic-bezier(.22,1,.36,1);padding-bottom:calc(24px + env(safe-area-inset-bottom));box-shadow:-18px 0 50px rgba(2,6,23,.28)}
+  #slc-mobile-more.open .slc-mobile-more-sheet{transform:translateX(0)}
+  .slc-mobile-more-head{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;align-items:center;padding:18px 18px 14px;background:var(--bg-secondary);border-bottom:1px solid var(--border)}
   .slc-mobile-more-head span{font-size:.65rem;letter-spacing:.12em;color:var(--accent-primary);font-weight:800}.slc-mobile-more-head h3{margin:2px 0 0;font-size:1.2rem}
-  .slc-mobile-more-content{padding:14px 14px 20px}.slc-mobile-more-content section{margin-bottom:18px}.slc-mobile-more-content h4{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary);margin:0 4px 8px}
-  .slc-mobile-more-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.slc-mobile-more-grid button{min-height:58px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);border-radius:14px;padding:10px;text-align:left;display:flex;align-items:center;gap:10px;font:inherit;cursor:pointer}.slc-mobile-more-grid button i{width:20px;text-align:center;color:var(--accent-primary)}
+  .slc-mobile-more-content{padding:16px 14px 24px}.slc-mobile-more-content section{margin-bottom:20px}.slc-mobile-more-content h4{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary);margin:0 4px 8px}
+  .slc-mobile-more-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.slc-mobile-more-grid button{min-height:62px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);border-radius:14px;padding:10px;text-align:left;display:flex;align-items:center;gap:10px;font:inherit;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}.slc-mobile-more-grid button i{width:20px;text-align:center;color:var(--accent-primary)}
+  #slc-product-bottom-nav.slc-more-hidden{display:none!important;pointer-events:none!important}
   .slc-profile-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
   .main-content,.content-area{padding-bottom:92px!important}
 }
@@ -6271,8 +6274,8 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif}
   #slc-product-bottom-nav{z-index:2147483000!important;height:72px!important;min-height:72px!important;padding:6px 5px calc(6px + env(safe-area-inset-bottom))!important;touch-action:manipulation;pointer-events:auto!important;-webkit-user-select:none!important;user-select:none!important}
   #slc-product-bottom-nav button{min-width:0!important;min-height:56px!important;padding:5px 3px!important;position:relative!important;z-index:2!important;pointer-events:auto!important;touch-action:manipulation!important;-webkit-tap-highlight-color:transparent!important;-webkit-touch-callout:none!important}
   #slc-product-bottom-nav button.primary{margin:-8px 3px 4px!important}
-  #slc-mobile-more{z-index:7000!important}
-  .slc-mobile-more-sheet{z-index:7001!important;padding-bottom:calc(88px + env(safe-area-inset-bottom))!important}
+  #slc-mobile-more{z-index:2147483646!important}
+  #slc-mobile-more .slc-mobile-more-sheet{z-index:2147483647!important}
   .slc-mobile-more-grid button{min-height:62px!important;touch-action:manipulation}
   .main-content,.content-area,#view-container{padding-bottom:104px!important}
   .slc-telegram-page-grid{grid-template-columns:1fr}.slc-tg-inbox-item{grid-template-columns:32px minmax(0,1fr)}.slc-tg-inbox-item button{grid-column:2;justify-self:start}.slc-tg-code{align-items:flex-start;flex-direction:column}.slc-tg-code button{width:100%}.slc-tg-connect-row{align-items:stretch}.slc-tg-connect-row button{width:100%}.slc-telegram-modal{padding:8px;align-items:flex-end}.slc-telegram-modal-card{max-height:92vh;border-radius:22px 22px 0 0}.slc-telegram-modal-body{padding:16px}.slc-tg-reconnect{justify-content:space-between}
