@@ -207,7 +207,11 @@
       b.setAttribute('aria-label','Navegação principal');
       b.innerHTML=`<button type="button" data-v="dashboard" aria-label="Início"><i class="fas fa-house"></i><span>Início</span></button><button type="button" data-v="estudar" aria-label="Estudar"><i class="fas fa-compass"></i><span>Estudar</span></button><button type="button" class="primary" data-v="foco" aria-label="Modo Foco"><i class="fas fa-play"></i><span>Foco</span></button><button type="button" data-v="mentor-ia" aria-label="Mentor IA"><i class="fas fa-robot"></i><span>Mentor</span></button><button type="button" data-v="__more" aria-label="Mais funções"><i class="fas fa-th-large"></i><span>Mais</span></button>`;
       document.body.appendChild(b);
-      b.querySelectorAll('button[data-v]').forEach(x=>x.addEventListener('click',()=>x.dataset.v==='__more'?openMobileMore():navigate(x.dataset.v)));
+      b.querySelectorAll('button[data-v]').forEach(x=>{
+        const go=()=>{ if(x.dataset.v==='__more'){ openMobileMore(); } else { navigate(x.dataset.v); } };
+        x.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();go();});
+        x.addEventListener('pointerup',e=>{if(e.pointerType==='touch'){e.preventDefault();e.stopPropagation();go();}}, {passive:false});
+      });
     }
     b.style.display='grid';
     b.querySelectorAll('button[data-v]').forEach(x=>x.classList.toggle('active', x.dataset.v===window.app?.currentView));
@@ -228,6 +232,15 @@
     addStudyView(); addProfileView(); polishLogin(); polishSetup(); restructureNav(); mobileNav(); patchLoadView(); bindStudyActions();
     document.addEventListener('app-ready',()=>{restructureNav();patchLoadView();updateTitle(titleFor(window.app?.currentView||'dashboard'));setTimeout(mobileNav,50);});
     document.addEventListener('click',e=>{const b=e.target.closest('[data-slcnavigate]');if(b&&!b.dataset.bound){e.preventDefault();navigate(b.dataset.slcnavigate);}});
+    // Fallback robusto para Safari/iOS: o botão Mais é tratado por delegação no documento.
+    if(!document.body.dataset.slcMoreDelegation){
+      document.body.dataset.slcMoreDelegation='1';
+      document.addEventListener('click',e=>{
+        const b=e.target.closest('#slc-product-bottom-nav button[data-v="__more"]');
+        if(!b) return;
+        e.preventDefault(); e.stopPropagation(); openMobileMore();
+      }, true);
+    }
     window.addEventListener('resize',()=>mobileNav());
     document.addEventListener('visibilitychange',()=>mobileNav());
   }
