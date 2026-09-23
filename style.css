@@ -6286,3 +6286,288 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif}
 /* V24 — notificações Telegram como segundo canal do mesmo scheduler */
 .slc-tg-toggle{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:14px;padding:13px 14px;border:1px solid var(--border);border-radius:14px;background:var(--bg-primary);cursor:pointer}
 .slc-tg-toggle span{min-width:0}.slc-tg-toggle strong,.slc-tg-toggle small{display:block}.slc-tg-toggle strong{font-size:.82rem}.slc-tg-toggle small{margin-top:4px;color:var(--text-secondary);font-size:.72rem;line-height:1.45}.slc-tg-toggle input{position:absolute;opacity:0;pointer-events:none}.slc-tg-toggle i{width:46px;height:26px;border-radius:999px;background:var(--border);position:relative;flex:none;transition:.18s}.slc-tg-toggle i:after{content:'';position:absolute;width:20px;height:20px;border-radius:50%;left:3px;top:3px;background:#fff;transition:.18s}.slc-tg-toggle input:checked+i{background:var(--accent-primary)}.slc-tg-toggle input:checked+i:after{transform:translateX(20px)}
+
+/* =========================================================
+   SLCampus V30 — header responsivo / UX premium
+   Objetivo: uma única hierarquia visual para cada formato de tela,
+   sem duplicar navegação existente.
+   - Mobile: navegação inferior continua sendo a navegação principal.
+   - Tablet/iPad: gaveta lateral existente continua acessível pelo ☰.
+   - Desktop: sidebar existente permanece intacta.
+========================================================= */
+
+.content-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  min-height: 68px;
+  padding: 10px clamp(16px, 2.2vw, 30px);
+  gap: clamp(10px, 1.6vw, 20px);
+  background: color-mix(in srgb, var(--bg-primary) 88%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--border) 72%, transparent);
+  box-shadow: 0 8px 28px rgba(2, 6, 23, .08);
+  -webkit-backdrop-filter: blur(18px) saturate(135%);
+  backdrop-filter: blur(18px) saturate(135%);
+}
+
+.content-header .page-title {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.content-header .page-title h1 {
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: clamp(1.02rem, 1.35vw, 1.3rem);
+  letter-spacing: -.025em;
+}
+
+.content-header .header-actions {
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.content-header .header-actions .btn-icon,
+.content-header .header-actions .notification-badge {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  padding: 0;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color .18s ease, color .18s ease, transform .18s ease, border-color .18s ease;
+}
+
+.content-header .header-actions .btn-icon:hover,
+.content-header .header-actions .notification-badge:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.content-header .header-actions .btn-icon:focus-visible,
+.content-header .header-actions .notification-badge:focus-visible,
+.content-header .semester-context-select:focus-visible,
+.content-header .mobile-nav-toggle:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent-primary) 72%, white);
+  outline-offset: 2px;
+}
+
+.content-header .header-actions .btn-icon i,
+.content-header .header-actions .notification-badge i {
+  font-size: 16px;
+}
+
+.content-header .notification-badge {
+  position: relative;
+  cursor: pointer;
+}
+
+.content-header .notification-badge .badge-count {
+  top: 1px;
+  right: 1px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  line-height: 1;
+  border: 2px solid var(--bg-primary);
+  box-sizing: border-box;
+}
+
+.content-header .semester-context-switcher {
+  position: relative;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.content-header .semester-context-select {
+  width: 100%;
+  max-width: 280px;
+  min-width: 180px;
+  min-height: 40px;
+  padding: 8px 38px 8px 13px;
+  border-radius: 13px;
+  border-color: color-mix(in srgb, var(--border) 82%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 72%, var(--bg-tertiary));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.content-header .semester-context-switcher::after {
+  content: '\f107';
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-family: 'Font Awesome 6 Free', 'Font Awesome 5 Free';
+  font-weight: 900;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.content-header .semester-context-badge {
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  font-size: .7rem;
+}
+
+/* iPad/tablets: não cria uma nova navegação; usa a gaveta ☰ que já existe. */
+@media (min-width: 769px) and (max-width: 980px) {
+  .content-header {
+    display: grid;
+    grid-template-columns: auto auto minmax(150px, 1fr) auto;
+    grid-template-areas: 'menu title semester actions';
+    min-height: 66px;
+    padding: 10px clamp(14px, 2vw, 22px);
+  }
+
+  .content-header .mobile-nav-toggle {
+    grid-area: menu;
+    display: inline-flex;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border-radius: 12px;
+    flex: none;
+  }
+
+  .content-header .page-title { grid-area: title; }
+  .content-header .semester-context-switcher {
+    grid-area: semester;
+    width: min(100%, 280px);
+    justify-self: center;
+    order: initial;
+  }
+  .content-header .semester-context-select {
+    max-width: none;
+    min-width: 0;
+  }
+  .content-header .header-actions { grid-area: actions; }
+}
+
+/* Celular: uma linha de identidade + ações e uma segunda linha apenas para
+   o contexto acadêmico. A navegação fica exclusivamente na barra inferior
+   #slc-product-bottom-nav já existente. */
+@media (max-width: 768px) {
+  .content-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'title actions'
+      'semester semester';
+    min-height: 0;
+    padding: 9px 12px 10px;
+    gap: 8px 10px;
+    border-bottom-color: color-mix(in srgb, var(--border) 64%, transparent);
+    box-shadow: 0 6px 22px rgba(2, 6, 23, .07);
+  }
+
+  .content-header .mobile-nav-toggle {
+    display: none !important;
+  }
+
+  .content-header .page-title {
+    grid-area: title;
+    min-height: 38px;
+  }
+
+  .content-header .page-title h1 {
+    font-size: 1.02rem;
+    font-weight: 750;
+  }
+
+  .content-header .header-actions {
+    grid-area: actions;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .content-header .header-actions .btn-icon,
+  .content-header .header-actions .notification-badge {
+    width: 35px;
+    height: 35px;
+    min-width: 35px;
+    border-radius: 11px;
+  }
+
+  .content-header .header-actions .btn-icon i,
+  .content-header .header-actions .notification-badge i {
+    font-size: 15px;
+  }
+
+  .content-header .notification-badge .badge-count {
+    top: 0;
+    right: 0;
+    min-width: 16px;
+    height: 16px;
+    font-size: 8px;
+  }
+
+  .content-header .semester-context-switcher {
+    grid-area: semester;
+    width: 100%;
+    display: block;
+    order: initial;
+  }
+
+  .content-header .semester-context-select {
+    display: block;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    min-height: 40px;
+    padding: 8px 38px 8px 13px;
+    border-radius: 13px;
+    font-size: .8rem;
+  }
+
+  .content-header .semester-context-switcher::after {
+    right: 14px;
+  }
+
+  .content-header .semester-context-badge {
+    display: inline-flex;
+    margin-top: 6px;
+  }
+
+  /* O conteúdo já reserva espaço para a barra inferior existente. */
+  #view-container {
+    scroll-margin-top: 72px;
+  }
+}
+
+/* Telas muito estreitas: reduzimos apenas o espaçamento, sem esconder
+   nenhuma função existente. */
+@media (max-width: 380px) {
+  .content-header { padding-left: 10px; padding-right: 10px; }
+  .content-header .header-actions { gap: 1px; }
+  .content-header .header-actions .btn-icon,
+  .content-header .header-actions .notification-badge {
+    width: 33px;
+    height: 33px;
+    min-width: 33px;
+  }
+  .content-header .header-actions .btn-icon i,
+  .content-header .header-actions .notification-badge i { font-size: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content-header,
+  .content-header * {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+  }
+}
