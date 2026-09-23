@@ -41,6 +41,39 @@
 // como um fallback diário caso o cron externo falhe.
 
 const DEDUPE_LIMIT = 500;
+const SCHEDULER_LEASE_MS = 110000; // ~1m50s: evita execuções sobrepostas de cron externo a cada 1 min.
+
+function schedulerRef(db) {
+  return db.collection('system').doc('notificationScheduler');
+}
+
+async function acquireSchedulerLease(db, runId, nowMs) {
+  const ref = schedulerRef(db);
+  let acquired = false;
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    const current = snap.exists ? (snap.data() || {}) : {};
+    const lockUntil = Date.parse(String(current.lockUntil || '')) || 0;
+    if (current.status === 'running' && lockUntil > nowMs && current.runId !== runId) return;
+    const startedAt = new Date(nowMs).toISOString();
+    tx.set(ref, {
+      status: 'running',
+      runId,
+      startedAt,
+      lockUntil: new Date(nowMs + SCHEDULER_LEASE_MS).toISOString(),
+      updatedAt: startedAt,
+      lastAttemptAt: startedAt
+    }, { merge: true });
+    acquired = true;
+  });
+  return acquired;
+}
+
+async function markScheduler(db, patch) {
+  try {
+    await schedulerRef(db).set({ ...patch, updatedAt: new Date().toISOString() }, { merge: true });
+  } catch (_) {}
+}
 
 let firebaseAdminApp = null;
 function getDb() {
@@ -318,15 +351,27 @@ module.exports = async function handler(req, res) {
   let db, webpush;
   try {
     db = getDb();
-    webpush = setupWebPush();
   } catch (err) {
-    return res.status(503).json({ error: err.message });
+    return res.status(503).json({ error: err.message, scheduler: 'database_unavailable' });
   }
 
   const now = Date.now();
+  const runId = `run_${now}_${Math.random().toString(36).slice(2, 10)}`;
+  const acquired = await acquireSchedulerLease(db, runId, now);
+  if (!acquired) {
+    await markScheduler(db, { status: 'skipped_locked', skippedAt: new Date(now).toISOString() });
+    return res.status(200).json({ skipped: true, reason: 'another scheduler run is still active' });
+  }
+
   const summary = { usersChecked: 0, notificationsSent: 0, telegramSent: 0, subscriptionsRemoved: 0, errors: [] };
 
   try {
+    try {
+      webpush = setupWebPush();
+    } catch (err) {
+      await markScheduler(db, { status: 'failed', runId, finishedAt: new Date().toISOString(), error: err.message, summary });
+      return res.status(503).json({ error: err.message, ...summary });
+    }
     // Dois conjuntos: lembretes gerais e término de foco. O segundo é
     // separado para que ativar Push para o Modo Foco não obrigue o usuário a
     // ativar todos os outros alarmes acadêmicos.
@@ -442,19 +487,26 @@ module.exports = async function handler(req, res) {
       await doc.ref.update(update);
     }
 
-    try {
-      await db.collection('system').doc('notificationScheduler').set({
-        lastRunAt: new Date().toISOString(),
-        summary,
-        error: summary.errors.length ? summary.errors.slice(0, 10).join(' | ') : null,
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
-    } catch (_) {}
-    return res.status(200).json(summary);
+    await markScheduler(db, {
+      status: summary.errors.length ? 'completed_with_errors' : 'ok',
+      runId,
+      lastRunAt: new Date().toISOString(),
+      finishedAt: new Date().toISOString(),
+      lockUntil: null,
+      summary,
+      error: summary.errors.length ? summary.errors.slice(0, 10).join(' | ') : null
+    });
+    return res.status(200).json({ ...summary, runId });
   } catch (err) {
-    try {
-      if (db) await db.collection('system').doc('notificationScheduler').set({ lastRunAt:new Date().toISOString(), error:err.message, summary, updatedAt:new Date().toISOString() }, { merge:true });
-    } catch (_) {}
-    return res.status(500).json({ error: err.message, ...summary });
+    await markScheduler(db, {
+      status: 'failed',
+      runId,
+      lastRunAt: new Date().toISOString(),
+      finishedAt: new Date().toISOString(),
+      lockUntil: null,
+      error: err.message,
+      summary
+    });
+    return res.status(500).json({ error: err.message, ...summary, runId });
   }
 };
