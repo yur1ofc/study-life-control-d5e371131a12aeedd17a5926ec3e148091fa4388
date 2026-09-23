@@ -6268,8 +6268,8 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif}
 .telegram-empty{padding:24px;text-align:center;color:var(--text-secondary)}
 
 @media(max-width:768px){
-  #slc-product-bottom-nav{z-index:5000!important;height:72px!important;min-height:72px!important;padding:6px 5px calc(6px + env(safe-area-inset-bottom))!important;touch-action:manipulation}
-  #slc-product-bottom-nav button{min-width:0!important;min-height:56px!important;padding:5px 3px!important;position:relative!important;z-index:1!important;pointer-events:auto!important;-webkit-tap-highlight-color:transparent}
+  #slc-product-bottom-nav{z-index:2147483000!important;height:72px!important;min-height:72px!important;padding:6px 5px calc(6px + env(safe-area-inset-bottom))!important;touch-action:manipulation;pointer-events:auto!important;-webkit-user-select:none!important;user-select:none!important}
+  #slc-product-bottom-nav button{min-width:0!important;min-height:56px!important;padding:5px 3px!important;position:relative!important;z-index:2!important;pointer-events:auto!important;touch-action:manipulation!important;-webkit-tap-highlight-color:transparent!important;-webkit-touch-callout:none!important}
   #slc-product-bottom-nav button.primary{margin:-8px 3px 4px!important}
   #slc-mobile-more{z-index:7000!important}
   .slc-mobile-more-sheet{z-index:7001!important;padding-bottom:calc(88px + env(safe-area-inset-bottom))!important}
