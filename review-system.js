@@ -15,6 +15,12 @@ class ReviewSystem {
     }
 
     async gerarRevisoesFromAula(classDiary) {
+        // O checkbox "Preciso revisar esse conteúdo depois" é o consentimento
+        // explícito para transformar uma aula em uma cadeia de revisões. Antes,
+        // toda aula gerava revisões mesmo quando o usuário não pediu, o que
+        // alimentava notificações demais. Evidência de aprendizagem do Modo Foco
+        // continua podendo criar revisões adaptativas separadamente.
+        if (!classDiary?.precisoRevisar && classDiary?.criarRevisoesAutomaticas !== true) return [];
         this.loadReviews();
         const hoje = new Date();
         const dataBase = new Date(classDiary.data || hoje);
@@ -33,7 +39,10 @@ class ReviewSystem {
                 duracao: intervalo <= 3 ? 25 : intervalo <= 7 ? 35 : 45,
                 tipo: `${intervalo}d`,
                 concluida: false,
-                aulaId: classDiary.id
+                aulaId: classDiary.id,
+                sourceClassDate: classDiary.data || '',
+                sourceClassWeekday: new Date(`${classDiary.data}T00:00:00Z`).getUTCDay(),
+                notificationPolicy: 'due-day-free-window'
             };
             const exists = this.revisoes.some(item => this._signature(item) === this._signature(review));
             if (!exists) {
@@ -61,7 +70,10 @@ class ReviewSystem {
                 tipo: 'pre-exam',
                 concluida: false,
                 aulaId: classDiary.id,
-                provaId: provaMaisProxima.id
+                provaId: provaMaisProxima.id,
+                sourceClassDate: classDiary.data || '',
+                sourceClassWeekday: new Date(`${classDiary.data}T00:00:00Z`).getUTCDay(),
+                notificationPolicy: 'due-day-free-window'
             };
             const exists = this.revisoes.some(item => this._signature(item) === this._signature(review));
             if (!exists && preExam > hoje) {
@@ -76,15 +88,12 @@ class ReviewSystem {
     }
 
     async gerarRevisoesFromSessao(sessao) {
+        // Sessões de estudo não geram automaticamente uma nova cadeia de
+        // revisões. O Modo Foco já registra evidência de aprendizagem e cria
+        // revisões adaptativas quando necessário. Criar outra cadeia aqui
+        // duplicava revisões e era a principal fonte de notificações diárias.
         if (!sessao?.materia) return [];
-        return this.gerarRevisoesFromAula({
-            id: sessao.id,
-            materia: sessao.materia,
-            data: sessao.data || new Date().toISOString().split('T')[0],
-            conteudoExplicado: sessao.topico || `${sessao.tipo || 'Sessão'} de estudo`,
-            naoEntendi: '',
-            precisoRevisar: true
-        });
+        return [];
     }
 
     getRevisoesPorData(data) {

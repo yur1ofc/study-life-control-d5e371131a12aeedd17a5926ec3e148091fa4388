@@ -6,7 +6,7 @@
 (function () {
   'use strict';
 
-  const VERSION = 1;
+  const VERSION = 2;
   const DAY = 86400000;
   const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
   const num = (v, fallback = 0) => { const n = Number(String(v ?? '').replace(',', '.')); return Number.isFinite(n) ? n : fallback; };
@@ -85,6 +85,8 @@
         lastAdjustmentDate: existing.lastAdjustmentDate || '',
         lastReason: existing.lastReason || 'inicial',
         preferredSessionMinutes: clamp(num(existing.preferredSessionMinutes, 45), 25, 90),
+        preferredStudyWindows: existing.preferredStudyWindows && typeof existing.preferredStudyWindows === 'object' ? existing.preferredStudyWindows : { manha: 0, tarde: 0, noite: 0, madrugada: 0 },
+        preferredStudyHours: Array.isArray(existing.preferredStudyHours) ? existing.preferredStudyHours.slice(-12) : [],
         learningConfidence: existing.learningConfidence || 'inicial'
       };
     }
@@ -92,6 +94,9 @@
     if (!a.dailyHistory || typeof a.dailyHistory !== 'object') a.dailyHistory = {};
     if (!Array.isArray(a.adjustments)) a.adjustments = [];
     if (!Number.isFinite(Number(a.preferredSessionMinutes))) a.preferredSessionMinutes = 45;
+    if (!a.preferredStudyWindows || typeof a.preferredStudyWindows !== 'object') a.preferredStudyWindows = { manha: 0, tarde: 0, noite: 0, madrugada: 0 };
+    for (const k of ['manha','tarde','noite','madrugada']) a.preferredStudyWindows[k] = Math.max(0, num(a.preferredStudyWindows[k], 0));
+    if (!Array.isArray(a.preferredStudyHours)) a.preferredStudyHours = [];
     return a;
   }
 
@@ -227,6 +232,40 @@
     return a.preferredSessionMinutes;
   }
 
+  function updatePreferredStudyWindows(app) {
+    const a = ensure(app);
+    if (!a) return null;
+    const rows = (app.data.sessions || []).filter(completed).slice(-40);
+    const buckets = { manha: 0, tarde: 0, noite: 0, madrugada: 0 };
+    const hours = [];
+    rows.forEach(s => {
+      const raw = s?.data || s?.dataConclusao || s?.inicio;
+      const d = new Date(raw || '');
+      if (Number.isNaN(d.getTime())) return;
+      const h = d.getHours();
+      hours.push(h);
+      if (h >= 5 && h < 12) buckets.manha += 1;
+      else if (h >= 12 && h < 18) buckets.tarde += 1;
+      else if (h >= 18 && h < 24) buckets.noite += 1;
+      else buckets.madrugada += 1;
+    });
+    if (rows.length >= 3) {
+      a.preferredStudyWindows = buckets;
+      a.preferredStudyHours = hours.slice(-12);
+    }
+    return a.preferredStudyWindows;
+  }
+
+  function preferredStudyWindow(app) {
+    const a = ensure(app);
+    if (!a) return null;
+    updatePreferredStudyWindows(app);
+    const entries = Object.entries(a.preferredStudyWindows || {});
+    if (!entries.length || entries.every(([,v]) => !v)) return app?.data?.user?.turnoPrincipal || null;
+    entries.sort((x,y) => y[1]-x[1]);
+    return entries[0]?.[0] || app?.data?.user?.turnoPrincipal || null;
+  }
+
   function subjectAdaptation(app, subject) {
     const name = String(subject || '').trim();
     const sessions = (app?.data?.sessions || []).filter(s => completed(s) && norm(s?.materia) === norm(name));
@@ -251,6 +290,7 @@
     const avg = rows.length ? rows.reduce((s, r) => s + r.actual, 0) / rows.length : 0;
     const adherence = rows.length ? rows.reduce((s, r) => s + Math.min(1.25, r.ratio), 0) / rows.length : null;
     updatePreferredSession(app);
+    updatePreferredStudyWindows(app);
     return {
       dailyTargetMinutes: target,
       dailyTargetHours: +(target / 60).toFixed(2),
@@ -261,6 +301,8 @@
       averageRecentDailyMinutes: Math.round(avg),
       adherence: adherence === null ? null : Number(adherence.toFixed(2)),
       preferredSessionMinutes: clamp(num(a.preferredSessionMinutes, 45), 25, 90),
+      preferredStudyWindow: preferredStudyWindow(app),
+      preferredStudyWindows: { ...(a.preferredStudyWindows || {}) },
       confidence: a.learningConfidence || 'inicial',
       reason: a.lastReason || 'ponto de partida',
       lastAdjustmentDate: a.lastAdjustmentDate || null,
@@ -340,7 +382,9 @@
     reviewIntervals,
     applyEvidence,
     getWeeklyTarget,
-    maxAvailableMinutes
+    maxAvailableMinutes,
+    preferredStudyWindow,
+    updatePreferredStudyWindows
   };
 
   document.addEventListener('app-ready', () => setTimeout(() => {
@@ -378,7 +422,7 @@
     const target = h ? `${h}h${m ? ` ${m}min` : ''}` : `${m}min`;
     const actual = s.actualTodayMinutes >= 60 ? `${Math.floor(s.actualTodayMinutes/60)}h ${s.actualTodayMinutes%60 ? `${s.actualTodayMinutes%60}min` : ''}`.trim() : `${s.actualTodayMinutes}min`;
     const remaining = s.remainingMinutes >= 60 ? `${Math.floor(s.remainingMinutes/60)}h ${s.remainingMinutes%60 ? `${s.remainingMinutes%60}min` : ''}`.trim() : `${s.remainingMinutes}min`;
-    return `<div class="slc-adaptive-card" id="slc-adaptive-card"><div class="slc-adaptive-head"><div><h3><i class="fas fa-brain"></i> Meta que aprende com você</h3><p>O SLCampus começa conservador e ajusta o ritmo conforme seu estudo real.</p></div><span class="slc-adaptive-pill">${esc(s.confidence)}</span></div><div class="slc-adaptive-grid"><div class="slc-adaptive-kpi"><span>Meta de hoje</span><strong>${target}</strong></div><div class="slc-adaptive-kpi"><span>Feito hoje</span><strong>${actual}</strong></div><div class="slc-adaptive-kpi"><span>Restante</span><strong>${remaining}</strong></div><div class="slc-adaptive-kpi"><span>Bloco sugerido</span><strong>${s.preferredSessionMinutes} min</strong></div></div><p class="slc-adaptive-copy">${esc(s.reason)}. ${esc(s.nextTargetHint)}</p></div>`;
+    return `<div class="slc-adaptive-card" id="slc-adaptive-card"><div class="slc-adaptive-head"><div><h3><i class="fas fa-brain"></i> Meta que aprende com você</h3><p>O SLCampus começa conservador e ajusta o ritmo conforme seu estudo real.</p></div><span class="slc-adaptive-pill">${esc(s.confidence)}</span></div><div class="slc-adaptive-grid"><div class="slc-adaptive-kpi"><span>Meta de hoje</span><strong>${target}</strong></div><div class="slc-adaptive-kpi"><span>Feito hoje</span><strong>${actual}</strong></div><div class="slc-adaptive-kpi"><span>Restante</span><strong>${remaining}</strong></div><div class="slc-adaptive-kpi"><span>Bloco sugerido</span><strong>${s.preferredSessionMinutes} min</strong></div><div class="slc-adaptive-kpi"><span>Horário que mais funciona</span><strong>${({manha:'manhã',tarde:'tarde',noite:'noite',madrugada:'madrugada'}[s.preferredStudyWindow]||'aprendendo')}</strong></div></div><p class="slc-adaptive-copy">${esc(s.reason)}. ${esc(s.nextTargetHint)}</p></div>`;
   }
   function patch(app){
     if (!app || app.__slcAdaptiveUIPatched) return;
