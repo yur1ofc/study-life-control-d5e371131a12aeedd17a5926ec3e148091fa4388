@@ -27,23 +27,71 @@ function alreadyProcessed(data,updateId){const ids=Array.isArray(data.telegramPr
 async function markProcessed(ref,data,updateId){if(updateId==null)return;const ids=Array.isArray(data.telegramProcessedUpdates)?data.telegramProcessedUpdates:[];await ref.set({telegramProcessedUpdates:[...ids,updateId].slice(-200)},{merge:true});}
 function agendaText(data,date){const day=dayFromDate(date);const names=['domingo','segunda','terça','quarta','quinta','sexta','sábado'];const items=(data.classSchedule||[]).filter(a=>Number(a.dia)===day).sort((a,b)=>String(a.inicio||'').localeCompare(String(b.inicio||'')));if(!items.length)return `Não encontrei aulas salvas para ${date===todayBR()?'hoje':'esse dia'}.`;return `Aulas de ${names[day]}:
 `+items.map(a=>`• ${formatClass(a)}`).join('\n');}
-function parseDate(text){const n=normalize(text);if(/\bdepois de amanha\b/.test(n)){const d=dateObjBR();d.setUTCDate(d.getUTCDate()+2);return isoDate(d);}if(/\bamanha\b/.test(n)){const d=dateObjBR();d.setUTCDate(d.getUTCDate()+1);return isoDate(d);}if(/\bhoje\b/.test(n))return todayBR();const m=n.match(/\b(?:dia\s*)?(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?\b/);if(m){let y=m[3]?Number(m[3]):dateObjBR().getUTCFullYear();if(y<100)y+=2000;const d=new Date(Date.UTC(y,Number(m[2])-1,Number(m[1])));if(!isNaN(d))return isoDate(d);}for(const k of Object.keys(DAY).sort((a,b)=>b.length-a.length)){if(new RegExp(`\\b${k.replace(/-/g,'[- ]?')}\\b`,'i').test(n))return nextWeekday(k);}return null;}
+function parseDate(text){
+  const n=normalize(text),base=dateObjBR();
+  if(/\bdepois de amanha\b/.test(n)){const d=new Date(base);d.setUTCDate(d.getUTCDate()+2);return isoDate(d);}
+  if(/\b(amanha|amanha cedo|amanha a noite|amanha de manha)\b/.test(n)){const d=new Date(base);d.setUTCDate(d.getUTCDate()+1);return isoDate(d);}
+  if(/\bhoje\b/.test(n))return todayBR();
+  if(/\bontem\b/.test(n)){const d=new Date(base);d.setUTCDate(d.getUTCDate()-1);return isoDate(d);}
+  if(/\b(fim de semana|final de semana)\b/.test(n)){const d=new Date(base);const add=(6-d.getUTCDay()+7)%7;d.setUTCDate(d.getUTCDate()+add);return isoDate(d);}
+  const m=n.match(/\b(?:dia\s*)?(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?\b/);
+  if(m){let y=m[3]?Number(m[3]):base.getUTCFullYear();if(y<100)y+=2000;const d=new Date(Date.UTC(y,Number(m[2])-1,Number(m[1])));if(!isNaN(d))return isoDate(d);}
+  const dayOnly=n.match(/\bdia\s+(\d{1,2})\b/);
+  if(dayOnly){const d=new Date(Date.UTC(base.getUTCFullYear(),base.getUTCMonth(),Number(dayOnly[1])));if(!isNaN(d))return isoDate(d);}
+  for(const k of Object.keys(DAY).sort((a,b)=>b.length-a.length)){
+    const patternDay=`\\b${k.replace(/-/g,'[- ]?')}\\b`;
+    if(new RegExp(patternDay,'i').test(n))return nextWeekday(k);
+  }
+  return null;
+}
 function parseTimeRange(text){const n=normalize(text).replace(/h\b/g,':00');let m=n.match(/\b(\d{1,2})(?::(\d{2}))?\s*(?:as|a|ate|até|-)\s*(\d{1,2})(?::(\d{2}))?\b/);if(!m)m=n.match(/\b(\d{1,2})(?::(\d{2}))?\s*(?:h)?\s*(?:as|a|ate|até|-)\s*(\d{1,2})(?::(\d{2}))?\s*h?\b/);if(!m)return null;const fmt=(h,min)=>`${String(Math.min(23,Number(h))).padStart(2,'0')}:${String(min||0).padStart(2,'0')}`;return {inicio:fmt(m[1],m[2]),fim:fmt(m[3],m[4])};}
 function subjectTokens(s){return normalize(s).split(/[^a-z0-9]+/).filter(x=>x.length>=3&&!['de','da','do','das','dos','com','para'].includes(x));}
+function romanToArabic(v){const n=normalize(v);return ({i:1,ii:2,iii:3,iv:4,v:5,vi:6,vii:7,viii:8,ix:9,x:10}[n]||null);}
+function subjectAliases(subject){
+  const name=String(subject?.nome||subject||'').trim();
+  const code=String(subject?.codigo||subject?.code||'').trim();
+  const words=normalize(name).split(/[^a-z0-9]+/).filter(Boolean);
+  const stop=new Set(['de','da','do','das','dos','e','em','para','a','o','as','os']);
+  const significant=words.filter(w=>!stop.has(w));
+  const sig=significant.map(w=>w[0]).join('');
+  const aliases=new Set();
+  if(code) aliases.add(normalize(code).replace(/\s+/g,''));
+  if(sig.length>=2) aliases.add(sig);
+  if(significant.length){
+    aliases.add(significant[0]);
+    aliases.add(significant[0].slice(0,4));
+    const last=significant.at(-1); const roman=romanToArabic(last);
+    if(roman){aliases.add(`${significant[0]}${roman}`);aliases.add(`${sig}${roman}`);}
+  }
+  const compact=normalize(name).replace(/[^a-z0-9]/g,'');
+  if(compact) aliases.add(compact);
+  return [...aliases].filter(x=>x.length>=2);
+}
 function findSubject(text,subjects){
   const n=normalize(text);
   const arr=(subjects||[]).map(s=>typeof s==='string'?{nome:s}:s).filter(s=>s?.nome);
   const exact=arr.filter(s=>n.includes(normalize(s.nome))).sort((a,b)=>normalize(b.nome).length-normalize(a.nome).length);
   if(exact.length)return exact[0];
-  const nt=subjectTokens(n); if(!nt.length)return null;
-  const scored=arr.map(s=>{
-    const st=subjectTokens(s.nome);let hits=0;
+  const candidates=[];
+  for(const s of arr){
+    const aliases=subjectAliases(s); let score=0,hits=0;
+    for(const alias of aliases){
+      const safe=alias.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      if(new RegExp(`(^|\\s)${safe}(?=\\s|$|[.,!?:;=\-])`,'i').test(n)){
+        const weight=alias.length>=4?100:alias.length===3?85:70;
+        score=Math.max(score,weight);
+      }
+    }
+    const st=subjectTokens(s.nome), nt=subjectTokens(n);
     for(const u of nt){if(st.some(v=>v===u||v.startsWith(u)||u.startsWith(v)))hits++;}
-    return {s,score:hits/Math.max(1,st.length),hits};
-  }).filter(x=>x.hits>0).sort((a,b)=>b.score-a.score||b.hits-a.hits||normalize(a.s.nome).length-normalize(b.s.nome).length);
-  if(!scored.length||scored[0].score<0.5)return null;
-  if(scored.length>1&&scored[1].score===scored[0].score&&scored[1].hits===scored[0].hits)return null;
-  return scored[0].s;
+    score=Math.max(score,hits?Math.round((hits/Math.max(1,st.length))*60):0);
+    if(score)candidates.push({s,score,hits});
+  }
+  candidates.sort((a,b)=>b.score-a.score||b.hits-a.hits||normalize(a.s.nome).length-normalize(b.s.nome).length);
+  if(!candidates.length)return null;
+  const top=candidates[0],second=candidates[1];
+  if(second&&second.score===top.score&&second.hits===top.hits&&top.score<100)return null;
+  return top.score>=55?top.s:null;
 }
 function stripSubject(text,subject){if(!subject)return text;return text.replace(new RegExp(subject.nome.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'ig'),'').replace(/\s{2,}/g,' ').trim();}
 function listAgenda(data,date){return agendaText(data,date);}
@@ -103,30 +151,82 @@ function formatGroupedBySubject(items, formatter){
   return [...groups.entries()].map(([materia,list])=>`${materia}\n${list.map(formatter).join('\n')}`).join('\n\n');
 }
 function daysUntil(date){if(!date)return null;const a=dateObjBR(),b=new Date(`${date}T00:00:00Z`);return Math.round((b-a)/86400000);}
+function periodRange(text){
+  const n=normalize(text),base=dateObjBR(),dow=base.getUTCDay();
+  if(/\bsemana que vem\b/.test(n)){const start=new Date(base);const add=((8-dow)%7)||7;start.setUTCDate(start.getUTCDate()+add);const end=new Date(start);end.setUTCDate(end.getUTCDate()+6);return {start:isoDate(start),end:isoDate(end)};}
+  if(/\b(essa|esta|nesta) semana\b/.test(n)){const start=new Date(base);start.setUTCDate(start.getUTCDate()-dow);const end=new Date(start);end.setUTCDate(end.getUTCDate()+6);return {start:isoDate(start),end:isoDate(end)};}
+  if(/\b(este|esse|neste|nesse) mes\b/.test(n)||/\bmes\b/.test(n)){const start=new Date(Date.UTC(base.getUTCFullYear(),base.getUTCMonth(),1));const end=new Date(Date.UTC(base.getUTCFullYear(),base.getUTCMonth()+1,0));return {start:isoDate(start),end:isoDate(end)};}
+  return null;
+}
+function adaptiveTelegram(data){
+  const a=data?.user?.adaptiveLearning||{};
+  const max=Math.max(30,Math.round((Number(data?.user?.horasMaximas)||4)*60-(Number(data?.user?.tempoDeslocamento)||0)));
+  const target=Math.max(30,Math.min(max,Number(a.dailyTargetMinutes)||Math.round(max*.45/5)*5));
+  const today=todayBR();
+  const actual=(data.sessions||[]).filter(s=> (s?.concluida||s?.status==='concluida') && String(s?.data||'').slice(0,10)===today).reduce((sum,s)=>sum+Number(s?.duracaoReal||s?.duracaoMin||s?.duracao||0),0);
+  return {target,actual,remaining:Math.max(0,target-actual),percent:Math.min(100,Math.round(actual/Math.max(1,target)*100)),reason:a.lastReason||'ponto de partida'};
+}
+function subjectStatusText(data,subject){
+  const name=subject?.nome||subject||'';
+  const grades=scopedAcademicItems(data,'grades').filter(x=>sameSubject(x.materia,name));
+  const values=grades.map(x=>Number(x.valor)).filter(x=>Number.isFinite(x)&&x>=0&&x<=10);
+  const avg=values.length?values.reduce((a,b)=>a+b,0)/values.length:null;
+  const sessions=(data.sessions||[]).filter(x=>(x?.concluida||x?.status==='concluida')&&sameSubject(x.materia,name));
+  const minutes=sessions.reduce((a,x)=>a+Number(x?.duracaoReal||x?.duracaoMin||x?.duracao||0),0);
+  const tasks=scopedAcademicItems(data,'tasks').filter(x=>!x.concluida&&sameSubject(x.materia,name));
+  const exams=scopedAcademicItems(data,'exams').filter(x=>!x.concluida&&sameSubject(x.materia,name)&&String(x.data||'')>=todayBR()).sort((a,b)=>String(a.data).localeCompare(String(b.data)));
+  const topics=(data.learningMap||[]).filter(x=>sameSubject(x.materia,name)).filter(x=>Number(x.confianca??x.confidence??3)<=2||['fraco','revisar','estudando'].includes(normalize(x.status))).slice(0,3);
+  const lines=[`Situação em ${name}:`];
+  lines.push(avg===null?'• Notas: ainda não registradas.':`• Média das notas registradas: ${avg.toFixed(1)}.`);
+  lines.push(`• Estudo acumulado: ${(minutes/60).toFixed(1)}h.`);
+  if(tasks.length)lines.push(`• Tarefas pendentes: ${tasks.length}.`);else lines.push('• Tarefas pendentes: nenhuma.');
+  if(exams.length)lines.push(`• Próxima avaliação: ${exams[0].titulo||'Avaliação'} em ${formatDateBR(exams[0].data)}.`);
+  if(topics.length)lines.push(`• Tópicos que pedem atenção: ${topics.map(x=>x.nome||x.topico).filter(Boolean).join(', ')}.`);
+  return lines.join('\n');
+}
+function studyPlanText(data){
+  const target=adaptiveTelegram(data), subjects=Array.isArray(data.subjects)?data.subjects:[];
+  const now=todayBR();
+  const score=s=>{
+    const name=s.nome||''; const grades=scopedAcademicItems(data,'grades').filter(x=>sameSubject(x.materia,name)).map(x=>Number(x.valor)).filter(Number.isFinite); const avg=grades.length?grades.reduce((a,b)=>a+b,0)/grades.length:7;
+    const exam=scopedAcademicItems(data,'exams').filter(x=>!x.concluida&&sameSubject(x.materia,name)&&String(x.data||'')>=now).sort((a,b)=>String(a.data).localeCompare(String(b.data)))[0];
+    const days=exam?daysUntil(exam.data):30; const tasks=scopedAcademicItems(data,'tasks').filter(x=>!x.concluida&&sameSubject(x.materia,name)).length;
+    const weak=(data.learningMap||[]).filter(x=>sameSubject(x.materia,name)&&Number(x.confianca??3)<=2).length;
+    return (exam?Math.max(0,30-days*2):0)+Math.max(0,7-avg)*7+tasks*3+weak*4+Number(s.dificuldade||3)*2;
+  };
+  const ranked=subjects.map(s=>({s,score:score(s)})).sort((a,b)=>b.score-a.score).slice(0,4);
+  if(!ranked.length)return 'Ainda não tenho matérias suficientes para montar um plano.';
+  let remaining=target.remaining||target.target; const lines=[`Plano adaptativo de hoje (${Math.round(target.target/60*10)/10}h de meta):`];
+  ranked.forEach((row,i)=>{if(remaining<=0)return;const share=i===0?0.4:i===1?0.3:i===2?0.2:0.1;const mins=Math.max(20,Math.min(90,Math.round((remaining*share)/5)*5));remaining-=mins;lines.push(`• ${row.s.nome} — ${mins} min.`);});
+  lines.push(`\n${target.actual?`Você já estudou ${Math.round(target.actual)} min hoje. `:''}${target.remaining?`Restam ${target.remaining} min para a meta atual.`:'Meta de hoje já atingida.'}`);
+  return lines.join('\n');
+}
 function naturalQuery(text,data){
-  const n=normalize(text);
-  const date=parseDate(text);
-  if(/\b(proxima|próxima)\s+aula\b/.test(n))return {kind:'nextClass'};
+  const n=normalize(text),date=parseDate(text),period=periodRange(text),subject=findSubject(text,data.subjects||[]);
+  const subjectName=subject?.nome||'';
+  if(/\b(qual|quanto|meta|objetivo).*\b(estudar|estudo|estudei|estudar hoje|tempo)\b/.test(n)&&/\b(hoje|agora|dia)\b/.test(n))return {kind:'adaptiveGoal'};
+  if(/\b(o que|oq|qual|como)\b.*\b(estudar|estudo|estude|estudaria|plano de estudo)\b/.test(n))return {kind:'studyPlan'};
+  if(subject&&/\b(como estou|como esta|como ta|situa[cç]ao|desempenho|rendimento)\b/.test(n))return {kind:'subjectStatus',subject:subjectName};
+  const dayContext=!!date||/\b(hoje|amanha|depois de amanha|ontem|segunda|terca|quarta|quinta|sexta|sabado|domingo|semana que vem|fim de semana)\b/.test(n);
+  if(/\b(o que|oq|o q|tem o que|tenho o que|tenho alguma coisa|tem alguma coisa)\b/.test(n)&&dayContext)return {kind:'dayOverview',date:date||todayBR(),subject:subjectName};
+  if(/\b(agenda|meu dia|minha agenda|como esta meu dia|como ta meu dia)\b/.test(n)&&dayContext)return {kind:'dayOverview',date:date||todayBR(),subject:subjectName};
+  if(/\b(proxima|próxima|seguinte)\s+(aula|classe)\b/.test(n)||/\bqual.*(aula|classe).*vem\b/.test(n))return {kind:'nextClass',subject:subjectName};
   const classAction=/\b(adiciona|adicionar|cria|criar|marca|marcar|registra|registrar|coloca|colocar|vou\s+ter|tenho)\b.*\b(aulas?|classe|classes)\b/.test(n);
   const asksClasses=/^\s*(que|quais|qual)\b.*\b(aulas?|horario|horarios)\b/.test(n)
-    || /\b(minhas|meu|meus)\s+(aulas?|horario|horarios)\b/.test(n)
-    || /\b(o que|oq)\s+(eu\s+)?tenho\b.*\b(aulas?|horario|horarios)\b/.test(n)
-    || /\b(como\s+(esta|esta o|está|está o)|mostra|mostrar|ver)\b.*\b(horario|horarios|grade)\b/.test(n)
-    || /^\s*aulas?\b.*\b(hoje|amanha|depois de amanha|segunda|terca|quarta|quinta|sexta|sabado|domingo)\b/.test(n)
-    || (/\btenho\s+(aulas?|aula)\b/.test(n)&&/[?]$/.test(String(text).trim()));
-  if(asksClasses&&!classAction){return {kind:'agenda',date:date||todayBR()};}
-  if(/\b(que|quais|qual|mostra|mostrar|ver|minhas|meus)\b.*\b(tarefas?|lembretes?|pendencias?|pendências?)\b/.test(n)
-    || /\b(o que|oq)\s+(eu\s+)?tenho\s+(para\s+)?(fazer|entregar)\b/.test(n)) return {kind:'tasks',date};
-  const asksNextExam=/\b(proxima|próxima)\b.*\b(prova|avaliacao|avaliação|trabalho)\b/.test(n)
-    || /\bquando\s+(é|e)\s+(minha|a)\s+(prova|avaliacao|avaliação)\b/.test(n);
-  if(asksNextExam)return {kind:'exams',date,nextOnly:true};
-  if(/\b(que|quais|qual|mostra|mostrar|ver|minhas|meus)\b.*\b(provas?|avaliacoes?|avaliações?|trabalhos?)\b/.test(n)) return {kind:'exams',date,nextOnly:false};
-  const gradeAction=/\b(minha|minhas)\s+nota\b.*\b(foi|é|e)\b.*\d/.test(n) || /\b(tirei|fiquei\s+com)\b.*\d/.test(n);
-  if(!gradeAction && (/\b(minhas|meus|quais|qual|mostra|mostrar|ver)\b.*\b(notas?|medias?|médias?|boletim)\b/.test(n)
-    || /\bnota\s+(de|em|do|da)\b/.test(n))) return {kind:'grades'};
-  if(/\bquanto\s+(tempo|eu\s+estudei|estudei)\b/.test(n)
-    || /\b(horas?|minutos?)\s+(eu\s+)?estudei\b/.test(n)
-    || /\b(estudos?|sessoes?|sessões?)\b.*\b(hoje|ontem|semana|mes|mês)\b/.test(n)) return {kind:'studySummary',date};
+    ||/\b(minhas|meu|meus)\s+(aulas?|horario|horarios)\b/.test(n)
+    ||/\b(o que|oq)\s+(eu\s+)?tenho\b.*\b(aulas?|horario|horarios)\b/.test(n)
+    ||/\b(como\s+(esta|esta o)|mostra|mostrar|ver)\b.*\b(horario|horarios|grade)\b/.test(n)
+    ||/^\s*(aulas?|classes?|grade|horario|horarios)\b.*\b(hoje|amanha|depois de amanha|segunda|terca|quarta|quinta|sexta|sabado|domingo)\b/.test(n)
+    ||(/\btenho\s+(aulas?|aula)\b/.test(n)&&/[?]$/.test(String(text).trim()));
+  if(asksClasses&&!classAction)return {kind:'agenda',date:date||todayBR(),subject:subjectName};
+  if(/\b(que|quais|qual|mostra|mostrar|ver|minhas|meus)\b.*\b(tarefas?|lembretes?|pendencias?|pendências?|entregas?|afazeres?|to-do|todo)\b/.test(n)||/\b(o que|oq)\s+(eu\s+)?tenho\s+(para\s+)?(fazer|entregar)\b/.test(n))return {kind:'tasks',date,period,subject:subjectName};
+  const asksNextExam=/\b(proxima|próxima)\b.*\b(prova|avaliacao|avaliação|trabalho|teste|p\s*\d+|av\s*\d+)\b/.test(n)||/\bquando\s+(é|e)\s+(minha|a)\s+(prova|avaliacao|avaliação|teste|p\s*\d+|av\s*\d+)\b/.test(n)||/\bqual\s+(?:é|e)\s+(?:a|minha)\s+(p\s*\d+|prova\s*\d+|av\s*\d+)\b/.test(n);
+  if(asksNextExam)return {kind:'exams',date,nextOnly:true,subject:subjectName};
+  if(/\b(tenho|tem|ha|há)\s+(alguma|algum)\s+(prova|avaliacao|avaliação|trabalho|teste)\b/.test(n)||/\bqual\s+(?:e|é)\s+(?:a|minha)\s+(prova|avaliacao|avaliação)\b/.test(n))return {kind:'exams',date,nextOnly:false,period,subject:subjectName};
+  if(/\b(que|quais|qual|mostra|mostrar|ver|minhas|meus)\b.*\b(provas?|avaliacoes?|avaliações?|trabalhos?|testes?|p\s*\d+|av\s*\d+|n\s*\d+)\b/.test(n))return {kind:'exams',date,nextOnly:false,period,subject:subjectName};
+  const gradeAction=/\b(minha|minhas)\s+nota\b.*\b(foi|é|e)\b.*\d/.test(n)||/\b(tirei|fiquei\s+com)\b.*\d/.test(n);
+  if(!gradeAction&&(/\b(minhas|meus|quais|qual|mostra|mostrar|ver)\b.*\b(notas?|medias?|médias?|boletim|resultado|resultados)\b/.test(n)||/\bnota\s+(de|em|do|da)\b/.test(n)))return {kind:'grades',subject:subjectName};
+  if(/\bquanto\s+(tempo|eu\s+estudei|estudei|tempo\s+de\s+estudo)\b/.test(n)||/\b(horas?|minutos?)\s+(eu\s+)?estudei\b/.test(n)||/\b(estudos?|sessoes?|sessões?)\b.*\b(hoje|ontem|semana|mes|mês)\b/.test(n))return {kind:'studySummary',date,subject:subjectName};
   return null;
 }
 function parseNatural(text,data){
@@ -149,6 +249,7 @@ function parseNatural(text,data){
 
   // Nota: "tirei 7,5 em Cálculo na P1 valendo 20%", "Minha nota em Física foi 8".
   const gradeM=n.match(/\b(?:tirei(?:\s+uma\s+nota)?|nota(?:\s+de)?|fiquei\s+com)\s*(\d+(?:[\.,]\d+)?)\s*(?:em|na|no|de)?\s*(.+?)(?=\s+(?:na|no)\s+(?:p\s*\d+|prova|avalia)|\s+valendo\s+\d+%|$)/i)
+    || n.match(/\b(?:p\s*\d+|prova\s*\d+|av\s*\d+)\s+(?:de|da|do|em)\s+(.+?)\s*[:=-]\s*(\d+(?:[\.,]\d+)?)(?:\s|$)/i)
     || n.match(/\b(?:minha|minhas)\s+nota\s+(?:em|de|no|na)\s+(.+?)\s+(?:foi|é|e)\s+(\d+(?:[\.,]\d+)?)(?:\s|$)/i)
     || n.match(/\b(?:p\s*\d+|prova\s*\d+|av\s*\d+)\s+(?:de|da|do|em)\s+(.+?)\s+(?:foi|é|e)\s+(\d+(?:[\.,]\d+)?)(?:\s|$)/i);
   if(gradeM){
@@ -168,8 +269,10 @@ function parseNatural(text,data){
     return {kind:'task',item:{id:id('task'),materia,titulo:title,dataLimite:date||todayBR(),concluida:false,criadaEm:new Date().toISOString(),origem:'telegram-natural'}};
   }
 
-  // Prova/avaliação/trabalho e também "P1 de Cálculo é sexta".
-  if((/\b(prova|avalia(?:cao|ção)|trabalho)\b/.test(n) && date) || /\b(?:p\s*\d+|prova\s*\d+)\b.*\b(?:é|e|será|sera)\b/.test(n) && date){
+  // Prova/avaliação/trabalho e também frases como "tenho P1 de GA sexta".
+  if((/\b(tenho|vou\s+ter|marcaram|minha|meu)\b.*\b(?:p\s*\d+|n\s*\d+|prova\s*\d+|prova|avali(?:acao|ção)|trabalho|teste)\b/.test(n) && date && !/[?]$/.test(String(text).trim()))
+    || ((/\b(prova|avali(?:acao|ção)|trabalho|teste)\b/.test(n) && date))
+    || /\b(?:p\s*\d+|prova\s*\d+)\b.*\b(?:é|e|será|sera)\b/.test(n) && date){
     const materia=subject?.nome||text.match(/\b(?:prova|avalia(?:ção|cao)|trabalho|p\s*\d+|prova\s*\d+)\s+(?:de|da|do)\s+(.+?)(?=\s+(?:amanha|hoje|segunda|terca|terça|quarta|quinta|sexta|sabado|sábado|dia\s+\d|é|e|será|sera|$))/i)?.[1]?.trim()||'';
     const titulo=(n.match(/\b(p\s*\d+|prova\s*\d+|trabalho|avalia(?:cao|ção)\s*\d*)\b/i)?.[1]||'Avaliação').replace(/\s+/g,' ').trim();
     return {kind:'exam',item:{id:id('exam'),materia,titulo:data?titulo:'Avaliação',data:date,concluida:false,criadaEm:new Date().toISOString(),origem:'telegram-natural'}};
@@ -179,7 +282,7 @@ function parseNatural(text,data){
   const compactH=n.match(/\b(\d+(?:[\.,]\d+)?)\s*h\s*(\d{1,2})?\b/i);
   const hoursM=n.match(/\b(\d+(?:[\.,]\d+)?)\s*(?:hora|horas)\b(?:\s*e\s*(\d+)\s*(?:min|minuto|minutos))?/i);
   const minsM=n.match(/\b(\d+(?:[\.,]\d+)?)\s*(?:min|minuto|minutos)\b/i);
-  if(/\b(estudei|estudo|estudos|estudar|fiz\s+.*estudo)\b/.test(n)&&(compactH||hoursM||minsM)){
+  if(/\b(estudei|estudo|estudos|estudar|fiz|passei)\b/.test(n)&&(compactH||hoursM||minsM)&&(subject||/\b(estudo|estudando)\b/.test(n))){
     let min=0;
     if(compactH){min=Number(String(compactH[1]).replace(',','.'))*60+(compactH[2]?Number(compactH[2]):0);}
     else if(hoursM){min=Number(String(hoursM[1]).replace(',','.'))*60+(hoursM[2]?Number(hoursM[2]):0);}
@@ -191,7 +294,7 @@ function parseNatural(text,data){
   if(/^\s*(anota|anote|salva|salve|registr[ae])\b/i.test(text)){return {kind:'note',text:text.replace(/^\s*(anota|anote|salva|salve|registre|registra)\s*:?[-\s]*/i,'').trim()||text};}
   return null;
 }
-function help(){return `SLCampus conectado.\n\nVocê pode falar normalmente comigo. Exemplos:\n• Tenho aula de Cálculo amanhã das 8 às 10 na sala 12\n• Que aulas tenho amanhã?\n• Quais são minhas tarefas de sexta?\n• Quando é minha próxima prova?\n• Minhas notas\n• Me lembra de fazer a lista de Física sexta\n• Tenho prova de Geometria na próxima terça\n• Tirei 7,5 em Cálculo na P1 valendo 20%\n• Estudei Cálculo por 1h30\n• Quanto estudei esta semana?\n• Anota: revisar regra da cadeia\n\nComandos: /aula, /tarefa, /prova, /nota, /anotar, /agenda, /status, /ajuda, /desvincular\n\nFotos e PDFs enviados ao bot entram na caixa de entrada do SLCampus.`;}
+function help(){return `SLCampus conectado.\n\nFale comigo naturalmente; comandos são opcionais.\n\nConsultas:\n• O que tenho amanhã?\n• Que aulas tenho quinta?\n• Qual é minha próxima aula?\n• Quais tarefas tenho essa semana?\n• Quando é minha próxima prova?\n• Tenho alguma prova de GA?\n• Minhas notas de Cálculo / GA / FI\n• Quanto estudei hoje / essa semana?\n• Como está meu dia amanhã?\n\nAções:\n• Tenho aula de GA quarta 7:30 às 9:10 sala PD04\n• P1 de Cálculo é sexta\n• Tirei 8,5 em GA na P1 valendo 20%\n• Me lembra da lista de Física sexta\n• Estudei FI por 1h30\n• Anota: revisar regra da cadeia\n\nEntendo nomes, abreviações, siglas e códigos cadastrados para as matérias. Se uma sigla for ambígua, prefiro pedir confirmação a escolher errado.\n\nComandos: /aula, /tarefa, /prova, /nota, /anotar, /agenda, /status, /ajuda, /desvincular.\n\nFotos e PDFs enviados ao bot entram na Caixa de Entrada do SLCampus.`;}
 async function saveArray(ref,data,key,item){await ref.set({[key]:[...(data[key]||[]),item]},{merge:true});}
 module.exports=async function(req,res){
   if(req.method!=='POST')return res.status(405).json({error:'Método não permitido.'});
@@ -205,7 +308,7 @@ module.exports=async function(req,res){
     const ref=q.docs[0].ref,data=q.docs[0].data()||{};if(alreadyProcessed(data,update.update_id))return res.status(200).json({ok:true,duplicate:true});const mark=()=>markProcessed(ref,data,update.update_id).catch(()=>null);const lower=normalize(text);
     if(lower==='/ajuda'||lower==='/help'){await reply(chatId,help());await mark();return res.status(200).json({ok:true});}
     if(lower==='/desvincular'){await ref.set({telegram:null},{merge:true});await reply(chatId,'Telegram desvinculado.');await mark();return res.status(200).json({ok:true});}
-    if(lower==='/status'){const subjects=(data.subjects||[]).length,pending=(data.tasks||[]).filter(x=>!x.concluida).length,exams=(data.exams||[]).filter(x=>!x.concluida).length,sessions=(data.sessions||[]).length;await reply(chatId,`SLCampus\nMatérias: ${subjects}\nTarefas pendentes: ${pending}\nProvas/trabalhos: ${exams}\nSessões registradas: ${sessions}`);await mark();return res.status(200).json({ok:true});}
+    if(lower==='/status'){const subjects=(data.subjects||[]).length,pending=scopedAcademicItems(data,'tasks').filter(x=>!x.concluida).length,exams=scopedAcademicItems(data,'exams').filter(x=>!x.concluida&&String(x.data||'')>=todayBR()).length,sessions=(data.sessions||[]).length;await reply(chatId,`SLCampus\nMatérias no semestre atual: ${subjects}\nTarefas pendentes: ${pending}\nPróximas avaliações: ${exams}\nSessões registradas: ${sessions}`);await mark();return res.status(200).json({ok:true});}
     if(lower==='/agenda'){await reply(chatId,agendaText(data,todayBR()));await mark();return res.status(200).json({ok:true});}
     let inboxItem={id:id('tg'),receivedAt:new Date().toISOString(),chatId,type:'message',caption:msg.caption||'',text:msg.text||''};
     if(msg.document){inboxItem.type='document';inboxItem.fileId=msg.document.file_id;inboxItem.fileName=msg.document.file_name||'arquivo';inboxItem.mimeType=msg.document.mime_type||'';}
@@ -217,22 +320,45 @@ module.exports=async function(req,res){
     if(lower.startsWith('/nota')){const p=parts(text.replace(/^\/nota\s*/i,''));const value=Number(String(p[1]||'').replace(',','.'));if(p.length<2||!Number.isFinite(value)||value<0||value>10){await reply(chatId,'Formato: /nota | Matéria | 7.5 | P1 | 20');await mark();return res.status(200).json({ok:true});}const grade={id:id('grade'),materia:p[0],nome:p[2]||'Nota Telegram',valor:value,peso:Math.min(100,Math.max(.1,Number(p[3]||20))),data:todayBR(),origem:'telegram'};await saveArray(ref,data,'grades',grade);await reply(chatId,`Nota registrada: ${value.toFixed(1)} em ${grade.materia}.`);await mark();return res.status(200).json({ok:true});}
     if(lower.startsWith('/anotar')){const p=parts(text.replace(/^\/anotar\s*/i,''));if(p.length<2){await reply(chatId,'Formato: /anotar | Matéria | sua anotação');await mark();return res.status(200).json({ok:true});}inboxItem.type='note';inboxItem.materia=p[0];inboxItem.text=p.slice(1).join(' | ');await ref.set({telegramInbox:addInbox(data,inboxItem)},{merge:true});await reply(chatId,'Anotação salva na caixa de entrada do SLCampus.');await mark();return res.status(200).json({ok:true});}
     const natural=parseNatural(text,data);
+    if(natural?.kind==='adaptiveGoal'){
+      const g=adaptiveTelegram(data); const h=Math.floor(g.target/60),m=g.target%60; const targetLabel=h?`${h}h${m?` ${m}min`:''}`:`${m}min`; const doneLabel=g.actual>=60?`${Math.floor(g.actual/60)}h ${g.actual%60?`${g.actual%60}min`:''}`.trim():`${g.actual}min`;
+      await reply(chatId,`Meta adaptativa de hoje: ${targetLabel}.\nFeito hoje: ${doneLabel}.\n${g.remaining?`Restam ${g.remaining} min.`:'Meta atingida.'}\nO sistema ajusta essa meta com base no seu ritmo real.`);await mark();return res.status(200).json({ok:true});
+    }
+    if(natural?.kind==='studyPlan'){await reply(chatId,studyPlanText(data));await mark();return res.status(200).json({ok:true});}
+    if(natural?.kind==='subjectStatus'){await reply(chatId,subjectStatusText(data,natural.subject));await mark();return res.status(200).json({ok:true});}
+    if(natural?.kind==='dayOverview'){
+      const target=natural.date||todayBR(), day=dayFromDate(target);
+      const classes=(data.classSchedule||[]).filter(a=>Number(a.dia)===day&&(!natural.subject||sameSubject(a.materia,natural.subject))).sort((a,b)=>(timeMin(a.inicio)||0)-(timeMin(b.inicio)||0));
+      const tasks=scopedAcademicItems(data,'tasks').filter(x=>!x.concluida&&x.dataLimite===target&&(!natural.subject||sameSubject(x.materia,natural.subject)));
+      const exams=scopedAcademicItems(data,'exams').filter(x=>!x.concluida&&x.data===target&&(!natural.subject||sameSubject(x.materia,natural.subject)));
+      const reviews=(data.reviews||[]).filter(x=>!x.concluida&&String(x.data||'').slice(0,10)===target&&(!natural.subject||sameSubject(x.materia,natural.subject)));
+      const lines=[`Agenda de ${formatDateBR(target)}:`];
+      if(classes.length)lines.push(`\nAulas\n${classes.map(a=>`• ${formatClass(a)}`).join('\n')}`);
+      if(exams.length)lines.push(`\nAvaliações\n${exams.map(x=>`• ${x.titulo||'Avaliação'} · ${x.materia||'Sem matéria'}`).join('\n')}`);
+      if(tasks.length)lines.push(`\nTarefas\n${tasks.map(x=>`• ${x.titulo||'Tarefa'}${x.materia?` · ${x.materia}`:''}`).join('\n')}`);
+      if(reviews.length)lines.push(`\nRevisões\n${reviews.map(x=>`• ${x.materia||'Sem matéria'} · ${x.topico||'revisão'}`).join('\n')}`);
+      if(lines.length===1)lines.push('\nNada acadêmico encontrado para esse dia.');
+      await reply(chatId,lines.join('\n'));await mark();return res.status(200).json({ok:true});
+    }
     if(natural?.kind==='agenda'){
-      await reply(chatId,listAgenda(data,natural.date||todayBR()));
+      const target=natural.date||todayBR();
+      if(natural.subject){const day=dayFromDate(target);const items=(data.classSchedule||[]).filter(a=>Number(a.dia)===day&&sameSubject(a.materia,natural.subject)).sort((a,b)=>(timeMin(a.inicio)||0)-(timeMin(b.inicio)||0));await reply(chatId,items.length?`Aulas de ${formatDateBR(target)} — ${natural.subject}:\n${items.map(a=>`• ${formatClass(a)}`).join('\n')}`:`Não encontrei aula de ${natural.subject} em ${formatDateBR(target)}.`);}else await reply(chatId,listAgenda(data,target));
       await mark();return res.status(200).json({ok:true});
     }
     if(natural?.kind==='nextClass'){
       const upcoming=nextClass(data);
-      if(!upcoming)await reply(chatId,'Não encontrei nenhuma aula futura cadastrada nos próximos 7 dias.');
+      if(natural.subject){const d=dateObjBR(),current=nowMinBR();let found=null;for(let offset=0;offset<=30&&!found;offset++){const date=isoDate(new Date(d.getTime()+offset*86400000)),day=dayFromDate(date);const items=(data.classSchedule||[]).filter(a=>Number(a.dia)===day&&sameSubject(a.materia,natural.subject)).sort((a,b)=>(timeMin(a.inicio)||0)-(timeMin(b.inicio)||0));for(const item of items){if(offset>0||(timeMin(item.inicio)!=null&&timeMin(item.inicio)>=current)){found={item,date};break;}}}if(!found)await reply(chatId,`Não encontrei próxima aula de ${natural.subject} nos próximos 30 dias.`);else await reply(chatId,`Próxima aula de ${natural.subject}: ${formatClass(found.item)} · ${formatDateBR(found.date)}.`);}else if(!upcoming)await reply(chatId,'Não encontrei nenhuma aula futura cadastrada nos próximos 7 dias.');
       else await reply(chatId,`Próxima aula: ${formatClass(upcoming.item)} · ${formatDateBR(upcoming.date)}.`);
       await mark();return res.status(200).json({ok:true});
     }
     if(natural?.kind==='tasks'){
       let items=scopedAcademicItems(data,'tasks').filter(x=>!x.concluida);
       if(natural.date)items=items.filter(x=>x.dataLimite===natural.date);
+      if(natural.period)items=items.filter(x=>String(x.dataLimite||'')>=natural.period.start&&String(x.dataLimite||'')<=natural.period.end);
+      if(natural.subject)items=items.filter(x=>sameSubject(x.materia,natural.subject));
       items.sort((a,b)=>String(a.dataLimite||'').localeCompare(String(b.dataLimite||'')));
       if(!items.length){await reply(chatId,natural.date?`Não encontrei tarefas pendentes para ${formatDateBR(natural.date)}.`:'Não encontrei tarefas pendentes.');}
-      else await reply(chatId,(natural.date?`Tarefas de ${formatDateBR(natural.date)}:`:'Tarefas pendentes:')+'\n'+formatGroupedBySubject(items.slice(0,20),x=>`• ${x.titulo||'Tarefa'}${x.dataLimite?' · '+formatDateBR(x.dataLimite):''}`));
+      else await reply(chatId,(natural.date?`Tarefas de ${formatDateBR(natural.date)}:`:natural.period?`Tarefas de ${formatDateBR(natural.period.start)} a ${formatDateBR(natural.period.end)}:`:'Tarefas pendentes:')+'\n'+formatGroupedBySubject(items.slice(0,20),x=>`• ${x.titulo||'Tarefa'}${x.dataLimite?' · '+formatDateBR(x.dataLimite):''}`));
       await mark();return res.status(200).json({ok:true});
     }
     if(natural?.kind==='exams'){
@@ -242,9 +368,11 @@ module.exports=async function(req,res){
       // A mesma regra vale para a listagem de próximas avaliações.
       items=items.filter(x=>String(x.data||'')>=today);
       if(natural.date)items=items.filter(x=>x.data===natural.date);
+      if(natural.period)items=items.filter(x=>String(x.data||'')>=natural.period.start&&String(x.data||'')<=natural.period.end);
+      if(natural.subject)items=items.filter(x=>sameSubject(x.materia,natural.subject));
       items.sort((a,b)=>String(a.data||'').localeCompare(String(b.data||'')));
       if(natural.nextOnly)items=items.slice(0,1);
-      if(!items.length){await reply(chatId,natural.date?`Não encontrei avaliações pendentes para ${formatDateBR(natural.date)}.`:natural.nextOnly?'Não encontrei nenhuma próxima prova ou avaliação cadastrada.':'Não encontrei provas, avaliações ou trabalhos futuros cadastrados.');}
+      if(!items.length){await reply(chatId,natural.date?`Não encontrei avaliações pendentes para ${formatDateBR(natural.date)}.`:natural.period?`Não encontrei avaliações pendentes de ${formatDateBR(natural.period.start)} a ${formatDateBR(natural.period.end)}.`:natural.nextOnly?'Não encontrei nenhuma próxima prova ou avaliação cadastrada.':'Não encontrei provas, avaliações ou trabalhos futuros cadastrados.');}
       else if(natural.nextOnly){const x=items[0];await reply(chatId,`Sua próxima avaliação é:
 
 ${x.titulo||'Avaliação'}
@@ -254,7 +382,8 @@ ${formatDateBR(x.data)}`);}
       await mark();return res.status(200).json({ok:true});
     }
     if(natural?.kind==='grades'){
-      const items=scopedAcademicItems(data,'grades').slice().sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')));
+      let items=scopedAcademicItems(data,'grades').slice().sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')));
+      if(natural.subject)items=items.filter(x=>sameSubject(x.materia,natural.subject));
       if(!items.length)await reply(chatId,'Ainda não encontrei notas registradas no semestre atual do SLCampus.');
       else await reply(chatId,'Notas do semestre atual:\n\n'+formatGroupedBySubject(items.slice(0,30),x=>`• ${x.nome||'Avaliação'}: ${Number(x.valor).toFixed(1)}${x.peso?' · peso '+x.peso+'%':''}`));
       await mark();return res.status(200).json({ok:true});
@@ -264,7 +393,8 @@ ${formatDateBR(x.data)}`);}
       if(!natural.date&&/\b(semana|semanal)\b/.test(normalize(text))){const dow=now.getUTCDay();start.setUTCDate(start.getUTCDate()-dow);end.setUTCDate(start.getUTCDate()+6);}
       else if(!natural.date&&/\b(mes|mês)\b/.test(normalize(text))){start=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),1));end=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()+1,0));}
       else {start=new Date(`${d}T00:00:00Z`);end=new Date(`${d}T23:59:59Z`);}
-      const sessions=(data.sessions||[]).filter(x=>{const t=new Date(x.data||x.inicio||0);return !isNaN(t)&&t>=start&&t<=end;});
+      let sessions=(data.sessions||[]).filter(x=>{const t=new Date(x.data||x.inicio||0);return !isNaN(t)&&t>=start&&t<=end;});
+      if(natural.subject)sessions=sessions.filter(x=>sameSubject(x.materia,natural.subject));
       const total=sessions.reduce((sum,x)=>sum+Number(x.duracaoReal||x.duracaoMin||0),0);const h=Math.floor(total/60),m=total%60;
       await reply(chatId,`Estudo no período consultado: ${h?`${h}h `:''}${m}min.\nSessões: ${sessions.length}.`);
       await mark();return res.status(200).json({ok:true});
