@@ -21,7 +21,8 @@ class ReviewSystem {
         const revisoesGeradas = [];
         const topicoBase = classDiary.conteudoExplicado || classDiary.naoEntendi || 'Conteúdo da aula';
 
-        for (const intervalo of this.intervalos) {
+        const adaptiveIntervals = window.SLCAdaptive?.reviewIntervals?.(window.app, classDiary.materia) || this.intervalos;
+        for (const intervalo of adaptiveIntervals) {
             const dataRevisao = new Date(dataBase);
             dataRevisao.setDate(dataBase.getDate() + intervalo);
             const review = {

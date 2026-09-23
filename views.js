@@ -127,7 +127,7 @@ class ViewRenderer {
                     <div class="card-body">
                         <div class="progress-container">
                             <div class="progress-label">
-                                <span>Planejado: ${this.esc(this.app.data.user?.horasMaximas || 6)}h</span>
+                                <span>Disponibilidade: ${this.esc(this.app.data.user?.horasMaximas || 6)}h</span>
                                 <span>${this.esc(progresso.concluido)}h</span>
                             </div>
                             <div class="progress-bar">
