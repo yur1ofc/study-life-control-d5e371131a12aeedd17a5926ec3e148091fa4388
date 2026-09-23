@@ -6283,3 +6283,6 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif}
 
 /* Evita que o botão flutuante de IA cubra a navegação inferior no celular. */
 @media(max-width:768px){.floating-ai-launcher{bottom:94px!important}.floating-ai-panel{bottom:160px!important;max-height:66vh!important}}
+/* V24 — notificações Telegram como segundo canal do mesmo scheduler */
+.slc-tg-toggle{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:14px;padding:13px 14px;border:1px solid var(--border);border-radius:14px;background:var(--bg-primary);cursor:pointer}
+.slc-tg-toggle span{min-width:0}.slc-tg-toggle strong,.slc-tg-toggle small{display:block}.slc-tg-toggle strong{font-size:.82rem}.slc-tg-toggle small{margin-top:4px;color:var(--text-secondary);font-size:.72rem;line-height:1.45}.slc-tg-toggle input{position:absolute;opacity:0;pointer-events:none}.slc-tg-toggle i{width:46px;height:26px;border-radius:999px;background:var(--border);position:relative;flex:none;transition:.18s}.slc-tg-toggle i:after{content:'';position:absolute;width:20px;height:20px;border-radius:50%;left:3px;top:3px;background:#fff;transition:.18s}.slc-tg-toggle input:checked+i{background:var(--accent-primary)}.slc-tg-toggle input:checked+i:after{transform:translateX(20px)}
