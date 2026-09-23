@@ -115,9 +115,19 @@
   }
 
   function mobileNav(){
-    let b=document.getElementById('slc-product-bottom-nav'); if(b)return;
-    b=document.createElement('nav');b.id='slc-product-bottom-nav';b.innerHTML=`<button data-v="dashboard"><i class="fas fa-house"></i><span>Início</span></button><button data-v="estudar"><i class="fas fa-compass"></i><span>Estudar</span></button><button class="primary" data-v="foco"><i class="fas fa-play"></i><span>Foco</span></button><button data-v="mentor-ia"><i class="fas fa-robot"></i><span>Mentor</span></button><button data-v="perfil"><i class="fas fa-user"></i><span>Perfil</span></button>`;
-    document.body.appendChild(b); b.querySelectorAll('button').forEach(x=>x.addEventListener('click',()=>navigate(x.dataset.v)));
+    const shouldShow = () => window.innerWidth <= 768 && !!document.getElementById('view-container') && !document.getElementById('login-screen')?.offsetParent && !document.getElementById('setup-screen')?.offsetParent;
+    let b=document.getElementById('slc-product-bottom-nav');
+    if(!shouldShow()){ b?.remove(); return; }
+    if(!b){
+      b=document.createElement('nav');
+      b.id='slc-product-bottom-nav';
+      b.setAttribute('aria-label','Navegação principal');
+      b.innerHTML=`<button type="button" data-v="dashboard" aria-label="Início"><i class="fas fa-house"></i><span>Início</span></button><button type="button" data-v="estudar" aria-label="Estudar"><i class="fas fa-compass"></i><span>Estudar</span></button><button type="button" class="primary" data-v="foco" aria-label="Modo Foco"><i class="fas fa-play"></i><span>Foco</span></button><button type="button" data-v="mentor-ia" aria-label="Mentor IA"><i class="fas fa-robot"></i><span>Mentor</span></button><button type="button" data-v="perfil" aria-label="Perfil"><i class="fas fa-user"></i><span>Perfil</span></button>`;
+      document.body.appendChild(b);
+      b.querySelectorAll('button[data-v]').forEach(x=>x.addEventListener('click',()=>navigate(x.dataset.v)));
+    }
+    b.style.display='grid';
+    b.querySelectorAll('button[data-v]').forEach(x=>x.classList.toggle('active', x.dataset.v===window.app?.currentView));
   }
 
   function polishLogin(){
@@ -133,8 +143,10 @@
 
   function boot(){
     addStudyView(); addProfileView(); polishLogin(); polishSetup(); restructureNav(); mobileNav(); patchLoadView(); bindStudyActions();
-    document.addEventListener('app-ready',()=>{restructureNav();mobileNav();patchLoadView();updateTitle(titleFor(window.app?.currentView||'dashboard'));});
+    document.addEventListener('app-ready',()=>{restructureNav();patchLoadView();updateTitle(titleFor(window.app?.currentView||'dashboard'));setTimeout(mobileNav,50);});
     document.addEventListener('click',e=>{const b=e.target.closest('[data-slcnavigate]');if(b&&!b.dataset.bound){e.preventDefault();navigate(b.dataset.slcnavigate);}});
+    window.addEventListener('resize',()=>mobileNav());
+    document.addEventListener('visibilitychange',()=>mobileNav());
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();

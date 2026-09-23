@@ -587,80 +587,11 @@
   // ═══════════════════════════════════════════════════════════════
   // 7. BOTTOM NAV MOBILE
   // ═══════════════════════════════════════════════════════════════
+  // A navegação mobile principal é gerenciada por product-shell.js.
+  // A versão antiga (#slc-bottom-nav) foi desativada para evitar duas
+  // barras fixas sobrepostas e cliques interceptados.
   function injectBottomNav() {
-    if (document.getElementById('slc-bottom-nav')) return;
-    if (window.innerWidth > 768) return;
-    // Não injeta enquanto o usuário ainda está na tela de login/setup —
-    // senão essa barra fixa cobre o rodapé (botão "Continuar") do wizard
-    // de cadastro no celular. Ver syncBottomNavVisibility().
-    if (!isDashboardVisible()) return;
-
-    const nav = document.createElement('nav');
-    nav.id = 'slc-bottom-nav';
-    nav.style.cssText = `
-      position:fixed;bottom:0;left:0;right:0;z-index:200;
-      background:var(--bg-secondary);border-top:1px solid var(--border);
-      display:flex;align-items:center;justify-content:space-around;
-      padding:8px 0 calc(8px + env(safe-area-inset-bottom));
-      backdrop-filter:blur(10px);
-    `;
-
-    const tabs = [
-      { view: 'dashboard',  icon: 'fa-chart-pie',      label: 'Início' },
-      { view: 'grade-horaria', icon: 'fa-calendar-week', label: 'Horário' },
-      { view: 'tarefas',    icon: 'fa-tasks',           label: 'Tarefas' },
-      { view: 'mentor-ia',  icon: 'fa-robot',           label: 'IA' },
-      { view: 'sessoes',    icon: 'fa-clock',           label: 'Sessões' },
-    ];
-
-    tabs.forEach(tab => {
-      const btn = document.createElement('button');
-      btn.dataset.bottomView = tab.view;
-      btn.style.cssText = `
-        display:flex;flex-direction:column;align-items:center;gap:3px;
-        background:none;border:none;cursor:pointer;padding:4px 12px;
-        color:var(--text-tertiary);font-family:inherit;transition:color .15s;min-width:0;
-      `;
-      btn.innerHTML = `
-        <i class="fas ${tab.icon}" style="font-size:18px;"></i>
-        <span style="font-size:10px;font-weight:500;">${tab.label}</span>`;
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('[data-bottom-view]').forEach(b => b.style.color = 'var(--text-tertiary)');
-        btn.style.color = 'var(--accent-primary)';
-        goTo(tab.view);
-        // Fecha sidebar se aberta
-        window.SLCSidebar?.close();
-      });
-      nav.appendChild(btn);
-    });
-
-    document.body.appendChild(nav);
-
-    // Adiciona padding no conteúdo principal para não ficar atrás do nav
-    const style = document.createElement('style');
-    style.textContent = `
-      @media (max-width: 768px) {
-        .main-content { padding-bottom: 72px !important; }
-        #slc-quick-add-btn { bottom: 90px !important; }
-        #slc-quick-menu { bottom: 154px !important; }
-        #slc-feedback-btn { bottom: 90px !important; }
-        #slc-feedback-nudge { bottom: 140px !important; }
-      }
-    `;
-    document.head.appendChild(style);
-
-    // Atualiza aba ativa quando loadView é chamado
-    const origLoadView = window.app?.loadView?.bind(window.app);
-    if (origLoadView && window.app) {
-      window.app.loadView = function (view) {
-        origLoadView(view);
-        setTimeout(() => {
-          document.querySelectorAll('[data-bottom-view]').forEach(b => {
-            b.style.color = b.dataset.bottomView === view ? 'var(--accent-primary)' : 'var(--text-tertiary)';
-          });
-        }, 50);
-      };
-    }
+    document.getElementById('slc-bottom-nav')?.remove();
   }
 
   // ═══════════════════════════════════════════════════════════════
