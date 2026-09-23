@@ -34,7 +34,7 @@
           <div class="card slc-study-plan-card">
             <div class="card-header"><div><span class="slc-card-kicker">EXECUÇÃO</span><h3><i class="fas fa-list-check"></i> Seu próximo estudo</h3></div><button class="btn-secondary btn-sm" data-slcnavigate="mentor-ia">Pedir ao Mentor</button></div>
             <div class="card-body">
-              ${soon ? `<div class="slc-study-focus-item"><div class="slc-study-focus-icon"><i class="fas fa-graduation-cap"></i></div><div class="slc-study-focus-copy"><span>Próxima avaliação</span><strong>${esc(soon.titulo||soon.nome||soon.materia||'Avaliação')}</strong><small>${esc(soon.materia||soon.subject||'')} ${soon.data||soon.date?`• ${new Date(soon.data||soon.date||soon.dataProva).toLocaleDateString('pt-BR')}`:''}</small></div><button class="btn-primary btn-sm" data-slcnavigate="foco">Estudar</button></div>` : `<div class="slc-empty-study"><i class="fas fa-sparkles"></i><div><strong>Você ainda não tem uma próxima avaliação cadastrada.</strong><span>Use o Mentor para definir uma prioridade ou cadastre uma prova.</span></div><div class="slc-inline-actions"><button class="btn-primary btn-sm" data-slcnavigate="mentor-ia">O que estudar?</button><button class="btn-secondary btn-sm" data-slcnavigate="provas">Adicionar prova</button></div></div>`}
+              ${soon ? `<div class="slc-study-focus-item"><div class="slc-study-focus-icon"><i class="fas fa-graduation-cap"></i></div><div class="slc-study-focus-copy"><span>Próxima avaliação</span><strong>${esc(soon.titulo||soon.nome||soon.materia||'Avaliação')}</strong><small>${esc(soon.materia||soon.subject||'')} ${soon.data||soon.date?`• ${new Date(soon.data||soon.date||soon.dataProva).toLocaleDateString('pt-BR')}`:''}</small></div><button class="btn-primary btn-sm" data-slcnavigate="foco" data-slcmateria="${esc(soon.materia||soon.subject||'')}">Estudar</button></div>` : `<div class="slc-empty-study"><i class="fas fa-sparkles"></i><div><strong>Você ainda não tem uma próxima avaliação cadastrada.</strong><span>Use o Mentor para definir uma prioridade ou cadastre uma prova.</span></div><div class="slc-inline-actions"><button class="btn-primary btn-sm" data-slcnavigate="mentor-ia">O que estudar?</button><button class="btn-secondary btn-sm" data-slcnavigate="provas">Adicionar prova</button></div></div>`}
               <div class="slc-study-mini-grid"><div><strong>${subjects.length}</strong><span>matérias</span></div><div><strong>${tasks.length}</strong><span>tarefas abertas</span></div><div><strong>${reviews.length}</strong><span>revisões pendentes</span></div><div><strong>${sessions.length}</strong><span>sessões registradas</span></div></div>
             </div>
           </div>
@@ -58,8 +58,10 @@
     };
   }
 
-  function navigate(view){
+  function navigate(view, options = {}){
     const app = window.app;
+    if (options?.materia && app) app.pendingFocusMateria = options.materia;
+    if (options?.sessionId && app) app.pendingFocusSessionId = options.sessionId;
     let handled = false;
     if (app && typeof app.loadView === 'function') {
       app.loadView(view);
@@ -120,7 +122,7 @@
   function titleFor(v){return ({dashboard:'Início',perfil:'Perfil','estudar':'Estudar','mentor-ia':'Mentor IA',tarefas:'Tarefas',provas:'Provas e trabalhos',biblioteca:'Biblioteca',configuracoes:'Configurações',materias:'Matérias',calendario:'Calendário',foco:'Modo Foco',sessoes:'Sessões de estudo',estatisticas:'Estatísticas','grade-horaria':'Grade horária','grade-curricular':'Grade curricular','mapa-aprendizado':'Mapa de aprendizado'}[v]||'SLCampus');}
   function updateTitle(t){const e=document.getElementById('page-title');if(e)e.textContent=t;}
   function updateActive(v){document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.view===v));}
-  function bindStudyActions(){document.querySelectorAll('[data-slcnavigate]').forEach(b=>{if(b.dataset.bound)return;b.dataset.bound='1';b.addEventListener('click',()=>navigate(b.dataset.slcnavigate));});}
+  function bindStudyActions(){document.querySelectorAll('[data-slcnavigate]').forEach(b=>{if(b.dataset.bound)return;b.dataset.bound='1';b.addEventListener('click',e=>{e.preventDefault();navigate(b.dataset.slcnavigate,{materia:b.dataset.slcmateria||''});});});}
 
   function restructureNav(){
     const nav=document.getElementById('sidebar-nav'); if(!nav || nav.dataset.v14)return; nav.dataset.v14='1';

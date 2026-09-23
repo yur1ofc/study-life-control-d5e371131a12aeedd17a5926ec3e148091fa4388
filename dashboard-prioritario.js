@@ -128,7 +128,7 @@
         sub: exam._days === 0
           ? 'É hoje! Revise os pontos principais antes de ir.'
           : `Você tem ${exam._days === 1 ? 'apenas um dia' : `${exam._days} dias`} para se preparar.`,
-        primaryBtn: { label: 'Iniciar sessão de foco', view: 'foco' },
+        primaryBtn: { label: 'Iniciar sessão de foco', view: 'foco', materia: exam.materia || '' },
         secondaryBtn: { label: 'Ver detalhes', view: 'provas' }
       };
     }
@@ -164,7 +164,7 @@
         urgency: 'normal',
         title: `${exam.materia || exam.nome || 'Prova'} em ${exam._days} dias`,
         sub: 'Bom momento para começar a revisar o conteúdo.',
-        primaryBtn: { label: 'Estudar agora', view: 'foco' },
+        primaryBtn: { label: 'Estudar agora', view: 'foco', materia: exam.materia || '' },
         secondaryBtn: { label: 'Ver calendário', view: 'calendario' }
       };
     }
@@ -195,7 +195,7 @@
         urgency: 'normal',
         title: 'Ainda não estudou hoje',
         sub: `Que tal uma sessão de ${firstSubject?.nome || 'estudos'} agora? Até 25 minutos já fazem diferença.`,
-        primaryBtn: { label: 'Iniciar sessão', view: 'foco' },
+        primaryBtn: { label: 'Iniciar sessão', view: 'foco', materia: firstSubject?.nome || '' },
         secondaryBtn: { label: 'Ver plano do dia', view: 'mentor-ia' }
       };
     }
@@ -248,7 +248,7 @@
       <div class="slc-prio-title">${action.title}</div>
       <div class="slc-prio-sub">${action.sub}</div>
       <div class="slc-prio-actions">
-        <button class="slc-prio-btn primary" data-view="${action.primaryBtn.view}">${action.primaryBtn.label}</button>
+        <button class="slc-prio-btn primary" data-view="${action.primaryBtn.view}" data-materia="${action.primaryBtn.materia || ''}">${action.primaryBtn.label}</button>
         ${action.secondaryBtn ? `<button class="slc-prio-btn secondary" data-view="${action.secondaryBtn.view}">${action.secondaryBtn.label}</button>` : ''}
       </div>
     `;
@@ -266,7 +266,10 @@
     card.querySelectorAll('[data-view]').forEach(btn => {
       btn.addEventListener('click', () => {
         const view = btn.dataset.view;
-        if (view && window.app?.loadView) window.app.loadView(view);
+        if (!view || !window.app) return;
+        if (btn.dataset.materia) window.app.pendingFocusMateria = btn.dataset.materia;
+        if (window.SLCFocusEngine && view === 'foco') window.app.pendingFocusMateria = btn.dataset.materia || '';
+        window.app.loadView?.(view);
       });
     });
 

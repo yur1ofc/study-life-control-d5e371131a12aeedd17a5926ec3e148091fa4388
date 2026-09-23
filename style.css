@@ -6185,3 +6185,13 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif}
   .slc-study-tools { grid-template-columns:1fr 1fr; }
   .slc-study-tools button { min-height:60px; }
 }
+
+/* SLCampus Focus Engine v16 */
+.focus-engine-meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px}
+.focus-engine-meta>div{padding:12px 14px;border:1px solid rgba(148,163,184,.14);border-radius:15px;background:rgba(15,23,42,.16)}
+.focus-engine-meta span{display:block;font-size:.75rem;opacity:.7}.focus-engine-meta strong{display:block;margin-top:4px;font-size:1rem}
+.focus-engine-actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:14px}
+.focus-engine-note{margin:12px auto 0;max-width:760px;font-size:.8rem;opacity:.68;text-align:center;line-height:1.5}
+#focus-break-start:disabled{opacity:.45;cursor:not-allowed;filter:saturate(.5)}
+@media(max-width:700px){.focus-engine-meta{grid-template-columns:repeat(2,minmax(0,1fr))}.focus-engine-note{font-size:.76rem}}
+.focus-engine-notification{display:flex;justify-content:center;margin-top:10px}.focus-notif-ok{font-size:.78rem;opacity:.68}.focus-notif-ok i{margin-right:5px}
