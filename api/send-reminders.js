@@ -66,6 +66,9 @@ function setupWebPush() {
   return webpush;
 }
 
+function telegramToken(){return process.env.TELEGRAM_BOT_TOKEN||'';}
+async function sendTelegram(chatId,text){const t=telegramToken();if(!t||!chatId)return false;const r=await fetch(`https://api.telegram.org/bot${t}/sendMessage`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({chat_id:chatId,text})});const j=await r.json().catch(()=>({}));if(!r.ok||!j.ok)throw new Error(j.description||`Telegram sendMessage falhou (${r.status})`);return true;}
+
 // Datas e horários salvos pelo app (exams.data, tasks.dataLimite,
 // reviews.data, sessions.data) não guardam fuso horário — vêm de campos
 // <input type="date"> / type="datetime-local">, que só têm os dígitos da
@@ -261,29 +264,35 @@ module.exports = async function handler(req, res) {
   }
 
   const now = Date.now();
-  const summary = { usersChecked: 0, notificationsSent: 0, subscriptionsRemoved: 0, errors: [] };
+  const summary = { usersChecked: 0, notificationsSent: 0, telegramSent: 0, subscriptionsRemoved: 0, errors: [] };
 
   try {
     // Dois conjuntos: lembretes gerais e término de foco. O segundo é
     // separado para que ativar Push para o Modo Foco não obrigue o usuário a
     // ativar todos os outros alarmes acadêmicos.
-    const [generalSnapshot, focusSnapshot] = await Promise.all([
+    const [generalSnapshot, focusSnapshot, telegramSnapshot] = await Promise.all([
       db.collection('users').where('settings.studyReminders.enabled', '==', true).get(),
-      db.collection('users').where('settings.focusPushEnabled', '==', true).get()
+      db.collection('users').where('settings.focusPushEnabled', '==', true).get(),
+      db.collection('users').where('telegram.chatId', '>', '').get()
     ]);
     const docs = new Map();
-    [...generalSnapshot.docs, ...focusSnapshot.docs].forEach(d => docs.set(d.id, d));
+    [...generalSnapshot.docs, ...focusSnapshot.docs, ...telegramSnapshot.docs].forEach(d => docs.set(d.id, d));
 
     for (const doc of docs.values()) {
       summary.usersChecked++;
       const data = doc.data();
       const subscriptions = Array.isArray(data.pushSubscriptions) ? data.pushSubscriptions : [];
-      if (!subscriptions.length) continue;
+      const telegram = data.telegram || {};
+      const telegramEnabled = !!telegram.chatId && telegram.notificationsEnabled !== false;
+      const hasPushGeneral = !!data.settings?.studyReminders?.enabled;
+      const hasPushFocus = !!data.settings?.focusPushEnabled;
+      if (!subscriptions.length && !telegramEnabled) continue;
 
-      const due = findDueReminders(data, now);
+      const due = [];
+      if (hasPushGeneral || telegramEnabled) due.push(...findDueReminders(data, now));
       const focus = data.focusPushSchedule;
-      const focusDue = !!(focus && !focus.sent && Number(focus.targetMs) && now >= Number(focus.targetMs));
-      if (focusDue) due.push({
+      const focusDue = !!(focus && Number(focus.targetMs) && now >= Number(focus.targetMs));
+      if (focusDue && (hasPushFocus || telegramEnabled)) due.push({
         key: `focus:${focus.id}`,
         title: 'Foco concluído',
         body: `${focus.subject || 'Seu estudo'}${focus.topic ? ` — ${focus.topic}` : ''}: o bloco terminou. Você pode continuar estudando ou iniciar o descanso recomendado.`,
@@ -293,41 +302,61 @@ module.exports = async function handler(req, res) {
 
       const stillValidSubs = [];
       const sentKeys = [];
-      const itemSent = new Map();
-      let focusSent = false;
+      const telegramSentKeys = [];
+      const sentPush = new Set();
+      const sentTelegram = new Set();
+      let focusPushSent = false;
+      let focusTelegramSent = false;
+      const alreadyTelegram = new Set(data.sentTelegramReminders || []);
+      const alreadyPush = new Set(data.sentReminders || []);
 
       for (const subscription of subscriptions) {
         let subOk = true;
         for (const item of due) {
+          if (alreadyPush.has(item.key)) continue;
           try {
             await webpush.sendNotification(subscription, JSON.stringify({
-              title: item.title,
-              body: item.body,
-              url: './',
-              tag: item.key,
-              requireInteraction: true
+              title: item.title, body: item.body, url: './', tag: item.key, requireInteraction: true
             }));
             summary.notificationsSent++;
-            itemSent.set(item.key, true);
-            if (item.focusPush) focusSent = true;
+            sentPush.add(item.key);
+            if (item.focusPush) focusPushSent = true;
           } catch (err) {
-            if (err.statusCode === 404 || err.statusCode === 410) {
-              subOk = false;
-            } else {
-              summary.errors.push(`push ${doc.id}: ${err.message}`);
-            }
+            if (err.statusCode === 404 || err.statusCode === 410) subOk = false;
+            else summary.errors.push(`push ${doc.id}: ${err.message}`);
           }
         }
         if (subOk) stillValidSubs.push(subscription);
         else summary.subscriptionsRemoved++;
       }
 
-      due.forEach(item => { if (!item.focusPush && itemSent.get(item.key)) sentKeys.push(item.key); });
+      if (telegramEnabled) {
+        for (const item of due) {
+          if (alreadyTelegram.has(item.key)) continue;
+          try {
+            await sendTelegram(telegram.chatId, `SLCampus\n${item.title}\n${item.body}`);
+            summary.telegramSent = (summary.telegramSent || 0) + 1;
+            sentTelegram.add(item.key);
+            if (item.focusPush) focusTelegramSent = true;
+          } catch (err) {
+            summary.errors.push(`telegram ${doc.id}: ${err.message}`);
+          }
+        }
+      }
+
+      sentPush.forEach(key => { if (!alreadyPush.has(key)) sentKeys.push(key); });
+      sentTelegram.forEach(key => { if (!alreadyTelegram.has(key)) telegramSentKeys.push(key); });
       const mergedSent = [...(data.sentReminders || []), ...sentKeys].slice(-DEDUPE_LIMIT);
-      const update = { sentReminders: mergedSent, pushSubscriptions: stillValidSubs };
-      // Só considera o lembrete entregue quando pelo menos um dispositivo recebeu.
-      // Assim uma falha transitória do web-push não "queima" o lembrete para sempre.
-      if (focusDue && focusSent) update.focusPushSchedule = null;
+      const mergedTelegram = [...(data.sentTelegramReminders || []), ...telegramSentKeys].slice(-DEDUPE_LIMIT);
+      const update = { sentReminders: mergedSent, sentTelegramReminders: mergedTelegram, pushSubscriptions: stillValidSubs };
+      // O término do foco só é encerrado no servidor depois que todos os
+      // canais habilitados entregarem. Assim, se o Push falhar mas Telegram
+      // funcionar (ou vice-versa), o canal que falhou ainda terá outra chance.
+      if (focusDue) {
+        const pushDone = !hasPushFocus || focusPushSent || alreadyPush.has(`focus:${focus.id}`);
+        const telegramDone = !telegramEnabled || focusTelegramSent || alreadyTelegram.has(`focus:${focus.id}`);
+        if (pushDone && telegramDone) update.focusPushSchedule = null;
+      }
       await doc.ref.update(update);
     }
 

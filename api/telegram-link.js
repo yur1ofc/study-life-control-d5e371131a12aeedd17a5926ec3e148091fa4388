@@ -10,6 +10,7 @@ module.exports=async function(req,res){
     const t=bearer(req);if(!t)return res.status(401).json({error:'Login necessário.'});
     const decoded=await init().auth().verifyIdToken(t);const db=admin.firestore();const ref=db.collection('users').doc(decoded.uid);const action=req.body?.action||'create';
     if(action==='disconnect'){await ref.set({telegram:null},{merge:true});return res.status(200).json({ok:true,disconnected:true});}
+    if(action==='notifications'){const enabled=req.body?.enabled!==false;await ref.set({telegram:{notificationsEnabled:enabled}},{merge:true});return res.status(200).json({ok:true,notificationsEnabled:enabled});}
     const c=code();const expiresAt=new Date(Date.now()+15*60000).toISOString();
     await db.collection('telegramLinks').doc(c).set({uid:decoded.uid,expiresAt,createdAt:new Date().toISOString()});
     await ref.set({telegramLinkCode:{code:c,expiresAt}},{merge:true});
