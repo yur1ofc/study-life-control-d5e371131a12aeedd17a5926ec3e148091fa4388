@@ -6247,3 +6247,36 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif}
   .main-content,.content-area{padding-bottom:92px!important}
 }
 @media(max-width:390px){.slc-mobile-more-grid{grid-template-columns:1fr}.slc-profile-stats{gap:7px}.slc-profile-stats>div{padding:11px 7px}}
+
+/* SLCampus V20 — Telegram separado + mobile touch fixes */
+.slc-telegram-config-item{position:relative;z-index:2;min-height:68px}
+.slc-telegram-modal{position:fixed;inset:0;z-index:6000;display:flex;align-items:center;justify-content:center;padding:16px}
+.slc-telegram-modal-backdrop{position:absolute;inset:0;background:rgba(2,6,23,.62);backdrop-filter:blur(5px)}
+.slc-telegram-modal-card{position:relative;z-index:1;width:min(620px,100%);max-height:min(88vh,760px);overflow:auto;background:var(--bg-secondary);border:1px solid var(--border);border-radius:22px;box-shadow:0 28px 80px rgba(2,6,23,.4)}
+.slc-telegram-modal-card>header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:color-mix(in srgb,var(--bg-secondary) 96%,transparent);backdrop-filter:blur(14px);z-index:2}
+.slc-telegram-modal-card h2{margin:3px 0 0;font-size:1.25rem}.slc-telegram-modal-body{padding:20px}
+.slc-tg-status{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid var(--border);border-radius:15px;background:var(--bg-primary)}
+.slc-tg-status.connected{border-color:rgba(34,197,94,.28);background:rgba(34,197,94,.05)}
+.slc-tg-status-icon{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:rgba(37,99,235,.1);color:var(--accent-primary);flex:none}.slc-tg-status.connected .slc-tg-status-icon{color:#22c55e;background:rgba(34,197,94,.1)}
+.slc-tg-status strong,.slc-tg-status span{display:block}.slc-tg-status span{margin-top:4px;color:var(--text-secondary);font-size:.78rem;line-height:1.45}
+.slc-tg-connect-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}.slc-tg-connect-row>span{font-size:.75rem;color:var(--text-secondary)}
+.slc-tg-reconnect{display:flex;gap:14px;align-items:center;margin-top:10px}.btn-link{border:0;background:transparent;color:var(--accent-primary);padding:6px 0;cursor:pointer;font:inherit;font-size:.78rem;font-weight:700}.btn-link.danger{color:#ef4444}
+.slc-tg-config-help{margin-top:16px;padding:13px 14px;border:1px solid var(--border);border-radius:14px}.slc-tg-config-help strong{font-size:.82rem}.slc-tg-config-help p{margin:5px 0 0;color:var(--text-secondary);font-size:.78rem;line-height:1.5}
+.slc-tg-code-host{margin-top:12px}.slc-tg-code{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px;border:1px solid rgba(37,99,235,.28);border-radius:15px;background:rgba(37,99,235,.06)}.slc-tg-code>div{min-width:0}.slc-tg-code span,.slc-tg-code small{display:block;color:var(--text-secondary);font-size:.76rem}.slc-tg-code code{display:block;margin:7px 0;font-size:1rem;font-weight:800;word-break:break-all;color:var(--text-primary)}.slc-tg-code small{font-size:.68rem}.slc-tg-code button{flex:none;white-space:nowrap}
+.slc-telegram-page{padding-bottom:20px}.slc-telegram-page-grid{display:grid;grid-template-columns:minmax(260px,.7fr) minmax(0,1.3fr);gap:14px}.slc-tg-count{display:inline-flex;align-items:center;justify-content:center;min-width:23px;height:23px;border-radius:999px;background:rgba(37,99,235,.1);color:var(--accent-primary);font-size:.7rem;margin-left:5px}
+.slc-tg-inbox{display:grid;gap:8px}.slc-tg-inbox-item{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px;border:1px solid var(--border);border-radius:13px;background:var(--bg-primary)}.slc-tg-inbox-icon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:rgba(37,99,235,.08);color:var(--accent-primary)}.slc-tg-inbox-item strong,.slc-tg-inbox-item span,.slc-tg-inbox-item small{display:block;min-width:0}.slc-tg-inbox-item strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.slc-tg-inbox-item span{margin-top:2px;color:var(--text-secondary);font-size:.76rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.slc-tg-inbox-item small{margin-top:3px;color:var(--text-tertiary);font-size:.65rem}.slc-tg-natural-card{margin-top:14px}.slc-tg-examples{display:grid;gap:7px;margin-top:10px}.slc-tg-examples code{display:block;padding:10px 11px;border:1px solid var(--border);border-radius:10px;background:var(--bg-primary);font-size:.76rem;line-height:1.45;white-space:normal}
+.telegram-empty{padding:24px;text-align:center;color:var(--text-secondary)}
+
+@media(max-width:768px){
+  #slc-product-bottom-nav{z-index:5000!important;height:72px!important;min-height:72px!important;padding:6px 5px calc(6px + env(safe-area-inset-bottom))!important;touch-action:manipulation}
+  #slc-product-bottom-nav button{min-width:0!important;min-height:56px!important;padding:5px 3px!important;position:relative!important;z-index:1!important;pointer-events:auto!important;-webkit-tap-highlight-color:transparent}
+  #slc-product-bottom-nav button.primary{margin:-8px 3px 4px!important}
+  #slc-mobile-more{z-index:7000!important}
+  .slc-mobile-more-sheet{z-index:7001!important;padding-bottom:calc(88px + env(safe-area-inset-bottom))!important}
+  .slc-mobile-more-grid button{min-height:62px!important;touch-action:manipulation}
+  .main-content,.content-area,#view-container{padding-bottom:104px!important}
+  .slc-telegram-page-grid{grid-template-columns:1fr}.slc-tg-inbox-item{grid-template-columns:32px minmax(0,1fr)}.slc-tg-inbox-item button{grid-column:2;justify-self:start}.slc-tg-code{align-items:flex-start;flex-direction:column}.slc-tg-code button{width:100%}.slc-tg-connect-row{align-items:stretch}.slc-tg-connect-row button{width:100%}.slc-telegram-modal{padding:8px;align-items:flex-end}.slc-telegram-modal-card{max-height:92vh;border-radius:22px 22px 0 0}.slc-telegram-modal-body{padding:16px}.slc-tg-reconnect{justify-content:space-between}
+}
+
+/* Evita que o botão flutuante de IA cubra a navegação inferior no celular. */
+@media(max-width:768px){.floating-ai-launcher{bottom:94px!important}.floating-ai-panel{bottom:160px!important;max-height:66vh!important}}

@@ -63,7 +63,13 @@
     if (options?.materia && app) app.pendingFocusMateria = options.materia;
     if (options?.sessionId && app) app.pendingFocusSessionId = options.sessionId;
     let handled = false;
-    if (app && typeof app.loadView === 'function') {
+    // Telegram é uma área própria do produto, mas não precisa entrar no
+    // renderer legado. Isso também permite acessá-lo no celular pelo menu Mais.
+    if (view === 'telegram' && window.slctelegram?.renderInbox) {
+      window.slctelegram.renderInbox();
+      if (app) { app.currentView='telegram'; document.body.dataset.view='telegram'; }
+      handled = true;
+    } else if (app && typeof app.loadView === 'function') {
       app.loadView(view);
       handled = true;
     } else if (app && window.StudyLifeControl?.prototype && typeof window.StudyLifeControl.prototype.loadView === 'function') {
@@ -99,6 +105,10 @@
     if (!proto || typeof proto.loadView !== 'function' || proto.__slcProductShellLoadView) return;
     const original = proto.loadView;
     proto.loadView = function(view, ...rest){
+      if (view === 'telegram' && window.slctelegram?.renderInbox) {
+        this.currentView='telegram'; document.body.dataset.view='telegram'; window.slctelegram.renderInbox();
+        updateTitle('Telegram'); updateActive('telegram'); mobileNav(); return;
+      }
       if (view === 'perfil') {
         if (!this.viewRenderer) this.viewRenderer = new ViewRenderer(this);
         this.currentView='perfil'; document.body.dataset.view='perfil';
@@ -122,7 +132,7 @@
     };
     proto.__slcProductShellLoadView = true;
   }
-  function titleFor(v){return ({dashboard:'Início',perfil:'Perfil','estudar':'Estudar','mentor-ia':'Mentor IA',tarefas:'Tarefas',provas:'Provas e trabalhos',biblioteca:'Biblioteca',configuracoes:'Configurações',materias:'Matérias',calendario:'Calendário',foco:'Modo Foco',sessoes:'Sessões de estudo',estatisticas:'Estatísticas','grade-horaria':'Grade horária','grade-curricular':'Grade curricular','mapa-aprendizado':'Mapa de aprendizado'}[v]||'SLCampus');}
+  function titleFor(v){return ({dashboard:'Início',perfil:'Perfil','estudar':'Estudar','mentor-ia':'Mentor IA',telegram:'Telegram',tarefas:'Tarefas',provas:'Provas e trabalhos',biblioteca:'Biblioteca',configuracoes:'Configurações',materias:'Matérias',calendario:'Calendário',foco:'Modo Foco',sessoes:'Sessões de estudo',estatisticas:'Estatísticas','grade-horaria':'Grade horária','grade-curricular':'Grade curricular','mapa-aprendizado':'Mapa de aprendizado'}[v]||'SLCampus');}
   function updateTitle(t){const e=document.getElementById('page-title');if(e)e.textContent=t;}
   function updateActive(v){document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.view===v));}
   function bindStudyActions(){document.querySelectorAll('[data-slcnavigate]').forEach(b=>{if(b.dataset.bound)return;b.dataset.bound='1';b.addEventListener('click',e=>{e.preventDefault();navigate(b.dataset.slcnavigate,{materia:b.dataset.slcmateria||''});});});}
@@ -140,7 +150,7 @@
     nav.append(section('Organizar'),make('tarefas','fa-check-square','Tarefas'),make('provas','fa-graduation-cap','Provas e trabalhos'),make('calendario','fa-calendar-alt','Calendário'),make('grade-horaria','fa-calendar-week','Grade horária'));
     nav.append(section('Aprender'),make('materias','fa-book','Matérias'),make('foco','fa-bullseye','Modo Foco'),make('sessoes','fa-clock','Sessões de estudo'),make('biblioteca','fa-layer-group','Biblioteca','<span class="nav-pill">NOVO</span>'),make('mapa-aprendizado','fa-map','Mapa de aprendizado'));
     nav.append(section('Acompanhar'),make('estatisticas','fa-chart-line','Estatísticas'),make('grade-curricular','fa-sitemap','Grade curricular'),make('previsao-notas','fa-chart-bar','Notas e previsão'));
-    nav.append(section('Conta'),make('configuracoes','fa-cog','Configurações'),make('ajuda','fa-question-circle','Ajuda'));
+    nav.append(section('Conta'),make('telegram','fa-telegram-plane','Telegram','<span class="nav-pill">BOT</span>'),make('configuracoes','fa-cog','Configurações'),make('ajuda','fa-question-circle','Ajuda'));
   }
 
   const MOBILE_MORE_GROUPS = [
@@ -154,7 +164,7 @@
       ['estatisticas','fa-chart-line','Estatísticas'],['grade-curricular','fa-sitemap','Grade curricular'],['previsao-notas','fa-chart-line','Notas e previsão'],['situacao-academica','fa-heartbeat','Situação acadêmica']
     ]},
     { label:'Conta', items:[
-      ['perfil','fa-user','Perfil'],['configuracoes','fa-cog','Configurações'],['ajuda','fa-question-circle','Ajuda']
+      ['telegram','fa-telegram-plane','Telegram'],['perfil','fa-user','Perfil'],['configuracoes','fa-cog','Configurações'],['ajuda','fa-question-circle','Ajuda']
     ]}
   ];
 
@@ -185,6 +195,9 @@
 
   function mobileNav(){
     const shouldShow = () => window.innerWidth <= 768 && !!document.getElementById('view-container') && !document.getElementById('login-screen')?.offsetParent && !document.getElementById('setup-screen')?.offsetParent;
+    // O shell V19 é a única barra inferior. Remove qualquer barra legada que
+    // possa ter sido injetada por versões anteriores.
+    document.getElementById('slc-bottom-nav')?.remove();
     let b=document.getElementById('slc-product-bottom-nav');
     if(!shouldShow()){ b?.remove(); document.getElementById('slc-mobile-more')?.classList.remove('open'); return; }
     ensureMobileMore();

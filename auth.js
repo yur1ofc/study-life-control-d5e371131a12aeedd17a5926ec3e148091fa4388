@@ -100,15 +100,18 @@ async function loginWithGoogle() {
       return;
     }
 
-    // Popup bloqueado pelo navegador — tenta redirect
+    // Não fazemos fallback para signInWithRedirect. Em um app hospedado no Vercel,
+    // esse fallback leva o usuário ao authDomain do Firebase (historicamente
+    // study-life-control.firebaseapp.com), o que dá a impressão de que o site
+    // voltou para a marca antiga. O login por popup deve ser iniciado diretamente
+    // pelo toque/clique do usuário. Se o navegador bloquear, orientamos a liberar
+    // popups em vez de trocar de domínio silenciosamente.
     if (code === 'auth/popup-blocked') {
-      try {
-        window.showToast?.('Popup bloqueado. Abrindo em tela cheia...', 'warning');
-        await auth.signInWithRedirect(googleProvider);
-        return;
-      } catch (redirectError) {
-        console.error('Erro no redirect:', redirectError);
-      }
+      const msg = 'O navegador bloqueou a janela do Google. Permita pop-ups para slcampus.vercel.app e toque em Entrar com Google novamente.';
+      if (errorEl) { errorEl.textContent = msg; errorEl.style.display = 'block'; }
+      else window.showToast?.(msg, 'warning');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fab fa-google"></i> Entrar com Google'; }
+      return;
     }
 
     // Erro real — mostrar na tela
