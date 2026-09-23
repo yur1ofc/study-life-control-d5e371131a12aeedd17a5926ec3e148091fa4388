@@ -30,6 +30,22 @@ module.exports = async function handler(req,res) {
       return res.status(401).json({error:'Autenticação antiga. Confirme sua identidade novamente.'});
     }
 
+
+    // Remove recursos públicos/auxiliares que ficam fora de users/{uid}.
+    // Calendar feeds são links públicos por token; sem esta limpeza um link
+    // antigo poderia continuar expondo a agenda após a exclusão da conta.
+    async function deleteQuery(query) {
+      while (true) {
+        const snap = await query.limit(200).get();
+        if (snap.empty) break;
+        const batch = db.batch();
+        snap.docs.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+      }
+    }
+    await deleteQuery(db.collection('calendar_feeds').where('uid','==',uid));
+    await deleteQuery(db.collection('telegramLinks').where('uid','==',uid));
+
     // Firestore Admin recursive delete remove o documento e subcoleções.
     await db.recursiveDelete(db.collection('users').doc(uid));
 

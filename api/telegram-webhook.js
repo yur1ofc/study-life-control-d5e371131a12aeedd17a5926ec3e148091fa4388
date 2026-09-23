@@ -1,6 +1,7 @@
 // SLCampus — webhook Telegram. Além dos comandos clássicos, entende frases
 // naturais em português sem precisar chamar uma IA paga.
 const admin=require('firebase-admin');
+const AcademicCore=require('../shared/academic-context.js');
 let app;
 function init(){if(app)return app;const raw=process.env.FIREBASE_SERVICE_ACCOUNT_KEY;if(!raw)throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY não configurada.');const service=JSON.parse(Buffer.from(raw,'base64').toString('utf8'));app=admin.apps.length?admin.app():admin.initializeApp({credential:admin.credential.cert(service)});return app;}
 const DAY={dom:0,domingo:0,seg:1,segunda:1,"segunda-feira":1,ter:2,terça:2,terca:2,"terça-feira":2,"terca-feira":2,qua:3,quarta:3,"quarta-feira":3,qui:4,quinta:4,"quinta-feira":4,sex:5,sexta:5,"sexta-feira":5,sab:6,sábado:6,sabado:6,"sábado-feira":6};
@@ -20,11 +21,21 @@ function timeMin(t){const m=String(t||'').match(/^(\d{1,2}):(\d{2})$/);return m?
 function overlaps(a,b,c,d){const x=timeMin(a),y=timeMin(b),u=timeMin(c),v=timeMin(d);if([x,y,u,v].some(n=>n==null))return false;return x<v&&u<y;}
 function formatClass(a){return `${a.materia}${a.inicio?` · ${a.inicio}${a.fim?`–${a.fim}`:''}`:''}${a.sala?` · Sala ${a.sala}`:''}`;}
 function sameSubject(a,b){return normalize(a)===normalize(b);}
+function resolveCurrentSubject(data, value){return AcademicCore.resolveSubject(data,value);}
+function subjectMatchesCurrent(data, value){const r=resolveCurrentSubject(data,value);return !!r && normalize(r.nome)===normalize(value);}
 function duplicateBy(data,key,predicate){return (data[key]||[]).find(predicate)||null;}
 function findExistingClass(data,item){return (data.classSchedule||[]).find(a=>Number(a.dia)===Number(item.dia)&&sameSubject(a.materia,item.materia)&&String(a.inicio||'')===String(item.inicio||'')&&String(a.fim||'')===String(item.fim||''));}
 function findClassConflict(data,item){return (data.classSchedule||[]).find(a=>Number(a.dia)===Number(item.dia)&&overlaps(a.inicio,a.fim,item.inicio,item.fim)&&!findExistingClass({classSchedule:[a]},item));}
 function alreadyProcessed(data,updateId){const ids=Array.isArray(data.telegramProcessedUpdates)?data.telegramProcessedUpdates:[];return updateId!=null&&ids.includes(updateId);}
-async function markProcessed(ref,data,updateId){if(updateId==null)return;const ids=Array.isArray(data.telegramProcessedUpdates)?data.telegramProcessedUpdates:[];await ref.set({telegramProcessedUpdates:[...ids,updateId].slice(-200)},{merge:true});}
+async function markProcessed(ref,data,updateId){
+  if(updateId==null)return;
+  await ref.firestore.runTransaction(async tx=>{
+    const snap=await tx.get(ref);
+    const ids=Array.isArray(snap.data()?.telegramProcessedUpdates)?snap.data().telegramProcessedUpdates:[];
+    if(ids.includes(updateId)) return;
+    tx.set(ref,{telegramProcessedUpdates:[...ids,updateId].slice(-200)},{merge:true});
+  });
+}
 function agendaText(data,date){const day=dayFromDate(date);const names=['domingo','segunda','terça','quarta','quinta','sexta','sábado'];const items=(data.classSchedule||[]).filter(a=>Number(a.dia)===day).sort((a,b)=>String(a.inicio||'').localeCompare(String(b.inicio||'')));if(!items.length)return `Não encontrei aulas salvas para ${date===todayBR()?'hoje':'esse dia'}.`;return `Aulas de ${names[day]}:
 `+items.map(a=>`• ${formatClass(a)}`).join('\n');}
 function parseDate(text){
@@ -106,45 +117,14 @@ function nextClass(data){const d=dateObjBR();const current=nowMinBR();for(let of
 // histórico. Isso evita que consultas do Telegram misturem 2025/2026.1 com o
 // semestre em andamento.
 function currentSubjectKeys(data){
-  const active=Array.isArray(data.subjects)?data.subjects.filter(s=>s&&s.nome):[];
-  if(active.length)return new Set(active.map(s=>normalize(s.nome)).filter(Boolean));
-  const curriculum=Array.isArray(data.curriculum)?data.curriculum.filter(s=>s&&s.nome&&normalize(s.status)==='cursando'):[];
-  return new Set(curriculum.map(s=>normalize(s.nome)).filter(Boolean));
+  return AcademicCore.currentNames(data);
 }
 function historicalItemKeys(data,key){
   const out=new Set();
-  const archives=Array.isArray(data.archivedSemesters)?data.archivedSemesters:[];
-  for(const archive of archives){
-    const items=Array.isArray(archive?.[key])?archive[key]:[];
-    for(const item of items){
-      if(key==='exams')out.add(`${normalize(item?.materia)}|${normalize(item?.titulo)}|${String(item?.data||'')}`);
-      else if(key==='grades')out.add(`${normalize(item?.materia)}|${normalize(item?.nome)}|${Number(item?.valor)}|${Number(item?.peso)}|${String(item?.data||'')}`);
-      else if(key==='tasks')out.add(`${normalize(item?.materia)}|${normalize(item?.titulo)}|${String(item?.dataLimite||'')}`);
-      else if(key==='sessions')out.add(`${normalize(item?.materia)}|${String(item?.data||item?.inicio||'')}|${Number(item?.duracaoReal||item?.duracaoMin||0)}`);
-    }
-  }
+  for(const a of (Array.isArray(data?.archivedSemesters)?data.archivedSemesters:[])) for(const item of (Array.isArray(a?.[key])?a[key]:[])){const k=AcademicCore.keysFor(item,key);if(k)out.add(k);}
   return out;
 }
-function scopedAcademicItems(data,key){
-  const raw=Array.isArray(data?.[key])?data[key]:[];
-  const subjects=currentSubjectKeys(data);
-  const hasSubjectScope=subjects.size>0;
-  const historical=historicalItemKeys(data,key);
-  return raw.filter(item=>{
-    const materia=normalize(item?.materia||'');
-    if(key==='exams'||key==='grades'||key==='tasks'||key==='sessions'){
-      if(hasSubjectScope && materia && !subjects.has(materia))return false;
-      // Itens sem matéria continuam visíveis, pois podem ser compromissos gerais.
-      let fingerprint='';
-      if(key==='exams')fingerprint=`${materia}|${normalize(item?.titulo)}|${String(item?.data||'')}`;
-      if(key==='grades')fingerprint=`${materia}|${normalize(item?.nome)}|${Number(item?.valor)}|${Number(item?.peso)}|${String(item?.data||'')}`;
-      if(key==='tasks')fingerprint=`${materia}|${normalize(item?.titulo)}|${String(item?.dataLimite||'')}`;
-      if(key==='sessions')fingerprint=`${materia}|${String(item?.data||item?.inicio||'')}|${Number(item?.duracaoReal||item?.duracaoMin||0)}`;
-      if(fingerprint && historical.has(fingerprint))return false;
-    }
-    return true;
-  });
-}
+function scopedAcademicItems(data,key){ return AcademicCore.items(data,key); }
 function formatGroupedBySubject(items, formatter){
   const groups=new Map();
   for(const item of items){const key=item?.materia||'Sem matéria';if(!groups.has(key))groups.set(key,[]);groups.get(key).push(item);}
@@ -295,10 +275,23 @@ function parseNatural(text,data){
   return null;
 }
 function help(){return `SLCampus conectado.\n\nFale comigo naturalmente; comandos são opcionais.\n\nConsultas:\n• O que tenho amanhã?\n• Que aulas tenho quinta?\n• Qual é minha próxima aula?\n• Quais tarefas tenho essa semana?\n• Quando é minha próxima prova?\n• Tenho alguma prova de GA?\n• Minhas notas de Cálculo / GA / FI\n• Quanto estudei hoje / essa semana?\n• Como está meu dia amanhã?\n\nAções:\n• Tenho aula de GA quarta 7:30 às 9:10 sala PD04\n• P1 de Cálculo é sexta\n• Tirei 8,5 em GA na P1 valendo 20%\n• Me lembra da lista de Física sexta\n• Estudei FI por 1h30\n• Anota: revisar regra da cadeia\n\nEntendo nomes, abreviações, siglas e códigos cadastrados para as matérias. Se uma sigla for ambígua, prefiro pedir confirmação a escolher errado.\n\nComandos: /aula, /tarefa, /prova, /nota, /anotar, /agenda, /status, /ajuda, /desvincular.\n\nFotos e PDFs enviados ao bot entram na Caixa de Entrada do SLCampus.`;}
-async function saveArray(ref,data,key,item){await ref.set({[key]:[...(data[key]||[]),item]},{merge:true});}
+async function saveArray(ref,data,key,item){
+  await ref.firestore.runTransaction(async tx=>{
+    const snap=await tx.get(ref);
+    const latest=Array.isArray(snap.data()?.[key])?snap.data()[key]:[];
+    if(item?.id && latest.some(x=>x?.id===item.id)) return;
+    tx.set(ref,{[key]:[...latest,item]},{merge:true});
+  });
+}
+
 module.exports=async function(req,res){
   if(req.method!=='POST')return res.status(405).json({error:'Método não permitido.'});
-  const expected=process.env.TELEGRAM_WEBHOOK_SECRET;if(expected&&req.headers['x-telegram-bot-api-secret-token']!==expected)return res.status(401).json({error:'Webhook não autorizado.'});
+  const expected=String(process.env.TELEGRAM_WEBHOOK_SECRET||'').trim();
+  if(!expected) return res.status(503).json({error:'Webhook não configurado com segredo.'});
+  const provided=String(req.headers['x-telegram-bot-api-secret-token']||'');
+  if(provided!==expected)return res.status(401).json({error:'Webhook não autorizado.'});
+  const rawLength=Number(req.headers['content-length']||0);
+  if(rawLength>256*1024)return res.status(413).json({error:'Atualização muito grande.'});
   try{
     const update=req.body||{},msg=update.message;if(!msg)return res.status(200).json({ok:true,ignored:true});
     const chatId=String(msg.chat?.id||'');if(!chatId)return res.status(200).json({ok:true,ignored:true});
