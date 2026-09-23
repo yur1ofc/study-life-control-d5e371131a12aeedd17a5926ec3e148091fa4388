@@ -1112,7 +1112,6 @@
           <div class="focus-hints">
             <button class="btn-secondary" id="focus-long-start"><i class="fas fa-hourglass-half"></i> Foco 50 min</button>
             <button class="btn-secondary" id="focus-heavy-start"><i class="fas fa-dumbbell"></i> Foco 90 min</button>
-            <button class="btn-secondary" id="focus-break-start"><i class="fas fa-mug-hot"></i> Descanso 15 min</button>
           </div>
         </div>`;
       return `${base}${card}`;

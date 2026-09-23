@@ -175,7 +175,17 @@
       const pendingReviews = (d.reviews || []).filter(x => norm(x?.materia) === norm(name) && !x?.concluida);
       const diary = (d.classDiaries || []).filter(x => norm(x?.materia) === norm(name));
       const doubts = diary.filter(x => x?.naoEntendi || x?.duvidaPendente || x?.precisoRevisar);
-      return { topics: topics.length, weakTopics: weak.length, pendingReviews: pendingReviews.length, unresolvedDoubts: doubts.length };
+      const evidence = (d.sessions || []).filter(x => norm(x?.materia) === norm(name) && x?.learningEvidence?.level);
+      const levels = evidence.reduce((acc, x) => { const k=x.learningEvidence.level; acc[k]=(acc[k]||0)+1; return acc; }, {});
+      const score = { explain: 5, exercise: 4, doubt: 2, review: 2 };
+      const vals = evidence.map(x => score[x.learningEvidence.level]).filter(Number.isFinite);
+      const averageEvidence = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+      const weakEvidence = (levels.doubt || 0) + (levels.review || 0);
+      const errorEvidence = evidence.filter(x => String(x?.learningEvidence?.errorNote || '').trim()).length;
+      const strongEvidence = (levels.explain || 0) + (levels.exercise || 0);
+      const latestEvidence = evidence.slice().sort((a,b)=>new Date(b?.learningEvidence?.answeredAt || b?.data || 0)-new Date(a?.learningEvidence?.answeredAt || a?.data || 0))[0]?.learningEvidence || null;
+      return { topics: topics.length, weakTopics: weak.length, pendingReviews: pendingReviews.length, unresolvedDoubts: doubts.length,
+        evidenceCount: evidence.length, evidenceLevels: levels, averageEvidence, weakEvidence, errorEvidence, strongEvidence, latestEvidence };
     }
 
     workload(name) {
@@ -215,6 +225,8 @@
       if (workload.overdueTasks) reasons.push(`${workload.overdueTasks} tarefa(s) atrasada(s)`);
       if (workload.nextExam && workload.nextExam.days <= 7) reasons.push(`avaliação em ${workload.nextExam.days} dia(s)`);
       if (learning.weakTopics) reasons.push(`${learning.weakTopics} tópico(s) com baixa confiança`);
+      if (learning.weakEvidence) reasons.push(`${learning.weakEvidence} sessão(ões) com dúvida ou necessidade de revisão`);
+      if (learning.errorEvidence) reasons.push(`${learning.errorEvidence} sessão(ões) com erro/dificuldade relatado`);
       if (study.daysSinceStudy !== null && study.daysSinceStudy >= 7) reasons.push(`${study.daysSinceStudy} dias sem estudar`);
       if (study.trend === 'caindo') reasons.push('ritmo de estudo caiu em relação aos 7 dias anteriores');
       if (prereq.length) {
@@ -231,6 +243,9 @@
       if (workload.nextExam?.days <= 7) priority += 18;
       else if (workload.nextExam?.days <= 14) priority += 8;
       priority += Math.min(12, learning.weakTopics*4);
+      priority += Math.min(18, learning.weakEvidence*6);
+      priority += Math.min(8, learning.errorEvidence*3);
+      priority += Math.min(8, learning.unresolvedDoubts*4);
       priority += Math.min(10, workload.overdueTasks*3);
       if (attendance.percentage !== null && attendance.percentage < 75) priority += 10;
       if (study.trend === 'caindo') priority += 6;
@@ -241,9 +256,11 @@
         ? `Você já teve ${failed.length} reprovação(ões) nesta matéria. Compare os pontos de dificuldade das tentativas anteriores e aumente o estudo ativo antes das próximas avaliações.`
         : workload.nextExam?.days <= 7
           ? `Avaliação próxima: priorize revisão dos tópicos fracos e exercícios até ${workload.nextExam.days} dia(s).`
-          : learning.weakTopics
-            ? `Ataque primeiro os ${learning.weakTopics} tópico(s) de baixa confiança e registre dúvidas no diário.`
-            : study.trend === 'caindo'
+          : learning.weakEvidence
+            ? `Comece pelos conteúdos marcados como dúvida/revisão nas últimas sessões e faça recuperação ativa antes de reler o material.`
+            : learning.weakTopics
+              ? `Ataque primeiro os ${learning.weakTopics} tópico(s) de baixa confiança e registre dúvidas no diário.`
+              : study.trend === 'caindo'
               ? 'Seu ritmo de estudo caiu. Retome sessões curtas e regulares antes de acumular conteúdo.'
               : 'Mantenha constância e registre notas, frequência e tópicos para aumentar a precisão da análise.';
       return { name, code: String(subject?.codigo || '').trim(), history, attempts: history.length,

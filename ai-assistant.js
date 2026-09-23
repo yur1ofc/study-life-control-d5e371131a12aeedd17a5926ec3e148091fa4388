@@ -109,6 +109,7 @@
         dailyLogs: Array.isArray(data?.dailyLogs) ? data.dailyLogs : [],
         classDiaries: Array.isArray(data?.classDiaries) ? data.classDiaries : [],
         reviews: Array.isArray(data?.reviews) ? data.reviews : [],
+        materials: Array.isArray(data?.materials) ? data.materials : [],
         attendance: data?.attendance || {}
       };
     }
@@ -2271,6 +2272,9 @@ ${report.monthly}`;
           '- Se faltar um dado que ajudaria (ex: sem notas, Mapa de Aprendizado vazio, sem diário), diga isso com naturalidade e sugira cadastrar/registrar na aba correspondente do site.',
           '- Quando o usuário perguntar o que estudar, cruze Mapa de Aprendizado + Diário de Aula + provas próximas e responda com uma ordem prática (estude isso, depois aquilo), com motivo curto para cada item.',
           '- Quando o usuário quiser revisar conteúdo de aula, use o que está no Diário daquela matéria/data; se não houver diário de hoje, pergunte objetivamente o que a pessoa viu na aula e ajude a revisar ali mesmo, na conversa.',
+          '- Use as Evidências de aprendizagem das sessões para diferenciar tempo estudado de domínio demonstrado. Se houver dúvida/necessidade de revisão, priorize recuperação ativa e questões antes de simplesmente recomendar releitura.',
+          '- Ao pedir questões, faça perguntas de recuperação ativa e espere a resposta antes de revelar a solução. Cruze tópico, erros/relatos, Mapa de Aprendizado, provas próximas, notas e revisões.',
+          '- Materiais/PDFs disponíveis no contexto podem ser recomendados como fonte de estudo; não invente o conteúdo de um PDF cujo texto não esteja no contexto.',
           '- Seja direto, encorajador e realista, sem enrolação. Respostas de tamanho médio (não gigantes). Pode usar "-" para listas e "**negrito**" para destacar.',
           '- Você não tem acesso à internet nem a nada fora do contexto fornecido — não responda perguntas de conhecimento geral fora do escopo de estudos/organização acadêmica da pessoa; nesses casos, redirecione gentilmente de volta ao propósito do mentor.',
           '- Não repita o contexto inteiro na resposta; use-o só para embasar o que for perguntado.'
@@ -2313,6 +2317,27 @@ ${report.monthly}`;
       });
     } else {
       linhas.push('\nMapa de Aprendizado ainda vazio (usuário não cadastrou tópicos de estudo).');
+    }
+
+    const evidenceSessions = (ctx.sessions || [])
+      .filter(s => s?.learningEvidence?.level)
+      .sort((a,b) => new Date(b?.learningEvidence?.answeredAt || b?.data || 0) - new Date(a?.learningEvidence?.answeredAt || a?.data || 0))
+      .slice(0, 12);
+    if (evidenceSessions.length) {
+      const labels = { explain: 'explica sem olhar', exercise: 'resolve exercícios', doubt: 'ainda tem dúvidas', review: 'precisa revisar' };
+      linhas.push('\nEvidências recentes de aprendizagem (sessões de foco):');
+      evidenceSessions.forEach(s => {
+        const e = s.learningEvidence;
+        linhas.push(`- ${s.materia || 'sem matéria'}${e.topic ? ` / ${e.topic}` : ''}: ${labels[e.level] || e.level}; confiança ${e.confidence || '?'}/5${e.recall ? `; relato: ${String(e.recall).slice(0,260)}` : ''}.`);
+      });
+    } else {
+      linhas.push('\nEvidências de aprendizagem: ainda não há autoavaliações de sessões de foco.');
+    }
+
+    const relevantMaterials = (ctx.materials || []).slice(0, 20);
+    if (relevantMaterials.length) {
+      linhas.push('\nMateriais/Biblioteca disponíveis:');
+      relevantMaterials.forEach(m => linhas.push(`- ${m.materia || 'sem matéria'}: ${m.titulo || 'material sem título'} [${m.tipo || 'recurso'}]${m.descricao ? ` — ${String(m.descricao).slice(0,180)}` : ''}.`));
     }
 
     const diarioHoje = this._getDiaryEntriesForDate(hoje);

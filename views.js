@@ -1396,6 +1396,9 @@ class ViewRenderer {
                         <button class="timer-btn pause" id="timer-pause" style="display: none;">
                             <i class="fas fa-pause"></i> Pausar
                         </button>
+                        <button class="timer-btn break" id="focus-break-start" style="display: none;">
+                            <i class="fas fa-mug-hot"></i> Descanso <span id="focus-break-label">5 min</span>
+                        </button>
                         <button class="timer-btn reset" id="timer-reset">
                             <i class="fas fa-undo"></i> Reset
                         </button>
