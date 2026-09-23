@@ -333,7 +333,7 @@ REGRAS CRÍTICAS:
 
     function aiResultToGroups(app, result) {
         const rawPeriods = Array.isArray(result?.periodos) ? result.periodos : [];
-        const periods = rawPeriods.map(p => String(p?.periodo || '').trim()).filter(p => /^\\d{4}\\.\\d$/.test(p)).sort();
+        const periods = rawPeriods.map(p => String(p?.periodo || '').trim()).filter(p => /^\d{4}\.\d$/.test(p)).sort();
         return periods.map(periodo => {
             const raw = rawPeriods.find(p => String(p?.periodo || '').trim() === periodo) || {};
             const subjects = (Array.isArray(raw.disciplinas) ? raw.disciplinas : [])
