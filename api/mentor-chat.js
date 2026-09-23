@@ -1,4 +1,4 @@
-// SLCampus — Mentor IA via AI Core (Groq). Mantém /api/mentor-chat por compatibilidade.
+// SLCampus — Mentor IA multi-provider. Mantém /api/mentor-chat por compatibilidade.
 const quota=require('./_lib/gemini-admin-quota');
 const AI=require('./_lib/ai-core');
 const ALLOWED_ORIGINS=['https://slcampus.vercel.app','https://study-life-control.vercel.app'];
@@ -11,9 +11,10 @@ module.exports=async function handler(req,res){res.setHeader('Access-Control-All
  if(JSON.stringify(body.contents).length>32000)return res.status(413).json({error:'O contexto enviado ao Mentor ficou grande demais. Tente uma pergunta mais específica.',code:'AI_CONTEXT_TOO_LARGE'});
  const requestId=AI.requestId('chat');
  try{const usage=await quota.reserveUserOperation({uid:user.uid,email:user.email,operation:'mentor',requestId});if(usage.blocked)return res.status(429).json({error:`Você atingiu o limite de ${quota.MENTOR_DAILY_LIMIT} mensagens do Mentor IA por hoje.`,code:'LOCAL_MENTOR_LIMIT'});}catch(err){console.error('[api/mentor-chat] quota:',err);return res.status(503).json({error:'O controle de uso da IA está temporariamente indisponível.',code:'QUOTA_STORE_UNAVAILABLE'});}
+ const failOperation=async(status,payload)=>{try{await quota.releaseUserOperation({uid:user.uid,operation:'mentor'});}catch(e){console.warn('[api/mentor-chat] falha ao devolver quota:',e.message);}return res.status(status).json(payload);};
  try{
-   const result=await AI.callGroq({messages:AI.geminiContentsToGroq(body.contents),systemInstruction:body.systemInstruction||'',operation:'mentor',uid:user.uid,email:user.email,requestId,maxTokens:1100,reasoningEffort:'medium'});
-   if(result.ok)return res.status(200).json({candidates:[{content:{role:'model',parts:[{text:result.text}]}}],meta:{provider:'groq',model:result.modelUsed,attempts:result.attempts,requestId}});
-   return res.status(result.status||503).json({error:result.error,code:result.code,provider:'groq',requestId});
+   const result=await AI.callAI({messages:AI.geminiContentsToGroq(body.contents),systemInstruction:body.systemInstruction||'',operation:'mentor',uid:user.uid,email:user.email,requestId,maxTokens:1100,reasoningEffort:'medium'});
+   if(result.ok)return res.status(200).json({candidates:[{content:{role:'model',parts:[{text:result.text}]}}],meta:{provider:result.provider,model:result.modelUsed,attempts:result.attempts||1,requestId}});
+   return failOperation(result.status||503,{error:result.error,code:result.code,provider:result.provider||'none',requestId});
  }catch(err){console.error('[api/mentor-chat] internal:',err);return res.status(500).json({error:'Erro interno no Mentor IA.',code:'AI_INTERNAL_ERROR',requestId});}
 };

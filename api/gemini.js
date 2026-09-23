@@ -1,5 +1,5 @@
-// SLCampus — endpoint legado /api/gemini mantido por compatibilidade.
-// A implementação não chama mais o Google Gemini: usa o AI Core/Groq.
+// SLCampus — endpoint de importação mantido por compatibilidade.
+// O AI Core decide automaticamente entre Gemini e Groq.
 const quota=require('./_lib/gemini-admin-quota');
 const AI=require('./_lib/ai-core');
 const ALLOWED_ORIGINS=['https://slcampus.vercel.app','https://study-life-control.vercel.app'];
@@ -38,7 +38,8 @@ module.exports=async function handler(req,res){
       if(usage.blocked)return res.status(429).json({error:`Limite de ${quota.USER_IMPORT_LIMIT} importações por dia atingido. Tente novamente amanhã.`,code:'LOCAL_USER_LIMIT'});
     }catch(err){console.error('[api/gemini] quota:',err);return res.status(503).json({error:'O controle de uso da IA está temporariamente indisponível.',code:'QUOTA_STORE_UNAVAILABLE'});}
 
-    let results=[];
+    const failImport=async(status,payload)=>{try{await quota.releaseUserOperation({uid:user.uid,operation:'import'});}catch(e){console.warn('[api/gemini] falha ao devolver quota:',e.message);}return res.status(status).json(payload);};
+    let results=[];let providersUsed=new Set();
     const model=built.hasImage?AI.VISION_MODEL:AI.TEXT_MODEL;
     const prompt=built.hasImage?'Extraia e organize os dados visíveis nas imagens para a finalidade solicitada pelo usuário. Retorne JSON válido e não invente dados.':'Extraia e organize fielmente os dados do conteúdo fornecido para a finalidade solicitada pelo usuário. Retorne JSON válido e não invente dados.';
     const chunks=built.pdfChunks?.length ? built.pdfChunks : null;
@@ -49,18 +50,18 @@ module.exports=async function handler(req,res){
             ...(built.messages.filter(m=>m.content && typeof m.content==='string' && !m.content.startsWith('CONTEÚDO EXTRAÍDO DE PDF(S):'))),
             {role:'user',content:`BLOCO ${i+1} DE ${chunks.length} DO PDF:\n${chunks[i]}\n\nExtraia somente os dados que realmente aparecem neste bloco. Preserve exatamente a estrutura JSON solicitada no conteúdo/prompt. Não invente dados.`}
           ];
-          const result=await AI.callGroq({messages:chunkMessages,systemInstruction:prompt,operation:'import',uid:user.uid,email:user.email,requestId:`${rid}_b${i+1}`,maxTokens:3500,reasoningEffort:'low',model,json:true});
-          if(!result.ok) return res.status(result.status||503).json({error:result.error,code:result.code,provider:'groq',requestId:rid,chunk:i+1});
+          const result=await AI.callAI({messages:chunkMessages,systemInstruction:prompt,operation:'import',uid:user.uid,email:user.email,requestId:`${rid}_b${i+1}`,maxTokens:3500,reasoningEffort:'low',model,json:true});
+          if(!result.ok) return failImport(result.status||503,{error:result.error,code:result.code,provider:result.provider||'none',requestId:rid,chunk:i+1});
           const parsed=AI.parseJsonResponse(result.text);
-          if(!parsed)return res.status(502).json({error:`A IA retornou um JSON inválido no bloco ${i+1}.`,code:'AI_BAD_JSON',provider:'groq',requestId:rid});
-          results.push(parsed);
+          if(!parsed)return failImport(502,{error:`A IA retornou um JSON inválido no bloco ${i+1}.`,code:'AI_BAD_JSON',provider:result.provider||'none',requestId:rid});
+          results.push(parsed);providersUsed.add(result.provider||'unknown');
         }
       }else{
-        const result=await AI.callGroq({messages:built.messages,systemInstruction:prompt,operation:'import',uid:user.uid,email:user.email,requestId:rid,maxTokens:5000,reasoningEffort:'low',model,json:true});
-        if(!result.ok)return res.status(result.status||503).json({error:result.error,code:result.code,provider:'groq',requestId:rid});
+        const result=await AI.callAI({messages:built.messages,systemInstruction:prompt,operation:'import',uid:user.uid,email:user.email,requestId:rid,maxTokens:5000,reasoningEffort:'low',model});
+        if(!result.ok)return failImport(result.status||503,{error:result.error,code:result.code,provider:result.provider||'none',requestId:rid});
         const parsed=AI.parseJsonResponse(result.text);
-        if(!parsed)return res.status(502).json({error:'A IA retornou um formato JSON inesperado. Tente novamente.',code:'AI_BAD_JSON',provider:'groq',requestId:rid});
-        results=[parsed];
+        if(!parsed)return failImport(502,{error:'A IA retornou um formato JSON inesperado. Tente novamente.',code:'AI_BAD_JSON',provider:result.provider||'none',requestId:rid});
+        results=[parsed];providersUsed.add(result.provider||'unknown');
       }
 
       let merged=AI.mergeJsonObjects(results);
@@ -78,10 +79,10 @@ module.exports=async function handler(req,res){
       if(!built.hasImage && (!Array.isArray(merged.disciplinas)||merged.disciplinas.length===0) && built.pdfChunks?.length){
         const rawPdfText=String(built.pdfChunks.join('\n\n')).slice(0,28000);
         const rescuePrompt=`Você está fazendo uma segunda tentativa de extração de uma grade curricular acadêmica. O PDF pode ter sido extraído de um fluxograma/tabela e a ordem do texto pode estar quebrada.\n\nRetorne SOMENTE JSON no formato:\n{"faculdade":"","curso":"","disciplinas":[{"nome":"","codigo":"","semestre":0,"cargaHoraria":0,"creditos":0,"prerequisitos":[],"tipo":"obrigatoria"}]}\n\nExtraia todas as disciplinas que conseguir identificar no texto. Não invente nomes. Considere como disciplina linhas/itens que tenham nomes acadêmicos, códigos de componentes, carga horária, créditos ou indicação de semestre. Preserve nomes em português. Se uma informação não estiver disponível, use 0 ou string vazia.\n\nTEXTO EXTRAÍDO DO PDF:\n${rawPdfText}`;
-        const rescue=await AI.callGroq({messages:[{role:'user',content:rescuePrompt}],systemInstruction:'Faça extração estruturada de dados acadêmicos. Retorne apenas JSON válido.',operation:'import',uid:user.uid,email:user.email,requestId:`${rid}_rescue`,maxTokens:5000,reasoningEffort:'medium',model:AI.TEXT_MODEL,json:true});
+        const rescue=await AI.callAI({messages:[{role:'user',content:rescuePrompt}],systemInstruction:'Faça extração estruturada de dados acadêmicos. Retorne apenas JSON válido.',operation:'import',uid:user.uid,email:user.email,requestId:`${rid}_rescue`,maxTokens:5000,reasoningEffort:'medium',model:AI.TEXT_MODEL,json:true});
         if(rescue.ok){const rescued=AI.parseJsonResponse(rescue.text);if(rescued?.disciplinas?.length)merged=AI.mergeJsonObjects([merged,rescued]);}
       }
-      return res.status(200).json({candidates:[{content:{role:'model',parts:[{text:JSON.stringify(merged)}]}}],meta:{provider:'groq',model,requestId:rid,pdfCount:built.pdfCount,chunks:results.length,extractedTextChars:String(built.pdfChunks?.join('')||'').length}});
+      return res.status(200).json({candidates:[{content:{role:'model',parts:[{text:JSON.stringify(merged)}]}}],meta:{provider:[...providersUsed].join(','),model,requestId:rid,pdfCount:built.pdfCount,chunks:results.length,extractedTextChars:String(built.pdfChunks?.join('')||'').length}});
     }catch(err){
       // Uma tentativa que falhou não deve gastar permanentemente a vaga diária do usuário.
       try{await quota.releaseUserOperation({uid:user.uid,operation:'import'});}catch(releaseErr){console.warn('[api/gemini] falha ao devolver quota:',releaseErr.message);}

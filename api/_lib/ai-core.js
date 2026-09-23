@@ -1,14 +1,17 @@
-// SLCampus AI Core — provider-agnostic server-side gateway.
-// Primary text model: OpenAI GPT-OSS 120B on Groq.
-// Vision/document model: Qwen 3.8 27B on Groq.
-// API key is server-only (GROQ_API_KEY).
+// SLCampus AI Core — gateway multi-provider (Gemini + Groq).
+// As chaves ficam somente no servidor. O frontend continua usando os endpoints
+// antigos (/api/mentor-chat e /api/gemini), então a troca de provedor é transparente.
 const quota = require('./gemini-admin-quota');
 
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
 const TEXT_MODEL = process.env.SLC_AI_TEXT_MODEL || 'openai/gpt-oss-120b';
 const SMALL_TEXT_MODEL = process.env.SLC_AI_FALLBACK_MODEL || 'openai/gpt-oss-20b';
 const VISION_MODEL = process.env.SLC_AI_VISION_MODEL || 'qwen/qwen3.8-27b';
-const MAX_RETRIES = 1;
+const GEMINI_MODEL = process.env.SLC_AI_GEMINI_MODEL || 'gemini-3.5-flash-lite';
+const GEMINI_VISION_MODEL = process.env.SLC_AI_GEMINI_VISION_MODEL || GEMINI_MODEL;
+const MAX_RETRIES = 0;
 const TIMEOUT_MS = Number(process.env.SLC_AI_TIMEOUT_MS || 20000);
 const PDF_MAX_TEXT_CHARS = 64000;
 const CHUNK_CHARS = 10000;
@@ -16,10 +19,23 @@ const CHUNK_CHARS = 10000;
 function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 function requestId(prefix='ai'){ return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2,9)}`; }
 function isRetryable(status, data){
-  const msg=String(data?.error?.message||'').toLowerCase();
-  return [408,429,500,502,503,504].includes(status) || /overload|temporar|unavailable|timeout|rate.?limit|capacity/.test(msg);
+  const msg=String(data?.error?.message||data?.error?.status||'').toLowerCase();
+  return [408,429,500,502,503,504].includes(status) || /overload|temporar|unavailable|timeout|rate.?limit|capacity|resource.?exhausted/.test(msg);
 }
 function jsonText(data){ return data?.choices?.[0]?.message?.content || ''; }
+function geminiText(data){
+  return (data?.candidates||[]).flatMap(c=>c?.content?.parts||[]).map(p=>p?.text||'').join('');
+}
+const providerCooldowns={gemini:0,groq:0};
+function setProviderCooldown(provider,ms){providerCooldowns[provider]=Date.now()+Math.max(0,Math.min(15*60*1000,ms||0));}
+function providerIsCoolingDown(provider){return providerCooldowns[provider]>Date.now();}
+function providerCooldownRemaining(provider){return Math.max(0,providerCooldowns[provider]-Date.now());}
+
+function providerOrder(){
+  const raw=String(process.env.SLC_AI_PROVIDER_ORDER||'gemini,groq').toLowerCase();
+  const list=raw.split(',').map(x=>x.trim()).filter(x=>x==='gemini'||x==='groq');
+  return [...new Set(list.length?list:['gemini','groq'])];
+}
 
 function geminiContentsToGroq(contents){
   return (contents||[]).map((c)=>{
@@ -40,18 +56,87 @@ function geminiContentsToGroq(contents){
   }).filter(m=>m.content && (typeof m.content==='string'?m.content.trim():m.content.length));
 }
 
-async function callGroq({messages, systemInstruction='', json=false, model=TEXT_MODEL, operation='mentor', uid, email, requestId:rid, maxTokens=1400, reasoningEffort='medium'}){
+function geminiContentsFromMessages(messages){
+  return (messages||[]).map(m=>{
+    const role=m?.role==='assistant'?'model':'user';
+    if(Array.isArray(m?.content)){
+      const parts=[];
+      for(const item of m.content){
+        if(item?.type==='text' && item.text) parts.push({text:String(item.text)});
+        if(item?.type==='image_url' && item.image_url?.url){
+          const match=String(item.image_url.url).match(/^data:([^;]+);base64,(.+)$/s);
+          if(match) parts.push({inlineData:{mimeType:match[1],data:match[2]}});
+        }
+      }
+      return {role,parts};
+    }
+    return {role,parts:[{text:String(m?.content||'')}]} ;
+  }).filter(x=>x.parts?.length);
+}
+
+function geminiPayload({messages,systemInstruction='',json=false,maxTokens=1400,model=GEMINI_MODEL,reasoningEffort='medium'}){
+  const generationConfig={
+    temperature:0.35,
+    maxOutputTokens:maxTokens
+  };
+  if(json) generationConfig.responseMimeType='application/json';
+  const contents=geminiContentsFromMessages(messages);
+  const payload={contents,generationConfig};
+  if(systemInstruction) payload.systemInstruction={parts:[{text:String(systemInstruction)}]};
+  return payload;
+}
+
+async function callGemini({messages,systemInstruction='',json=false,model=GEMINI_MODEL,operation='mentor',uid,email,requestId:rid,maxTokens=1400,reasoningEffort='medium'}){
+  const key=process.env.GEMINI_API_KEY;
+  if(!key) return {ok:false,status:503,error:'GEMINI_API_KEY não configurada no Vercel.',code:'GEMINI_NOT_CONFIGURED',provider:'gemini',retryable:true};
+  const current=model || GEMINI_MODEL;
+  const reservation=await quota.reserveGlobalCall({uid,email,operation,model:current,requestId:rid,provider:'gemini'});
+  if(reservation.blocked){
+    return {ok:false,status:503,blocked:true,provider:'gemini',code:reservation.reason==='provider-limit'?'GEMINI_LOCAL_LIMIT':operation==='import'?'GLOBAL_AI_LIMIT':'GLOBAL_CHAT_LIMIT',error:reservation.reason==='provider-limit'?'Limite interno diário reservado para o Gemini atingido.':'Limite interno diário de IA atingido temporariamente.',providerLimit:reservation.providerLimit};
+  }
+  const started=Date.now();
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),TIMEOUT_MS);
+  let status=503,data={},outcome='error';
+  try{
+    const payload=geminiPayload({messages,systemInstruction,json,maxTokens,model:current,reasoningEffort});
+    const response=await fetch(`${GEMINI_URL}/${encodeURIComponent(current)}:generateContent?key=${encodeURIComponent(key)}`,{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal
+    });
+    status=response.status;
+    const retryAfterHeader=response.headers.get('retry-after');
+    const retryAfterMs=retryAfterHeader && /^\d+(?:\.\d+)?$/.test(retryAfterHeader) ? Number(retryAfterHeader)*1000 : 0;
+    data=await response.json().catch(()=>({}));
+    if(retryAfterMs) data.__retryAfterMs=retryAfterMs;
+    outcome=response.ok?'success':(isRetryable(status,data)?'transient-error':'error');
+    if(response.ok){
+      const text=geminiText(data);
+      providerCooldowns.gemini=0;
+      return {ok:true,status,provider:'gemini',modelUsed:current,data,text,usage:data?.usageMetadata||{},attempts:1};
+    }
+  }catch(err){
+    status=err?.name==='AbortError'?504:503;
+    data={error:{message:err?.name==='AbortError'?`A IA demorou mais de ${Math.round(TIMEOUT_MS/1000)}s para responder.`:(err?.message||'Falha de rede ao chamar o Gemini.')}};
+  }finally{
+    clearTimeout(timer);
+    await quota.finishCall(reservation.logId,{status:outcome,httpStatus:status,success:outcome==='success',latencyMs:Date.now()-started,errorMessage:data?.error?.message||'',retryable:isRetryable(status,data),provider:'gemini',model:current});
+  }
+  const raw=data?.error?.message||data?.error?.status||'';
+  const retryAfterMs=Number(data?.__retryAfterMs||0);
+  return {ok:false,status,provider:'gemini',modelUsed:current,data,retryable:isRetryable(status,data),retryAfterMs,error:status===429?'O Gemini está no limite temporário de uso.':status===503?'O Gemini está temporariamente sobrecarregado.':raw||`Erro HTTP ${status} do Gemini.`,code:status===429?'GEMINI_429':status===504?'GEMINI_504':'GEMINI_ERROR'};
+}
+
+async function callGroq({messages,systemInstruction='',json=false,model=TEXT_MODEL,operation='mentor',uid,email,requestId:rid,maxTokens=1400,reasoningEffort='medium'}){
   const key=process.env.GROQ_API_KEY;
-  if(!key) return {ok:false,status:503,error:'GROQ_API_KEY não configurada no Vercel.',code:'GROQ_NOT_CONFIGURED'};
+  if(!key) return {ok:false,status:503,error:'GROQ_API_KEY não configurada no Vercel.',code:'GROQ_NOT_CONFIGURED',provider:'groq',retryable:true};
   const models = model===VISION_MODEL ? [VISION_MODEL] : [model, SMALL_TEXT_MODEL].filter((v,i,a)=>v && a.indexOf(v)===i);
   let last=null;
   for(let mi=0;mi<models.length;mi++){
     const current=models[mi];
     for(let attempt=0;attempt<=MAX_RETRIES;attempt++){
-      if(attempt>0) await sleep(Math.min(2500,1000*attempt));
-      const reservation=await quota.reserveGlobalCall({uid,email,operation,model:current,requestId:rid});
+      const reservation=await quota.reserveGlobalCall({uid,email,operation,model:current,requestId:rid,provider:'groq'});
       if(reservation.blocked){
-        return {ok:false,status:503,blocked:true,code:operation==='import'?'GLOBAL_AI_LIMIT':'GLOBAL_CHAT_LIMIT',error:'Limite interno diário de IA atingido temporariamente.'};
+        return {ok:false,status:503,blocked:true,provider:'groq',code:reservation.reason==='provider-limit'?'GROQ_LOCAL_LIMIT':operation==='import'?'GLOBAL_AI_LIMIT':'GLOBAL_CHAT_LIMIT',error:reservation.reason==='provider-limit'?'Limite interno diário reservado para o Groq atingido.':'Limite interno diário de IA atingido temporariamente.',providerLimit:reservation.providerLimit};
       }
       const started=Date.now();
       const controller=new AbortController();
@@ -64,17 +149,21 @@ async function callGroq({messages, systemInstruction='', json=false, model=TEXT_
         if(current.startsWith('openai/gpt-oss-')) payload.reasoning_effort=reasoningEffort;
         if(current===VISION_MODEL) payload.reasoning_effort='none';
         const response=await fetch(GROQ_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify(payload),signal:controller.signal});
-        status=response.status; data=await response.json().catch(()=>({}));
+        status=response.status;
+        const retryAfterHeader=response.headers.get('retry-after');
+        const retryAfterMs=retryAfterHeader && /^\d+(?:\.\d+)?$/.test(retryAfterHeader) ? Number(retryAfterHeader)*1000 : 0;
+        data=await response.json().catch(()=>({}));
+        if(retryAfterMs) data.__retryAfterMs=retryAfterMs;
         outcome=response.ok?'success':(isRetryable(status,data)?'transient-error':'error');
-        if(response.ok) return {ok:true,status,modelUsed:current,data,text:jsonText(data),usage:data.usage||{},attempts:mi+attempt+1};
+        if(response.ok){providerCooldowns.groq=0;return {ok:true,status,provider:'groq',modelUsed:current,data,text:jsonText(data),usage:data.usage||{},attempts:mi+attempt+1};}
         last={ok:false,status,data,model:current,transient:isRetryable(status,data)};
       }catch(err){
         status=err?.name==='AbortError'?504:503;
-        data={error:{message:err?.name==='AbortError'?`A IA demorou mais de ${Math.round(TIMEOUT_MS/1000)}s para responder.`:(err?.message||'Falha de rede ao chamar a IA.')}};
+        data={error:{message:err?.name==='AbortError'?`A IA demorou mais de ${Math.round(TIMEOUT_MS/1000)}s para responder.`:(err?.message||'Falha de rede ao chamar o Groq.')}};
         last={ok:false,status,data,model:current,transient:true};
       }finally{
         clearTimeout(timer);
-        await quota.finishCall(reservation.logId,{status:outcome,httpStatus:status,success:outcome==='success',latencyMs:Date.now()-started,errorMessage:data?.error?.message||'',retryable:isRetryable(status,data),provider:'groq'});
+        await quota.finishCall(reservation.logId,{status:outcome,httpStatus:status,success:outcome==='success',latencyMs:Date.now()-started,errorMessage:data?.error?.message||'',retryable:isRetryable(status,data),provider:'groq',model:current});
       }
       if(!last?.transient) break;
     }
@@ -82,7 +171,30 @@ async function callGroq({messages, systemInstruction='', json=false, model=TEXT_
   }
   const status=last?.status||503;
   const raw=last?.data?.error?.message||'';
-  return {ok:false,status,error:status===429?'A IA atingiu o limite temporário de requisições. Aguarde alguns segundos e tente novamente.':status===503?'A IA está temporariamente indisponível. Tente novamente em alguns segundos.':raw||`Erro HTTP ${status} da IA.`,code:status===429?'GROQ_429':status===504?'GROQ_504':'GROQ_ERROR'};
+  return {ok:false,status,provider:'groq',retryAfterMs:Number(last?.data?.__retryAfterMs||0),error:status===429?'O Groq atingiu o limite temporário de requisições.':status===503?'O Groq está temporariamente indisponível.':raw||`Erro HTTP ${status} da IA.`,code:status===429?'GROQ_429':status===504?'GROQ_504':'GROQ_ERROR',retryable:isRetryable(status,last?.data||{})};
+}
+
+async function callAI({messages,systemInstruction='',json=false,operation='mentor',uid,email,requestId:rid,maxTokens=1400,reasoningEffort='medium',model,geminiModel}){
+  const order=providerOrder();
+  let last=null;
+  for(const provider of order){
+    if(providerIsCoolingDown(provider)) continue;
+    const result=provider==='gemini'
+      ? await callGemini({messages,systemInstruction,json,operation,uid,email,requestId:rid,maxTokens,reasoningEffort,model:geminiModel||GEMINI_MODEL})
+      : await callGroq({messages,systemInstruction,json,operation,uid,email,requestId:rid,maxTokens,reasoningEffort,model:model||TEXT_MODEL});
+    if(result.ok) return result;
+    last=result;
+    if(result.code==='GEMINI_NOT_CONFIGURED' || result.code==='GROQ_NOT_CONFIGURED'){
+      setProviderCooldown(provider,10*60*1000);
+    }else if(result.code==='GEMINI_LOCAL_LIMIT' || result.code==='GROQ_LOCAL_LIMIT'){
+      setProviderCooldown(provider,10*60*1000);
+    }else if(result.retryable || [408,429,500,502,503,504].includes(result.status)){
+      setProviderCooldown(provider,result.retryAfterMs||30*1000);
+    }
+  }
+  const remaining=order.filter(providerIsCoolingDown);
+  if(last && !last.retryAfterMs && remaining.length===order.length) last.retryAfterMs=Math.max(...remaining.map(providerCooldownRemaining));
+  return last||{ok:false,status:503,error:'Nenhum provedor de IA está disponível.',code:'AI_NO_PROVIDER'};
 }
 
 function sniffMimeFromBase64(data, declared=''){
@@ -316,4 +428,4 @@ function mergeJsonObjects(objects){
   return out;
 }
 
-module.exports={TEXT_MODEL,SMALL_TEXT_MODEL,VISION_MODEL,requestId,geminiContentsToGroq,buildMessagesFromGemini,callGroq,splitIntoChunks,parseJsonResponse,mergeJsonObjects,CHUNK_CHARS,sniffMimeFromBase64,normalizeExtractedPdfText,parseSigaaHistoryText};
+module.exports={TEXT_MODEL,SMALL_TEXT_MODEL,VISION_MODEL,GEMINI_MODEL,GEMINI_VISION_MODEL,requestId,geminiContentsToGroq,buildMessagesFromGemini,callAI,callGemini,callGroq,splitIntoChunks,parseJsonResponse,mergeJsonObjects,CHUNK_CHARS,sniffMimeFromBase64,normalizeExtractedPdfText,parseSigaaHistoryText};
