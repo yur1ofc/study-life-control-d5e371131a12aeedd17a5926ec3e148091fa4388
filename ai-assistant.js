@@ -2392,13 +2392,14 @@ ${report.monthly}`;
       return null;
     }
 
-    const contextoTexto = this._buildMentorContextSnapshot();
-    const historico = (this.sessionMemory || []).slice(-6);
+    let contextoTexto = this._buildMentorContextSnapshot();
+    if (contextoTexto.length > 21000) contextoTexto = contextoTexto.slice(0, 21000) + '\n[Contexto adicional omitido para manter a chamada leve.]';
+    const historico = (this.sessionMemory || []).slice(-4);
 
     const contents = [];
     historico.forEach(turn => {
       if (turn.question) contents.push({ role: 'user', parts: [{ text: turn.question }] });
-      if (turn.answer) contents.push({ role: 'model', parts: [{ text: String(turn.answer).slice(0, 2000) }] });
+      if (turn.answer) contents.push({ role: 'model', parts: [{ text: String(turn.answer).slice(0, 900) }] });
     });
     contents.push({
       role: 'user',

@@ -1,4 +1,4 @@
-// Quota Gemini SERVER-ONLY.
+// Quota de IA SERVER-ONLY.
 // Nenhum contador de quota é escrito pelo navegador. O Firebase Admin SDK usa
 // uma transação Firestore para tornar a reserva atômica e impedir que duas
 // pessoas consumam a mesma "vaga" ao mesmo tempo.
@@ -25,15 +25,15 @@ function todayKey() {
 // IMPORTANTE: este número é um orçamento interno do SLCampus, NÃO uma afirmação
 // sobre a quota do Google. Em produção, configure GEMINI_TOTAL_DAILY_LIMIT com
 // um valor abaixo do RPD efetivo que aparece no AI Studio para os modelos usados.
-const configuredTotal = parseInt(process.env.GEMINI_TOTAL_DAILY_LIMIT || '20', 10);
+const configuredTotal = parseInt(process.env.SLC_AI_TOTAL_DAILY_LIMIT || process.env.GEMINI_TOTAL_DAILY_LIMIT || '40', 10);
 const TOTAL_DAILY_LIMIT = Number.isFinite(configuredTotal) && configuredTotal > 0 ? configuredTotal : 20;
 
-const configuredReserve = parseInt(process.env.GEMINI_IMPORT_RESERVE || '16', 10);
+const configuredReserve = parseInt(process.env.SLC_AI_IMPORT_RESERVE || process.env.GEMINI_IMPORT_RESERVE || '10', 10);
 const IMPORT_RESERVE = Math.max(0, Math.min(TOTAL_DAILY_LIMIT - 1, Number.isFinite(configuredReserve) ? configuredReserve : 8));
 const CHAT_CEILING = Math.max(0, TOTAL_DAILY_LIMIT - IMPORT_RESERVE);
 
-const USER_IMPORT_LIMIT = parseInt(process.env.GEMINI_USER_IMPORT_LIMIT || '8', 10);
-const MENTOR_DAILY_LIMIT = parseInt(process.env.MENTOR_DAILY_LIMIT || '60', 10);
+const USER_IMPORT_LIMIT = parseInt(process.env.SLC_AI_USER_IMPORT_LIMIT || process.env.GEMINI_USER_IMPORT_LIMIT || '8', 10);
+const MENTOR_DAILY_LIMIT = parseInt(process.env.SLC_AI_MENTOR_DAILY_LIMIT || process.env.MENTOR_DAILY_LIMIT || '60', 10);
 
 function globalRef(db) {
   return db.collection('gemini_usage_global').doc('counter');
@@ -171,7 +171,7 @@ async function readDashboard() {
       chatCeiling: CHAT_CEILING,
       userImportLimit: USER_IMPORT_LIMIT,
       mentorDailyLimit: MENTOR_DAILY_LIMIT,
-      source: process.env.GEMINI_TOTAL_DAILY_LIMIT ? 'env' : 'default'
+      source: (process.env.SLC_AI_TOTAL_DAILY_LIMIT || process.env.GEMINI_TOTAL_DAILY_LIMIT) ? 'env' : 'default'
     },
     usage: {
       total: Number(current.count || 0),
