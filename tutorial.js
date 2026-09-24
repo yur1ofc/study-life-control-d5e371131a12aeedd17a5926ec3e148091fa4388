@@ -58,10 +58,10 @@
       focus: mobile ? '#slc-product-bottom-nav [data-v="foco"]' : '[data-view="foco"]',
       notifications: '[data-tutorial="notification-button"], #notification-badge',
       more: mobile ? '#slc-product-bottom-nav [data-v="__more"]' : (tablet ? '#mobile-nav-toggle, .mobile-nav-toggle' : '[data-view="ajuda"]'),
-      learning: '[data-view="mapa-aprendizado"]',
-      organization: '[data-view="tarefas"]',
-      profile: mobile ? '[data-slcnavigate="configuracoes"], [data-view="perfil"]' : '[data-view="configuracoes"], [data-slcnavigate="configuracoes"]',
-      help: '[data-view="ajuda"]'
+      learning: mobile ? '#slc-mobile-more [data-mobile-more-view="mapa-aprendizado"]' : '[data-view="mapa-aprendizado"]',
+      organization: mobile ? '#slc-mobile-more [data-mobile-more-view="tarefas"]' : '[data-view="tarefas"]',
+      profile: mobile ? '#slc-mobile-more [data-mobile-more-view="configuracoes"], #slc-mobile-more [data-mobile-more-view="perfil"]' : '[data-view="configuracoes"], [data-slcnavigate="configuracoes"]',
+      help: mobile ? '#slc-mobile-more [data-mobile-more-view="ajuda"]' : '[data-view="ajuda"]'
     };
     return selectors[kind] || selectors.home;
   }
@@ -89,7 +89,7 @@
     overlay.id = 'tutorial-overlay';
     overlay.className = 'tutorial-overlay';
     overlay.innerHTML = `
-      <div class="tutorial-backdrop"></div>
+      <div class="tutorial-backdrop"><i class="tutorial-backdrop-top"></i><i class="tutorial-backdrop-left"></i><i class="tutorial-backdrop-right"></i><i class="tutorial-backdrop-bottom"></i><i class="tutorial-target-blocker"></i></div>
       <div class="tutorial-spotlight"></div>
       <div class="tutorial-card" id="tutorial-card" role="dialog" aria-modal="true" aria-live="polite">
         <div class="tutorial-progress"><span id="tutorial-progress-text"></span><button class="tutorial-skip" id="tutorial-skip" type="button">Pular</button></div>
@@ -157,6 +157,8 @@
       const overlay=ensureOverlay();
       el('tutorial-next').onclick=()=>this.next(); el('tutorial-prev').onclick=()=>this.prev(); el('tutorial-skip').onclick=()=>this.stop(true);
       overlay.querySelector('.tutorial-backdrop').onclick=()=>this.stop(true);
+      const blocker=overlay.querySelector('.tutorial-target-blocker');
+      if(blocker) blocker.onclick=(e)=>{e.preventDefault();e.stopPropagation();};
     },
     next(){ if(this.index>=STEPS.length-1){this.stop(true);return;} this.index++; this.showStep(); },
     prev(){ if(this.index>0){this.index--;this.showStep();} },
@@ -176,19 +178,67 @@
       if(view && window.app?.loadView && !['home','notifications','more'].includes(step.target)){
         try{window.app.loadView(view);markNavActive(view);}catch(_){ }
       }
-      await wait(180); assignTargets();
+      // No celular, os itens secundários vivem dentro do menu Mais.
+      // Abra o menu somente para os passos que realmente apontam para um item dele.
+      if(deviceKind()==='mobile' && ['learning','organization','profile','help'].includes(step.target)){
+        window.SLCProductShell?.openMobileMore?.();
+      }
+      await wait(220); assignTargets();
     },
     updateSpotlight(target){
-      const s=ensureOverlay().querySelector('.tutorial-spotlight'); if(!s||!target)return;
+      const overlay=ensureOverlay(),s=overlay.querySelector('.tutorial-spotlight'),backdrop=overlay.querySelector('.tutorial-backdrop');
+      if(!s||!target)return;
       const r=target.getBoundingClientRect(); const pad=deviceKind()==='mobile'?6:10;
-      s.style.top=`${Math.max(4,r.top-pad)}px`;s.style.left=`${Math.max(4,r.left-pad)}px`;s.style.width=`${Math.max(56,r.width+pad*2)}px`;s.style.height=`${Math.max(32,r.height+pad*2)}px`;
+      const left=Math.max(4,r.left-pad), top=Math.max(4,r.top-pad), right=Math.min(innerWidth-4,r.right+pad), bottom=Math.min(innerHeight-4,r.bottom+pad);
+      s.style.top=`${top}px`;s.style.left=`${left}px`;s.style.width=`${Math.max(56,right-left)}px`;s.style.height=`${Math.max(32,bottom-top)}px`;
+      // Quatro painéis escurecem tudo ao redor e deixam o alvo totalmente limpo.
+      if(backdrop){
+        const panels=[
+          ['top',0,0,innerWidth,top],
+          ['left',0,top,left,Math.max(0,bottom-top)],
+          ['right',right,top,Math.max(0,innerWidth-right),Math.max(0,bottom-top)],
+          ['bottom',0,bottom,innerWidth,Math.max(0,innerHeight-bottom)]
+        ];
+        panels.forEach(([name,x,y,w,h])=>{
+          const el=backdrop.querySelector(`.tutorial-backdrop-${name}`);
+          if(!el)return;
+          el.style.left=`${x}px`;el.style.top=`${y}px`;el.style.width=`${w}px`;el.style.height=`${h}px`;
+        });
+        const blocker=backdrop.querySelector('.tutorial-target-blocker');
+        if(blocker){
+          blocker.style.left=`${left}px`;blocker.style.top=`${top}px`;blocker.style.width=`${Math.max(0,right-left)}px`;blocker.style.height=`${Math.max(0,bottom-top)}px`;
+        }
+      }
     },
     positionCard(target){
       const card=el('tutorial-card'),arrow=el('tutorial-card-arrow');if(!card||!arrow||!target)return;
       const r=target.getBoundingClientRect(),vw=innerWidth,vh=innerHeight,margin=deviceKind()==='mobile'?12:16;
       card.style.left='';card.style.right='';card.style.top='';card.style.bottom='';arrow.style.left='';arrow.style.right='';arrow.style.top='';arrow.style.bottom='';card.classList.remove('mobile','arrow-left','arrow-right','arrow-top','arrow-bottom');
       if(deviceKind()==='mobile'){
-        card.classList.add('mobile','arrow-bottom');card.style.left=`${margin}px`;card.style.right=`${margin}px`;card.style.bottom=`${margin+8}px`;arrow.style.left=`${Math.max(24,Math.min(vw-margin*2-30,r.left+r.width/2-margin-10))}px`;arrow.style.top='-10px';return;
+        const bottomNav=document.getElementById('slc-product-bottom-nav');
+        const navRect=bottomNav?.getBoundingClientRect?.();
+        const navTop=navRect?.top || vh;
+        const cardLeft=margin, cardWidth=vw-margin*2;
+        const cardHeight=card.offsetHeight||280;
+        const targetNearBottom=r.bottom >= navTop-18 || r.top > vh*.68;
+        card.classList.add('mobile');
+        card.style.left=`${margin}px`;card.style.right=`${margin}px`;
+
+        if(!targetNearBottom && r.bottom + cardHeight + 18 <= navTop){
+          // Alvo no topo/meio: card fica abaixo dele e a seta aponta para cima.
+          card.classList.add('arrow-top');
+          card.style.top=`${Math.max(margin,r.bottom+16)}px`;
+          arrow.style.top='-10px';arrow.style.bottom='';
+        }else{
+          // Alvo na barra inferior (ou sem espaço abaixo): card fica acima e a seta aponta para baixo.
+          card.classList.add('arrow-bottom');
+          const cardBottom=Math.max(margin+8, vh-navTop+10);
+          card.style.bottom=`${cardBottom}px`;card.style.top='';
+          arrow.style.bottom='-10px';arrow.style.top='';
+        }
+        const targetCenter=r.left+r.width/2;
+        arrow.style.left=`${Math.max(24,Math.min(cardWidth-30,targetCenter-cardLeft-10))}px`;
+        return;
       }
       const w=Math.min(420,vw-margin*2),h=card.offsetHeight||230;
       const right=vw-r.right,left=r.left,bottom=vh-r.bottom;
@@ -219,6 +269,7 @@
       el('tutorial-device-note').textContent=device==='desktop'?'Desktop':device==='tablet'?'Tablet':'Celular';
       el('tutorial-next').textContent=this.index===STEPS.length-1?'Finalizar':'Próximo';
       await wait(80);this.updateSpotlight(target);this.positionCard(target);
+      await wait(120);this.updateSpotlight(target);this.positionCard(target);
     }
   };
 
