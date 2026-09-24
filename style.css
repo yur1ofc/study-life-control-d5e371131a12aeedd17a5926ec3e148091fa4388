@@ -4529,14 +4529,14 @@ body.sidebar-open #slc-bottom-nav {
 .help-chip-list{display:flex;flex-wrap:wrap;gap:10px}
 .help-chip{padding:10px 14px;border-radius:999px;border:1px solid rgba(99,102,241,.18);background:rgba(59,130,246,.10);color:inherit;cursor:pointer;transition:transform .18s ease, background .18s ease}
 .help-chip:hover{transform:translateY(-2px);background:rgba(59,130,246,.16)}
-.tutorial-overlay{position:fixed;inset:0;display:none;z-index:3000;pointer-events:none}
+.tutorial-overlay{position:fixed;inset:0;display:none;z-index:2147483645;pointer-events:none}
 .tutorial-overlay.open{display:block}
 .tutorial-backdrop{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .28s ease;z-index:0}
 .tutorial-overlay.open .tutorial-backdrop{opacity:1}
 .tutorial-backdrop > i{position:fixed;display:block;background:rgba(2,6,23,.72);pointer-events:auto}
 .tutorial-target-blocker{background:transparent!important;pointer-events:auto!important}
-.tutorial-spotlight{position:fixed;z-index:1;border-radius:18px;border:1.5px solid rgba(125,211,252,.98);background:linear-gradient(180deg,rgba(59,130,246,.08),rgba(168,85,247,.08));box-shadow:0 0 0 1px rgba(255,255,255,.08) inset,0 0 0 8px rgba(96,165,250,.15),0 18px 48px rgba(15,23,42,.35),0 0 32px rgba(96,165,250,.26);transition:top .34s cubic-bezier(.22,1,.36,1),left .34s cubic-bezier(.22,1,.36,1),width .34s cubic-bezier(.22,1,.36,1),height .34s cubic-bezier(.22,1,.36,1),border-radius .34s ease;pointer-events:none;animation:tutorialSpotlightPulse 2s ease-in-out infinite}
-.tutorial-target-active{position:relative!important;z-index:3002!important;filter:none!important;opacity:1!important;isolation:isolate;transform:translateZ(0)}
+.tutorial-spotlight{position:fixed;z-index:1;border-radius:18px;border:1.5px solid rgba(125,211,252,.98);background:transparent;box-shadow:0 0 0 1px rgba(255,255,255,.08) inset,0 0 0 8px rgba(96,165,250,.15),0 18px 48px rgba(15,23,42,.35),0 0 32px rgba(96,165,250,.26);transition:top .34s cubic-bezier(.22,1,.36,1),left .34s cubic-bezier(.22,1,.36,1),width .34s cubic-bezier(.22,1,.36,1),height .34s cubic-bezier(.22,1,.36,1),border-radius .34s ease;pointer-events:none;animation:tutorialSpotlightPulse 2s ease-in-out infinite}
+.tutorial-target-active{position:relative!important;z-index:auto!important;filter:none!important;opacity:1!important;isolation:auto!important;transform:none!important}
 .tutorial-card{position:fixed;max-width:420px;width:min(420px,calc(100vw - 32px));background:linear-gradient(180deg,rgba(15,23,42,.98),rgba(17,24,39,.98));border:1px solid rgba(148,163,184,.18);border-radius:24px;padding:18px 18px 16px;box-shadow:0 20px 60px rgba(2,6,23,.54),0 0 0 1px rgba(255,255,255,.04) inset;color:#e5eefb;pointer-events:auto;transform:translateY(14px) scale(.98);opacity:0;transition:transform .3s cubic-bezier(.22,1,.36,1),opacity .28s ease,left .34s cubic-bezier(.22,1,.36,1),top .34s cubic-bezier(.22,1,.36,1),bottom .34s cubic-bezier(.22,1,.36,1),right .34s cubic-bezier(.22,1,.36,1)}
 .tutorial-overlay.open .tutorial-card{transform:translateY(0) scale(1);opacity:1}
 .tutorial-card.mobile{width:auto;max-width:none}
@@ -6583,6 +6583,10 @@ button.btn-primary,
 #slc-product-bottom-nav button.primary i,
 #slc-product-bottom-nav button.primary span { color: inherit !important; }
 body.slc-tutorial-open { overflow: hidden !important; overscroll-behavior: none !important; }
+body.slc-tutorial-open #slc-product-bottom-nav{z-index:2147483000!important;}
+body.slc-tutorial-open #slc-mobile-more{z-index:2147483001!important;}
+body.slc-tutorial-open #slc-mobile-more .slc-mobile-more-sheet{z-index:2147483002!important;}
+body.slc-tutorial-open .slc-mobile-more-backdrop{pointer-events:none!important;}
 #loading-screen { z-index: 2147483647 !important; }
 #loading-screen ~ * { }
 .help-profile-chip{display:flex;flex-direction:column;gap:4px;min-width:150px;padding:13px 15px;border:1px solid var(--border);border-radius:16px;background:var(--bg-primary)}

@@ -241,6 +241,23 @@
         return;
       }
       const w=Math.min(420,vw-margin*2),h=card.offsetHeight||230;
+
+      // Alvos da navegação lateral precisam manter o balão ao lado do menu.
+      // A lógica genérica pode escolher uma posição central quando existe muito
+      // espaço livre à direita, deixando a seta longe do item destacado.
+      const sidebarTarget=target.closest?.('.sidebar');
+      if(sidebarTarget){
+        const sidebarRect=sidebarTarget.getBoundingClientRect();
+        const top=Math.max(margin,Math.min(vh-h-margin,r.top+r.height/2-h/2));
+        const x=Math.min(vw-w-margin,Math.max(margin,sidebarRect.right+18));
+        card.classList.add('arrow-left');
+        card.style.left=`${x}px`;
+        card.style.top=`${top}px`;
+        arrow.style.left='-10px';
+        arrow.style.top=`${Math.max(22,Math.min(h-30,r.top+r.height/2-top-10))}px`;
+        return;
+      }
+
       const right=vw-r.right,left=r.left,bottom=vh-r.bottom;
       if(right>=w+28){const top=Math.max(margin,Math.min(vh-h-margin,r.top+r.height/2-h/2));card.classList.add('arrow-left');card.style.left=`${Math.min(vw-w-margin,r.right+18)}px`;card.style.top=`${top}px`;arrow.style.left='-10px';arrow.style.top=`${Math.max(22,Math.min(h-30,r.top+r.height/2-top-10))}px`;}
       else if(left>=w+28){const top=Math.max(margin,Math.min(vh-h-margin,r.top+r.height/2-h/2));card.classList.add('arrow-right');card.style.left=`${Math.max(margin,r.left-w-18)}px`;card.style.top=`${top}px`;arrow.style.right='-10px';arrow.style.top=`${Math.max(22,Math.min(h-30,r.top+r.height/2-top-10))}px`;}
