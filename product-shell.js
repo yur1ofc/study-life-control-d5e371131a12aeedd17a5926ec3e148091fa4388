@@ -255,6 +255,9 @@
     }catch(e){}
   }
 
+  // API pequena para o tutorial poder destacar itens que ficam dentro do menu Mais no celular.
+  window.SLCProductShell=Object.assign(window.SLCProductShell||{}, {openMobileMore, closeMobileMore, mobileNav});
+
   function boot(){
     requestServiceWorkerUpdate();
     addStudyView(); addProfileView(); polishLogin(); polishSetup(); restructureNav(); mobileNav(); patchLoadView(); bindStudyActions();
