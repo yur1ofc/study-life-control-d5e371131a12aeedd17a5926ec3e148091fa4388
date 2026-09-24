@@ -40,6 +40,8 @@
 // o header Authorization acima. Mantenha também a entrada em vercel.json
 // como um fallback diário caso o cron externo falhe.
 
+const AcademicIntelligence = require('./_lib/academic-intelligence-server');
+
 const DEDUPE_LIMIT = 500;
 const SCHEDULER_LEASE_MS = 110000; // ~1m50s: evita execuções sobrepostas de cron externo a cada 1 min.
 
@@ -197,8 +199,28 @@ function scheduleForDate(data,date){
   const wd=new Date(`${date}T00:00:00Z`).getUTCDay();
   return (data.classSchedule||[]).filter(a=>Number(a?.dia)===wd&&a?.inicio&&a?.fim&&isCurrentSubject(data,a.materia)).sort((a,b)=>(timeMin(a.inicio)||0)-(timeMin(b.inicio)||0));
 }
+function learnedStudyProfile(data){
+  const adaptive=data?.user?.adaptiveLearning&&typeof data.user.adaptiveLearning==='object'?data.user.adaptiveLearning:{};
+  const windows=adaptive.preferredStudyWindows&&typeof adaptive.preferredStudyWindows==='object'?adaptive.preferredStudyWindows:{};
+  const hours=Array.isArray(adaptive.preferredStudyHours)?adaptive.preferredStudyHours.map(Number).filter(Number.isFinite):[];
+  const counts={manha:Number(windows.manha||0),tarde:Number(windows.tarde||0),noite:Number(windows.noite||0),madrugada:Number(windows.madrugada||0)};
+  const total=Object.values(counts).reduce((a,b)=>a+b,0);
+  const preferredBucket=total?Object.entries(counts).sort((a,b)=>b[1]-a[1])[0][0]:'';
+  const hourCounts={}; hours.forEach(h=>{hourCounts[h]=(hourCounts[h]||0)+1;});
+  const preferredHour=Object.keys(hourCounts).length?Number(Object.entries(hourCounts).sort((a,b)=>b[1]-a[1])[0][0]):null;
+  const sessionMinutes=Number(adaptive.preferredSessionMinutes)||45;
+  return {preferredBucket,preferredHour,sessionMinutes:Math.max(25,Math.min(90,sessionMinutes)),sampleSize:total};
+}
 function freeWindowNow(data,now,minMinutes=10){
   const p=localParts(now); const intervals=scheduleForDate(data,p.date).map(a=>({start:timeMin(a.inicio),end:timeMin(a.fim)})).filter(x=>x.start!=null&&x.end!=null&&x.end>x.start);
+  // Sessões agendadas também ocupam o tempo do usuário. Elas não impedem o
+  // lembrete da própria sessão, mas impedem que o sistema invente outra ação.
+  (data.sessions||[]).filter(s=>!s?.concluida).forEach(s=>{
+    const raw=String(s?.data||'');
+    const date=raw.slice(0,10); const start=raw.length>=16?timeMin(raw.slice(11,16)):null;
+    const duration=Number(s?.duracaoMin||s?.duracao||45);
+    if(date===p.date&&start!=null&&duration>0)intervals.push({start,end:start+Math.min(180,duration)});
+  });
   intervals.sort((a,b)=>a.start-b.start);
   const merged=[]; for(const x of intervals){const last=merged.at(-1);if(last&&x.start<=last.end)last.end=Math.max(last.end,x.end);else merged.push({...x});}
   const dayStart=5*60, dayEnd=23*60+30;
@@ -209,19 +231,82 @@ function freeWindowNow(data,now,minMinutes=10){
   const minute=p.hour*60+p.minute;
   const active=gaps.find(g=>minute>=g.start&&minute<g.end&&g.end-minute>=minMinutes);
   if(!active)return null;
-  const preferred=String(data?.user?.adaptiveLearning?.preferredStudyWindow||'').toLowerCase();
+  const learned=learnedStudyProfile(data);
   const h=p.hour;
   const bucket=h>=5&&h<12?'manha':h>=12&&h<18?'tarde':h>=18?'noite':'madrugada';
   let quality=1;
-  if(active.end-active.start>=30)quality+=2; else if(active.end-active.start>=15)quality+=1;
-  if(preferred&&preferred===bucket)quality+=2;
-  if(h>=12&&h<14&&active.end-active.start>=30)quality+=1; // bom intervalo de almoço quando existir
-  return {date:p.date,minute,remaining:active.end-minute,quality,bucket};
+  if(active.end-active.start>=45)quality+=3; else if(active.end-active.start>=30)quality+=2; else if(active.end-active.start>=20)quality+=1;
+  if(learned.preferredBucket&&learned.preferredBucket===bucket)quality+=2;
+  if(learned.preferredHour!==null&&Math.abs(learned.preferredHour-h)<=1)quality+=2;
+  if(h>=12&&h<14&&active.end-active.start>=30)quality+=1;
+  return {date:p.date,minute,remaining:active.end-minute,quality,bucket,learned,startsAt:active.start,endsAt:active.end};
+}
+function todayStudyMinutes(data,date){
+  const sessions=(data.sessions||[]).filter(s=>s?.concluida);
+  let total=0;
+  sessions.forEach(s=>{const raw=s?.data||s?.dataConclusao||s?.inicio||'';if(String(raw).slice(0,10)!==date)return;total+=Number(s?.duracaoReal??s?.duracaoMin??s?.duracao??0)||0;});
+  return Math.max(0,total);
+}
+function smartReminderState(data){
+  const state=classCaptureState(data);
+  state.studyOpportunity=state.studyOpportunity&&typeof state.studyOpportunity==='object'?state.studyOpportunity:{};
+  return state;
+}
+function studyOpportunity(data,now){
+  const p=localParts(now);
+  const free=freeWindowNow(data,now,20);
+  if(!free)return null;
+  const state=smartReminderState(data).studyOpportunity;
+  const lastAt=state.lastSentAt?Date.parse(state.lastSentAt):0;
+  if(lastAt&&now-lastAt<4*3600000)return null;
+  const sentDate=state.lastSentDate===p.date?Number(state.sentToday||0):0;
+  if(sentDate>=2)return null;
+
+  const adaptive=data?.user?.adaptiveLearning&&typeof data.user.adaptiveLearning==='object'?data.user.adaptiveLearning:{};
+  const target=Number(adaptive.dailyTargetMinutes)||0;
+  const actual=todayStudyMinutes(data,p.date);
+  const remainingTarget=Math.max(0,target-actual);
+  const intelligence=AcademicIntelligence.analyze(data);
+  const candidates=(intelligence.priorities||[]).filter(r=>{
+    if(!r?.name)return false;
+    if(!r.currentEvidence&&!(r.workload?.nextExam?.days!==null&&r.workload?.nextExam?.days<=7))return false;
+    const days=r.workload?.nextExam?.days;
+    const urgent=Number.isFinite(Number(days))&&Number(days)<=2;
+    const score=Number(r.priorityScore)||0;
+    return urgent||score>=35||r.learning?.weakTopics>0||r.learning?.pendingReviews>0||r.workload?.overdueTasks>0;
+  });
+  if(!candidates.length)return null;
+
+  const recentCutoff=now-8*3600000;
+  const recentSubjects=new Set((data.sessions||[]).filter(s=>s?.concluida).filter(s=>{const d=new Date(s?.data||s?.inicio||s?.dataConclusao||0);return !Number.isNaN(d.getTime())&&d.getTime()>=recentCutoff;}).map(s=>normSubject(s?.materia)).filter(Boolean));
+  const sorted=candidates.slice().sort((a,b)=>{
+    const ar=recentSubjects.has(normSubject(a.name))?1:0, br=recentSubjects.has(normSubject(b.name))?1:0;
+    const ad=Number.isFinite(Number(a.workload?.nextExam?.days))?Number(a.workload.nextExam.days):999;
+    const bd=Number.isFinite(Number(b.workload?.nextExam?.days))?Number(b.workload.nextExam.days):999;
+    return ar-br || (b.priorityScore||0)-(a.priorityScore||0) || ad-bd;
+  });
+  let pick=sorted.find(r=>!recentSubjects.has(normSubject(r.name)))||sorted[0];
+  if(!pick)return null;
+  const urgent=Number.isFinite(Number(pick.workload?.nextExam?.days))&&pick.workload.nextExam.days<=2;
+  if(remainingTarget<=10&&!urgent&&pick.priorityScore<65)return null;
+  const preferred=Math.max(25,Math.min(45,Number(free.learned?.sessionMinutes)||45));
+  const minutes=Math.max(20,Math.min(preferred,free.remaining));
+  if(minutes<20)return null;
+  let action='revisar os tópicos mais frágeis';
+  if(pick.learning?.weakTopicNames?.length) action=`revisar ${pick.learning.weakTopicNames.slice(0,2).join(' e ')}`;
+  else if(pick.learning?.pendingReviews>0) action='fazer as revisões pendentes';
+  else if(pick.workload?.overdueTasks>0) action='resolver a tarefa atrasada';
+  else if(pick.workload?.nextExam?.title) action=`preparar a próxima avaliação (${pick.workload.nextExam.title})`;
+  const exam=pick.workload?.nextExam;
+  const examText=exam?` A próxima avaliação é ${exam.title}${exam.days===0?' hoje':exam.days===1?' amanhã':` em ${exam.days} dias`}.`:'';
+  const body=`Você está em um intervalo livre de cerca de ${Math.floor(free.remaining)} min e este horário combina com seus horários de estudo registrados. ${pick.name} está entre as prioridades atuais (score ${pick.priorityScore}).${examText} Aproveite ${minutes} min agora para ${action}.`;
+  return {key:`smart-study:${p.date}:${Math.floor(p.hour*60+p.minute/30)}`,title:'🧠 Hora útil para estudar',body,quality:free.quality,studyOpportunity:{subject:pick.name,minutes,priorityScore:pick.priorityScore,freeMinutes:free.remaining,bucket:free.bucket,preferredBucket:free.learned.preferredBucket,reason:action,createdAt:new Date(now).toISOString()}};
 }
 function classCaptureState(data){
   const state=data.smartReminderState&&typeof data.smartReminderState==='object'?data.smartReminderState:{};
   state.classCapture=state.classCapture&&typeof state.classCapture==='object'?state.classCapture:{};
   state.review=state.review&&typeof state.review==='object'?state.review:{};
+  state.studyOpportunity=state.studyOpportunity&&typeof state.studyOpportunity==='object'?state.studyOpportunity:{};
   return state;
 }
 function diaryExistsForClass(data,materia,date){return (data.classDiaries||[]).some(d=>String(d?.data||'').slice(0,10)===date&&normSubject(d?.materia)===normSubject(materia));}
@@ -279,10 +364,15 @@ function findDueReminders(data, now) {
   const prefs = data?.settings?.studyReminders || {};
   const already = new Set(data.sentReminders || []);
   const due = [];
+  const freeForAction=freeWindowNow(data,now,20);
   const scopedExams=(data.exams||[]).filter(e=>isCurrentSubject(data,e?.materia));
   const scopedTasks=(data.tasks||[]).filter(t=>isCurrentSubject(data,t?.materia));
-  scopedExams.forEach(e => { if(e.concluida)return; const ms=dateOnlyToMs(e.data); if(ms==null)return; const corpo=`${e.titulo}${e.materia?` — ${e.materia}`:''}`; due.push(...checkpointsDevidos(ms,'exam',e.id,'📝 Prova/trabalho',corpo,now,already)); });
-  scopedTasks.forEach(t => { if(t.concluida)return; const ms=dateOnlyToMs(t.dataLimite); if(ms==null)return; const corpo=`${t.titulo}${t.materia?` — ${t.materia}`:''}`; due.push(...checkpointsDevidos(ms,'task',t.id,'✅ Tarefa',corpo,now,already)); });
+  // Alertas acadêmicos que exigem uma ação só saem quando existe uma janela
+  // real para agir. Assim o cron não vira uma máquina de cobranças durante aula.
+  if(freeForAction){
+    scopedExams.forEach(e => { if(e.concluida)return; const ms=dateOnlyToMs(e.data); if(ms==null)return; const corpo=`${e.titulo}${e.materia?` — ${e.materia}`:''}`; checkpointsDevidos(ms,'exam',e.id,'📝 Prova/trabalho',corpo,now,already).forEach(x=>due.push({...x,actionableStudy:true,freeMinutes:freeForAction.remaining})); });
+    scopedTasks.forEach(t => { if(t.concluida)return; const ms=dateOnlyToMs(t.dataLimite); if(ms==null)return; const corpo=`${t.titulo}${t.materia?` — ${t.materia}`:''}`; checkpointsDevidos(ms,'task',t.id,'✅ Tarefa',corpo,now,already).forEach(x=>due.push({...x,actionableStudy:true,freeMinutes:freeForAction.remaining})); });
+  }
 
   // Sessões agendadas continuam usando o horário configurado; são compromissos
   // explícitos e não entram no filtro de "tempo livre".
@@ -330,11 +420,19 @@ function findDueReminders(data, now) {
     } else due.push(review.item);
   }
 
+  // Oportunidade de estudo: só entra quando há uma janela livre, existe algo
+  // acadêmico concreto para fazer e o sistema ainda não enviou alertas demais.
+  const hasActionableStudy=due.some(x=>x.actionableStudy||x.reviewKeys||x.captureRecords||x.studyOpportunity||String(x.key||'').startsWith('session:')||String(x.key||'').startsWith('aula:')||x.focusPush);
+  if(!hasActionableStudy){
+    const opportunity=studyOpportunity(data,now);
+    if(opportunity)due.push(opportunity);
+  }
+
   // Diário geral continua uma vez por dia, mas só é disparado em horário livre
   // quando possível. Se não houver janela após o horário configurado, não invade
   // um bloco de aula para cobrar o usuário.
   const diaryHour=Number(prefs.diaryReminderHour??20), b=pa;
-  if(!already.has(`diario:${b.date}`)&&b.hour>=diaryHour){
+  if(!already.has(`diario:${b.date}`)&&b.hour>=diaryHour&&!due.some(x=>x.studyOpportunity)){
     const logged=(data.dailyLogs||[]).some(l=>l.data===b.date)||(data.classDiaries||[]).some(d=>d.data===b.date);
     const free=freeWindowNow(data,now,10);
     if(!logged&&free)due.push({key:`diario:${b.date}`,title:'📖 Registre seu dia',body:'Você ainda não registrou seu dia. Estou te lembrando agora porque você está em um intervalo livre.',quality:free.quality});
@@ -461,6 +559,21 @@ module.exports = async function handler(req, res) {
       };
       for (const item of due) {
         if (!fullyDelivered(item)) continue;
+        if (item.studyOpportunity) {
+          const prev=smartState.studyOpportunity||{};
+          const sameDay=prev.lastSentDate===localParts(now).date;
+          smartState.studyOpportunity={
+            ...prev,
+            lastSentAt:new Date(now).toISOString(),
+            lastSentDate:localParts(now).date,
+            sentToday:(sameDay?Number(prev.sentToday||0):0)+1,
+            lastSubject:item.studyOpportunity.subject,
+            lastMinutes:item.studyOpportunity.minutes,
+            lastBucket:item.studyOpportunity.bucket,
+            lastFreeMinutes:item.studyOpportunity.freeMinutes,
+            lastReason:item.studyOpportunity.reason
+          };
+        }
         if (Array.isArray(item.captureRecords)) {
           for (const record of item.captureRecords) {
             const prev = smartState.classCapture[record.key] || {};
