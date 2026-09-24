@@ -4534,7 +4534,7 @@ body.sidebar-open #slc-bottom-nav {
 .tutorial-backdrop{position:absolute;inset:0;background:radial-gradient(circle at center, rgba(15,23,42,.10), rgba(2,6,23,.72) 58%, rgba(2,6,23,.86) 100%);pointer-events:auto;opacity:0;transition:opacity .28s ease}
 .tutorial-overlay.open .tutorial-backdrop{opacity:1}
 .tutorial-spotlight{position:fixed;border-radius:24px;border:1.5px solid rgba(125,211,252,.95);background:linear-gradient(180deg,rgba(59,130,246,.08),rgba(168,85,247,.08));box-shadow:0 0 0 1px rgba(255,255,255,.08) inset,0 0 0 9999px rgba(2,6,23,.58),0 0 0 8px rgba(96,165,250,.15),0 24px 60px rgba(15,23,42,.42),0 0 32px rgba(96,165,250,.26);transition:top .34s cubic-bezier(.22,1,.36,1),left .34s cubic-bezier(.22,1,.36,1),width .34s cubic-bezier(.22,1,.36,1),height .34s cubic-bezier(.22,1,.36,1),border-radius .34s ease;pointer-events:none;animation:tutorialSpotlightPulse 2s ease-in-out infinite}
-.tutorial-target-active{position:relative!important;z-index:3002!important;filter:none!important;opacity:1!important;isolation:isolate;transform:translateZ(0)}
+.tutorial-target-active{position:relative!important;filter:none!important;opacity:1!important;}
 .tutorial-card{position:fixed;max-width:420px;width:min(420px,calc(100vw - 32px));background:linear-gradient(180deg,rgba(15,23,42,.98),rgba(17,24,39,.98));border:1px solid rgba(148,163,184,.18);border-radius:24px;padding:18px 18px 16px;box-shadow:0 20px 60px rgba(2,6,23,.54),0 0 0 1px rgba(255,255,255,.04) inset;color:#e5eefb;pointer-events:auto;transform:translateY(14px) scale(.98);opacity:0;transition:transform .3s cubic-bezier(.22,1,.36,1),opacity .28s ease,left .34s cubic-bezier(.22,1,.36,1),top .34s cubic-bezier(.22,1,.36,1),bottom .34s cubic-bezier(.22,1,.36,1),right .34s cubic-bezier(.22,1,.36,1)}
 .tutorial-overlay.open .tutorial-card{transform:translateY(0) scale(1);opacity:1}
 .tutorial-card.mobile{width:auto;max-width:none}
@@ -6641,7 +6641,7 @@ body.slc-tutorial-open .tutorial-card button {
   .tutorial-card.tutorial-step-help{min-height:0;}
 }
 
-/* SLCampus Tutorial V48 — spotlight acima de qualquer navegação.
+/* SLCampus Tutorial V49 — spotlight acima de qualquer navegação.
    O alvo não precisa mais subir no z-index: o overlay cria uma janela
    transparente exatamente sobre o alvo. Isso evita que a barra inferior
    ou o drawer cubram o destaque no celular e no iPad. */
@@ -6688,11 +6688,68 @@ body.slc-tutorial-open .tutorial-target-active {
   body.slc-tutorial-open #slc-product-bottom-nav,
   body.slc-tutorial-open #slc-mobile-more,
   body.slc-tutorial-open #slc-mobile-more .slc-mobile-more-sheet {
-    /* O overlay V48 fica acima deles; não alteramos o layout nem a posição. */
+    /* O overlay V49 fica acima deles; não alteramos o layout nem a posição. */
     transform-origin: center;
   }
   .tutorial-card.tutorial-step-profile,
   .tutorial-card.tutorial-step-help {
     min-height: 0 !important;
   }
+}
+
+/* ================================================================
+   SLCampus Tutorial V49 — camada estrutural definitiva
+   O tutorial é uma camada independente do shell do produto.
+   O alvo nunca sobe de z-index para "furar" o overlay.
+================================================================ */
+#tutorial-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483647 !important;
+  isolation: isolate !important;
+  pointer-events: none !important;
+}
+#tutorial-overlay.open { display:block !important; }
+#tutorial-overlay .tutorial-backdrop {
+  position:absolute !important;
+  inset:0 !important;
+  z-index:0 !important;
+  background:transparent !important;
+  pointer-events:none !important;
+}
+#tutorial-overlay .tutorial-backdrop > i {
+  position:fixed !important;
+  display:block !important;
+  z-index:0 !important;
+  background:rgba(2,6,23,.76) !important;
+  pointer-events:auto !important;
+}
+#tutorial-overlay .tutorial-target-blocker {
+  z-index:1 !important;
+  background:transparent !important;
+}
+#tutorial-overlay .tutorial-spotlight {
+  z-index:2 !important;
+  pointer-events:none !important;
+  box-sizing:border-box !important;
+  background:linear-gradient(180deg,rgba(59,130,246,.08),rgba(168,85,247,.08)) !important;
+  box-shadow:0 0 0 2px rgba(125,211,252,.96),0 0 0 7px rgba(96,165,250,.20),0 0 30px rgba(96,165,250,.34) !important;
+}
+#tutorial-overlay .tutorial-card {
+  z-index:3 !important;
+  pointer-events:auto !important;
+}
+body.slc-tutorial-open .tutorial-target-active {
+  z-index:auto !important;
+  position:relative !important;
+  filter:none !important;
+  opacity:1 !important;
+  transform:none !important;
+  isolation:auto !important;
+}
+html.slc-tutorial-lock,
+body.slc-tutorial-open { overscroll-behavior:none !important; }
+@media(max-width:768px){
+  #tutorial-overlay .tutorial-card.tutorial-layout-bottom-nav { margin:0 !important; }
+  #tutorial-overlay .tutorial-card.tutorial-layout-drawer { max-height:calc(100vh - 24px) !important; }
 }

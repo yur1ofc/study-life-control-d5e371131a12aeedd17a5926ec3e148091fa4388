@@ -225,119 +225,204 @@
   }
 
   const SiteTutorial = {
-    index:0, running:false, pendingAutostart:false,
+    index:0,
+    running:false,
+    pendingAutostart:false,
+    _target:null,
+    _runToken:0,
+    _lastDevice:null,
+
     hasCompleted(){ return localStorage.getItem('slc_tutorial_completed_v2') === '1'; },
     markCompleted(){ localStorage.setItem('slc_tutorial_completed_v2','1'); localStorage.setItem('slc_tutorial_completed','1'); },
     reset(){ localStorage.removeItem('slc_tutorial_completed_v2'); localStorage.removeItem('slc_tutorial_completed'); },
+
     maybeStart(){
       const main=document.getElementById('main-dashboard');
       const visible=main && main.style.display!=='none' && !main.classList.contains('hidden');
       if(this.running||this.hasCompleted()||!window.app||!visible||document.getElementById('setup-screen')?.offsetParent)return;
       if(this.pendingAutostart)return;
       this.pendingAutostart=true;
-      setTimeout(()=>{this.pendingAutostart=false;if(!this.hasCompleted()&&!this.running)this.start();},700);
+      setTimeout(()=>{
+        this.pendingAutostart=false;
+        if(!this.hasCompleted()&&!this.running)this.start();
+      },700);
     },
+
     start(startIndex=0){
       assignTargets();
       const steps=currentSteps();
       this.index=Math.max(0,Math.min(startIndex,steps.length-1));
       this.running=true;
-      ensureOverlay().classList.add('open');
+      this._runToken++;
+      this._lastDevice=deviceKind();
+      const overlay=ensureOverlay();
+      overlay.classList.add('open');
       document.body.classList.add('slc-tutorial-open');
       this.bindControls();
-      this.showStep();
-      window.addEventListener('resize',this.handleViewportChange);
+      this._setInteractionLock(true);
+      this.showStep(this._runToken);
+      window.addEventListener('resize',this.handleViewportChange,{passive:true});
+      window.addEventListener('orientationchange',this.handleViewportChange,{passive:true});
     },
+
     stop(markDone=false){
+      this._runToken++;
       this.running=false;
-      ensureOverlay().classList.remove('open');
+      this._target=null;
+      const overlay=ensureOverlay();
+      overlay.classList.remove('open');
       document.body.classList.remove('slc-tutorial-open');
       document.querySelectorAll('.tutorial-target-active').forEach(n=>n.classList.remove('tutorial-target-active'));
       window.removeEventListener('resize',this.handleViewportChange);
+      window.removeEventListener('orientationchange',this.handleViewportChange);
+      this._setInteractionLock(false);
+      window.SLCProductShell?.closeMobileMore?.();
       window.SLCSidebar?.close?.();
       if(markDone)this.markCompleted();
     },
-    handleViewportChange(){ if(window.SiteTutorial?.running)window.SiteTutorial.positionCurrentStep(); },
+
+    _setInteractionLock(active){
+      const overlay=ensureOverlay();
+      overlay.setAttribute('aria-hidden',active?'false':'true');
+      if(active){
+        document.documentElement.classList.add('slc-tutorial-lock');
+      }else{
+        document.documentElement.classList.remove('slc-tutorial-lock');
+      }
+    },
+
+    handleViewportChange(){
+      if(!window.SiteTutorial?.running)return;
+      const nextDevice=deviceKind();
+      if(nextDevice!==window.SiteTutorial._lastDevice){
+        window.SiteTutorial._lastDevice=nextDevice;
+        window.SiteTutorial.showStep(window.SiteTutorial._runToken);
+        return;
+      }
+      requestAnimationFrame(()=>window.SiteTutorial.positionCurrentStep());
+    },
+
     bindControls(){
       const overlay=ensureOverlay();
-      el('tutorial-next').onclick=()=>this.next(); el('tutorial-prev').onclick=()=>this.prev(); el('tutorial-skip').onclick=()=>this.stop(true);
-      overlay.querySelector('.tutorial-backdrop').onclick=()=>this.stop(true);
+      el('tutorial-next').onclick=()=>this.next();
+      el('tutorial-prev').onclick=()=>this.prev();
+      el('tutorial-skip').onclick=()=>this.stop(true);
+      overlay.querySelector('.tutorial-backdrop').onclick=(e)=>{
+        if(e.target.closest('.tutorial-card'))return;
+        e.preventDefault();
+        e.stopPropagation();
+      };
       const blocker=overlay.querySelector('.tutorial-target-blocker');
       if(blocker) blocker.onclick=(e)=>{e.preventDefault();e.stopPropagation();};
     },
-    next(){ if(this.index>=currentSteps().length-1){this.stop(true);return;} this.index++; this.showStep(); },
-    prev(){ if(this.index>0){this.index--;this.showStep();} },
-    async getTarget(step){
-      for(let i=0;i<24;i++){
+
+    next(){
+      if(!this.running)return;
+      const steps=currentSteps();
+      if(this.index>=steps.length-1){this.stop(true);return;}
+      this.index++;
+      this.showStep(this._runToken);
+    },
+
+    prev(){
+      if(!this.running||this.index<=0)return;
+      this.index--;
+      this.showStep(this._runToken);
+    },
+
+    async getTarget(step, token=this._runToken){
+      for(let i=0;i<30;i++){
+        if(!this.running||token!==this._runToken)return null;
         assignTargets();
         const target=resolveTarget(step);
         if(target){
           const r=target.getBoundingClientRect();
-          if(r.width>0 && r.height>0) return target;
+          const visible=r.width>0&&r.height>0&&r.bottom>0&&r.right>0&&r.top<innerHeight&&r.left<innerWidth;
+          if(visible)return target;
         }
-        await wait(90);
+        await wait(80);
       }
       return null;
     },
 
-    async ensureView(step){
+    async _setDrawer(open){
+      const isMobile=deviceKind()==='mobile';
+      if(!isMobile)return;
+      const drawer=document.getElementById('slc-mobile-more');
+      const isOpen=!!drawer?.classList.contains('slc-mobile-more-open') || !!drawer?.querySelector('.slc-mobile-more-open');
+      if(open){
+        if(!isOpen)window.SLCProductShell?.openMobileMore?.();
+      }else if(isOpen){
+        window.SLCProductShell?.closeMobileMore?.();
+      }
+      await wait(120);
+    },
+
+    async _navigate(view){
+      if(!view||!window.app?.loadView)return;
+      try{ window.app.loadView(view); markNavActive(view); }catch(_){ }
+      await wait(140);
+      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    },
+
+    async ensureView(step, token=this._runToken){
       const viewByStep={
         home:'dashboard',study:'estudar',mentor:'mentor-ia',focus:'foco',
         learning:'mapa-aprendizado',organization:'tarefas',profile:'configuracoes',
         telegram:'telegram',help:'ajuda'
       };
+      const drawerSteps=['learning','organization','profile','help'];
+      const needsDrawer=deviceKind()==='mobile' && drawerSteps.includes(step.target);
       const view=viewByStep[step.target];
 
-      if(view && window.app?.loadView && !['notifications','more'].includes(step.target)){
-        try{ window.app.loadView(view); markNavActive(view); }catch(_){}
-      }
+      // Estado de navegação é parte do passo. Isso evita resíduos ao usar Voltar.
+      if(!needsDrawer) await this._setDrawer(false);
+      if(!this.running||token!==this._runToken)return;
 
-      if(deviceKind()==='mobile' && ['learning','organization','profile','help'].includes(step.target)){
-        window.SLCProductShell?.openMobileMore?.();
+      if(view && !['notifications','more'].includes(step.target)){
+        await this._navigate(view);
+      }else{
+        await wait(80);
       }
+      if(!this.running||token!==this._runToken)return;
 
-      await wait(220);
+      if(needsDrawer) await this._setDrawer(true);
+      if(!this.running||token!==this._runToken)return;
+
       assignTargets();
+      let target=resolveTarget(step);
 
-      if(deviceKind()==='mobile' && ['learning','organization','profile','help'].includes(step.target)){
+      // O drawer é uma área rolável. Primeiro tornamos o alvo visível; só então
+      // medimos o retângulo definitivo para o spotlight/card.
+      if(needsDrawer){
         const sheet=document.querySelector('#slc-mobile-more .slc-mobile-more-sheet');
-        const target=resolveTarget(step);
-        if(target && sheet){
-          // Posiciona o item em uma faixa previsível do drawer.
-          // Isso permite que cada balão escolha seu próprio espaço sem cobrir o alvo.
-          const desiredTop=step.target==='profile'||step.target==='help' ? 125 : 105;
-          const move=()=>{
-            const sr=sheet.getBoundingClientRect();
-            const tr=target.getBoundingClientRect();
-            const delta=tr.top-sr.top-desiredTop;
-            const max=Math.max(0,sheet.scrollHeight-sheet.clientHeight);
-            sheet.scrollTop=Math.max(0,Math.min(max,sheet.scrollTop+delta));
-          };
-          move();
+        if(sheet&&target){
+          const desiredTop=step.target==='profile'||step.target==='help'?118:92;
+          const sr=sheet.getBoundingClientRect();
+          const tr=target.getBoundingClientRect();
+          const delta=tr.top-sr.top-desiredTop;
+          const max=Math.max(0,sheet.scrollHeight-sheet.clientHeight);
+          sheet.scrollTop=Math.max(0,Math.min(max,sheet.scrollTop+delta));
           await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-          move();
-          await wait(80);
+          target=resolveTarget(step)||target;
         }
       }
 
-      if(deviceKind()!=='mobile'){
-        const target=resolveTarget(step);
-        if(target){
-          try{ target.scrollIntoView({block:'nearest',inline:'nearest',behavior:'auto'}); }catch(_){}
-          await wait(60);
-        }
+      if(!needsDrawer && deviceKind()!=='mobile' && target){
+        try{target.scrollIntoView({block:'nearest',inline:'nearest',behavior:'auto'});}catch(_){ }
+        await wait(40);
       }
     },
-
 
     updateSpotlight(target){
       const overlay=ensureOverlay(),s=overlay.querySelector('.tutorial-spotlight'),backdrop=overlay.querySelector('.tutorial-backdrop');
       if(!s||!target)return;
       const r=target.getBoundingClientRect();
-      const pad=deviceKind()==='mobile'?5:8;
+      const pad=deviceKind()==='mobile'?6:8;
       const left=Math.max(2,r.left-pad), top=Math.max(2,r.top-pad), right=Math.min(innerWidth-2,r.right+pad), bottom=Math.min(innerHeight-2,r.bottom+pad);
       s.style.top=`${top}px`;s.style.left=`${left}px`;
       s.style.width=`${Math.max(40,right-left)}px`;s.style.height=`${Math.max(30,bottom-top)}px`;
+      s.style.borderRadius=`${deviceKind()==='mobile'?18:14}px`;
 
       if(backdrop){
         const panels=[
@@ -367,27 +452,24 @@
       const step=currentStep()||{target:'home',id:'generic'};
       const layout=layoutFor(step);
       const margin=deviceKind()==='mobile'?12:16;
-
       card.style.left='';card.style.right='';card.style.top='';card.style.bottom='';
       card.style.width='';card.style.maxWidth='';
       arrow.style.left='';arrow.style.right='';arrow.style.top='';arrow.style.bottom='';
-      card.classList.remove('mobile','arrow-left','arrow-right','arrow-top','arrow-bottom',
-        'tutorial-layout-header','tutorial-layout-sidebar','tutorial-layout-bottom-nav','tutorial-layout-drawer');
+      card.classList.remove('mobile','arrow-left','arrow-right','arrow-top','arrow-bottom','tutorial-layout-header','tutorial-layout-sidebar','tutorial-layout-bottom-nav','tutorial-layout-drawer');
       card.classList.add(`tutorial-step-${step.id}`);
 
       if(deviceKind()==='mobile'){
         card.classList.add('mobile');
         const nav=document.getElementById('slc-product-bottom-nav');
         const navRect=nav?.getBoundingClientRect?.();
-        const navVisible=!!nav && getComputedStyle(nav).display!=='none';
+        const navVisible=!!nav&&getComputedStyle(nav).display!=='none';
         const navTop=navVisible&&navRect?navRect.top:vh;
         const width=vw-margin*2;
-        const h=card.offsetHeight||280;
+        const h=card.offsetHeight||260;
         const centerX=Math.max(22,Math.min(width-22,r.left+r.width/2-margin));
 
-        // Cada família de tela tem seu próprio espaço reservado.
         if(['home','study','mentor','focus','more'].includes(step.target)){
-          const top=Math.max(margin,navTop-h-10);
+          const top=Math.max(margin,navTop-h-14);
           card.classList.add('arrow-bottom','tutorial-layout-bottom-nav');
           card.style.left=`${margin}px`;card.style.right=`${margin}px`;card.style.top=`${top}px`;
           arrow.style.bottom='-10px';arrow.style.left=`${centerX}px`;
@@ -398,26 +480,20 @@
           const below=navTop-r.bottom-14;
           if(below>=h){
             card.classList.add('arrow-top');
-            card.style.left=`${margin}px`;card.style.right=`${margin}px`;
-            card.style.top=`${Math.min(navTop-h-8,r.bottom+14)}px`;
+            card.style.left=`${margin}px`;card.style.right=`${margin}px`;card.style.top=`${Math.min(navTop-h-8,r.bottom+14)}px`;
             arrow.style.top='-10px';
           }else{
             card.classList.add('arrow-bottom');
-            card.style.left=`${margin}px`;card.style.right=`${margin}px`;
-            card.style.top=`${Math.max(margin,r.top-h-14)}px`;
+            card.style.left=`${margin}px`;card.style.right=`${margin}px`;card.style.top=`${Math.max(margin,r.top-h-14)}px`;
             arrow.style.bottom='-10px';
           }
           arrow.style.left=`${centerX}px`;
           return;
         }
 
-        // Drawer: o alvo é deliberadamente mantido perto do topo. O balão
-        // fica em uma faixa separada, normalmente abaixo do alvo; se não
-        // couber, ele vai para o topo sem jamais atravessar o alvo.
         if(['learning','organization','profile','help'].includes(step.target)){
-          const targetBottom=r.bottom;
           const gap=12;
-          let top=targetBottom+gap;
+          let top=r.bottom+gap;
           if(top+h+margin>vh){
             top=Math.max(margin,r.top-h-gap);
             card.classList.add('arrow-bottom');
@@ -427,22 +503,17 @@
             arrow.style.top='-10px';
           }
           card.classList.add('tutorial-layout-drawer');
-          card.style.left=`${margin}px`;card.style.right=`${margin}px`;
-          card.style.top=`${Math.max(margin,top)}px`;
+          card.style.left=`${margin}px`;card.style.right=`${margin}px`;card.style.top=`${Math.max(margin,top)}px`;
           arrow.style.left=`${centerX}px`;
           return;
         }
 
-        // Fallback mobile.
-        card.style.left=`${margin}px`;card.style.right=`${margin}px`;
-        card.style.top=`${Math.max(margin,Math.min(navTop-h-margin,r.bottom+12))}px`;
+        card.style.left=`${margin}px`;card.style.right=`${margin}px`;card.style.top=`${Math.max(margin,Math.min(navTop-h-margin,r.bottom+12))}px`;
         card.classList.add('arrow-top');
         arrow.style.top='-10px';arrow.style.left=`${centerX}px`;
         return;
       }
 
-      // Desktop + iPad: cada passo usa a sidebar como eixo quando o alvo
-      // realmente está na navegação. O card nunca fica sobre o alvo.
       const w=Math.min(Number(layout.width)||380,vw-margin*2);
       const h=card.offsetHeight||230;
       card.style.width=`${w}px`;card.style.maxWidth=`${w}px`;
@@ -452,32 +523,24 @@
         const top=Math.min(vh-h-margin,r.bottom+16);
         card.classList.add('arrow-top','tutorial-layout-header');
         card.style.left=`${x}px`;card.style.top=`${top}px`;
-        arrow.style.top='-10px';
-        arrow.style.left=`${Math.max(24,Math.min(w-32,r.left+r.width/2-x-10))}px`;
+        arrow.style.top='-10px';arrow.style.left=`${Math.max(24,Math.min(w-32,r.left+r.width/2-x-10))}px`;
         return;
       }
 
-      const sidebar=target.closest?.('#sidebar-nav, .sidebar-nav, .sidebar') || document.querySelector('#sidebar-nav, .sidebar-nav, .sidebar');
+      const sidebar=target.closest?.('#sidebar-nav, .sidebar-nav, .sidebar')||document.querySelector('#sidebar-nav, .sidebar-nav, .sidebar');
       const sr=sidebar?.getBoundingClientRect?.();
-      if(sr && sr.width){
-        // Para a sidebar, o balão fica sempre à direita. Se não houver espaço,
-        // usa a esquerda; em nenhum caso ele cobre o item destacado.
+      if(sr&&sr.width){
         const gap=18;
         let left=sr.right+gap, arrowSide='left';
-        if(left+w>vw-margin){ left=Math.max(margin,sr.left-w-gap); arrowSide='right'; }
+        if(left+w>vw-margin){left=Math.max(margin,sr.left-w-gap);arrowSide='right';}
         const top=Math.max(margin,Math.min(vh-h-margin,r.top+r.height/2-h/2));
         card.style.left=`${left}px`;card.style.top=`${top}px`;
         card.classList.add(arrowSide==='left'?'arrow-left':'arrow-right','tutorial-layout-sidebar');
-        if(arrowSide==='left'){
-          arrow.style.left='-10px';
-        }else{
-          arrow.style.right='-10px';
-        }
         arrow.style.top=`${Math.max(24,Math.min(h-34,r.top+r.height/2-top-10))}px`;
+        if(arrowSide==='left')arrow.style.left='-10px';else arrow.style.right='-10px';
         return;
       }
 
-      // Fallback para elementos fora da sidebar.
       const right=vw-r.right,left=r.left,bottom=vh-r.bottom;
       if(right>=w+28){
         const top=Math.max(margin,Math.min(vh-h-margin,r.top+r.height/2-h/2));
@@ -492,35 +555,53 @@
         const top=r.bottom+h+16<=vh-margin?r.bottom+16:Math.max(margin,r.top-h-16);
         card.classList.add(top>r.top?'arrow-top':'arrow-bottom');
         card.style.left=`${x}px`;card.style.top=`${top}px`;
-        if(top>r.top){arrow.style.top='-10px';}else{arrow.style.bottom='-10px';}
+        if(top>r.top)arrow.style.top='-10px';else arrow.style.bottom='-10px';
         arrow.style.left=`${Math.max(24,Math.min(w-32,r.left+r.width/2-x-10))}px`;
       }
     },
 
-    positionCurrentStep(){const t=this._target;if(t&&document.body.contains(t)){this.updateSpotlight(t);this.positionCard(t);}},
-    async showStep(){
-      const steps=currentSteps();
-      const step=steps[this.index];if(!step)return;
-      // Nunca rola a página automaticamente. O tutorial usa alvos fixos da navegação.
-      window.scrollTo(0,0);
-      await this.ensureView(step);
-      document.querySelectorAll('.tutorial-target-active').forEach(n=>n.classList.remove('tutorial-target-active'));
-      const target=await this.getTarget(step);
-      if(!target){if(this.index<steps.length-1){this.index++;return this.showStep();}return;}
-      if(step.target==='more' && deviceKind()==='mobile'){
-        // O botão Mais deve continuar fechado enquanto o destaque é mostrado.
-        window.SLCProductShell?.closeMobileMore?.();
+    positionCurrentStep(){
+      const t=this._target;
+      if(t&&document.body.contains(t)){
+        this.updateSpotlight(t);
+        this.positionCard(t);
       }
+    },
+
+    async showStep(token=this._runToken){
+      const steps=currentSteps();
+      const step=steps[this.index];
+      if(!step||!this.running||token!==this._runToken)return;
+
+      await this.ensureView(step,token);
+      if(!this.running||token!==this._runToken)return;
+
+      document.querySelectorAll('.tutorial-target-active').forEach(n=>n.classList.remove('tutorial-target-active'));
+      const target=await this.getTarget(step,token);
+      if(!target)return;
+
+      // O alvo é somente uma referência visual. Ele nunca recebe z-index para
+      // furar o overlay; o recorte do tutorial é que cria a janela.
       target.classList.add('tutorial-target-active');
       this._target=target;
+      this._lastDevice=deviceKind();
+
       const device=deviceKind();
       el('tutorial-title').textContent=step.title;
       el('tutorial-text').textContent=step.text;
       el('tutorial-progress-text').textContent=`Passo ${this.index+1} de ${steps.length}`;
       el('tutorial-device-note').textContent=device==='mobile'?'Celular':'Computador';
       el('tutorial-next').textContent=this.index===steps.length-1?'Finalizar':'Próximo';
-      await wait(80);this.updateSpotlight(target);this.positionCard(target);
-      await wait(120);this.updateSpotlight(target);this.positionCard(target);
+      el('tutorial-prev').disabled=this.index===0;
+
+      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      if(!this.running||token!==this._runToken)return;
+      this.updateSpotlight(target);
+      this.positionCard(target);
+      await wait(60);
+      if(!this.running||token!==this._runToken)return;
+      this.updateSpotlight(target);
+      this.positionCard(target);
     }
   };
 
