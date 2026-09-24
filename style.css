@@ -6753,3 +6753,86 @@ body.slc-tutorial-open { overscroll-behavior:none !important; }
   #tutorial-overlay .tutorial-card.tutorial-layout-bottom-nav { margin:0 !important; }
   #tutorial-overlay .tutorial-card.tutorial-layout-drawer { max-height:calc(100vh - 24px) !important; }
 }
+
+
+/* ================================================================
+   SLCampus Tutorial V50 — correção definitiva do balão mobile
+   O CSS legado do tutorial definia bottom:12/16px. O posicionador
+   calcula top dinamicamente. Em position:fixed, manter top + bottom
+   simultaneamente faz height:auto preencher todo o espaço restante.
+   Resultado: passos 5–10 viravam cartões gigantes.
+================================================================ */
+#tutorial-overlay .tutorial-card {
+  box-sizing: border-box !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: min(520px, calc(100dvh - 24px)) !important;
+  overflow: visible !important;
+  bottom: auto !important;
+}
+
+@media (max-width: 768px) {
+  #tutorial-overlay .tutorial-card {
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: none;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: min(390px, calc(100dvh - 24px)) !important;
+    bottom: auto !important;
+    padding: 14px 14px 13px !important;
+  }
+
+  #tutorial-overlay .tutorial-card p {
+    font-size: .92rem;
+    line-height: 1.45;
+  }
+
+  #tutorial-overlay .tutorial-actions {
+    margin-top: 14px;
+    gap: 8px;
+  }
+
+  #tutorial-overlay .tutorial-actions .btn-secondary,
+  #tutorial-overlay .tutorial-actions .btn-primary {
+    min-height: 46px;
+  }
+
+  /* Se um texto excepcionalmente longo ultrapassar a área segura,
+     rola somente o conteúdo do balão — nunca a página inteira. */
+  #tutorial-overlay .tutorial-card {
+    display: block !important;
+  }
+
+  #tutorial-overlay .tutorial-card p {
+    max-height: 150px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+
+  /* As etapas que ficam acima da barra inferior nunca invadem a área
+     reservada da navegação. */
+  #tutorial-overlay .tutorial-layout-bottom-nav {
+    margin-bottom: 0 !important;
+  }
+}
+
+/* Em telas muito pequenas, compacta somente o conteúdo textual. */
+@media (max-width: 380px) {
+  #tutorial-overlay .tutorial-card {
+    padding: 12px !important;
+    max-height: min(360px, calc(100dvh - 20px)) !important;
+  }
+
+  #tutorial-overlay .tutorial-card h3 {
+    font-size: 1.04rem;
+  }
+
+  #tutorial-overlay .tutorial-card p {
+    font-size: .88rem;
+    line-height: 1.4;
+    max-height: 132px;
+  }
+}

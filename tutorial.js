@@ -452,8 +452,20 @@
       const step=currentStep()||{target:'home',id:'generic'};
       const layout=layoutFor(step);
       const margin=deviceKind()==='mobile'?12:16;
-      card.style.left='';card.style.right='';card.style.top='';card.style.bottom='';
-      card.style.width='';card.style.maxWidth='';
+
+      // IMPORTANTE: o CSS legado do mobile define `bottom: 12/16px`.
+      // Se colocarmos `top` via JS sem zerar `bottom`, um elemento fixed com
+      // height:auto fica esticado entre top e bottom. Era isso que fazia os
+      // passos 5–10 ocuparem quase a tela inteira.
+      card.style.left='';
+      card.style.right='';
+      card.style.top='';
+      card.style.bottom='auto';
+      card.style.width='';
+      card.style.maxWidth='';
+      card.style.height='auto';
+      card.style.minHeight='0';
+      card.style.maxHeight='';
       arrow.style.left='';arrow.style.right='';arrow.style.top='';arrow.style.bottom='';
       card.classList.remove('mobile','arrow-left','arrow-right','arrow-top','arrow-bottom','tutorial-layout-header','tutorial-layout-sidebar','tutorial-layout-bottom-nav','tutorial-layout-drawer');
       card.classList.add(`tutorial-step-${step.id}`);
@@ -465,7 +477,16 @@
         const navVisible=!!nav&&getComputedStyle(nav).display!=='none';
         const navTop=navVisible&&navRect?navRect.top:vh;
         const width=vw-margin*2;
-        const h=card.offsetHeight||260;
+
+        // Mede o balão já com a largura real do celular e sem `bottom`
+        // herdado do CSS. Isso torna o cálculo de posição determinístico.
+        card.style.left=`${margin}px`;
+        card.style.right=`${margin}px`;
+        card.style.width=`${width}px`;
+        card.style.maxWidth=`${width}px`;
+        card.style.bottom='auto';
+        card.style.height='auto';
+        const h=Math.max(1,card.offsetHeight||260);
         const centerX=Math.max(22,Math.min(width-22,r.left+r.width/2-margin));
 
         if(['home','study','mentor','focus','more'].includes(step.target)){
@@ -515,8 +536,11 @@
       }
 
       const w=Math.min(Number(layout.width)||380,vw-margin*2);
-      const h=card.offsetHeight||230;
-      card.style.width=`${w}px`;card.style.maxWidth=`${w}px`;
+      card.style.width=`${w}px`;
+      card.style.maxWidth=`${w}px`;
+      card.style.bottom='auto';
+      card.style.height='auto';
+      const h=Math.max(1,card.offsetHeight||230);
 
       if(step.target==='notifications'){
         const x=Math.max(margin,Math.min(vw-w-margin,r.left+r.width/2-w/2));
