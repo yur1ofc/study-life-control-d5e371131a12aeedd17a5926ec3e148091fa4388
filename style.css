@@ -6640,3 +6640,59 @@ body.slc-tutorial-open .tutorial-card button {
   .tutorial-card.tutorial-step-profile{min-height:0;}
   .tutorial-card.tutorial-step-help{min-height:0;}
 }
+
+/* SLCampus Tutorial V48 — spotlight acima de qualquer navegação.
+   O alvo não precisa mais subir no z-index: o overlay cria uma janela
+   transparente exatamente sobre o alvo. Isso evita que a barra inferior
+   ou o drawer cubram o destaque no celular e no iPad. */
+#tutorial-overlay {
+  z-index: 2147483647 !important;
+  isolation: isolate !important;
+}
+#tutorial-overlay .tutorial-backdrop {
+  z-index: 0 !important;
+  background: transparent !important;
+  opacity: 1 !important;
+  pointer-events: none !important;
+}
+#tutorial-overlay .tutorial-backdrop > i {
+  position: fixed !important;
+  display: block !important;
+  background: rgba(2,6,23,.74) !important;
+  pointer-events: auto !important;
+  z-index: 0 !important;
+}
+#tutorial-overlay .tutorial-target-blocker {
+  background: transparent !important;
+  pointer-events: auto !important;
+  z-index: 1 !important;
+}
+#tutorial-overlay .tutorial-spotlight {
+  z-index: 2 !important;
+  pointer-events: none !important;
+  background: linear-gradient(180deg,rgba(59,130,246,.10),rgba(168,85,247,.10)) !important;
+  box-shadow: 0 0 0 2px rgba(125,211,252,.95), 0 0 0 7px rgba(96,165,250,.20), 0 0 28px rgba(96,165,250,.38) !important;
+}
+#tutorial-overlay .tutorial-card {
+  z-index: 3 !important;
+}
+body.slc-tutorial-open .tutorial-target-active {
+  z-index: auto !important;
+  filter: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+/* Cada grupo de passos ganha uma área visual própria. */
+@media (max-width:768px){
+  body.slc-tutorial-open #slc-product-bottom-nav,
+  body.slc-tutorial-open #slc-mobile-more,
+  body.slc-tutorial-open #slc-mobile-more .slc-mobile-more-sheet {
+    /* O overlay V48 fica acima deles; não alteramos o layout nem a posição. */
+    transform-origin: center;
+  }
+  .tutorial-card.tutorial-step-profile,
+  .tutorial-card.tutorial-step-help {
+    min-height: 0 !important;
+  }
+}

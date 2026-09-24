@@ -105,23 +105,69 @@
       : {mode:'sidebar',width:380,arrow:'left',offset:18});
   }
 
+  function findVisibleNavItem(label) {
+    const wanted = String(label || '').trim().toLocaleLowerCase('pt-BR');
+    const nodes = [...document.querySelectorAll('#sidebar-nav .nav-item, .sidebar .nav-item, [data-view]')];
+    return nodes.find(node => {
+      const r = node.getBoundingClientRect();
+      if (!r.width || !r.height) return false;
+      if (node.closest('#slc-mobile-more') && deviceKind() !== 'mobile') return false;
+      const text = (node.innerText || node.textContent || '').replace(/\s+/g,' ').trim().toLocaleLowerCase('pt-BR');
+      return text === wanted || text.includes(wanted);
+    }) || null;
+  }
+
   function targetFor(kind) {
     const mobile = deviceKind() === 'mobile';
-    const tablet = deviceKind() === 'tablet';
     const selectors = {
       home: mobile ? '#slc-product-bottom-nav [data-v="dashboard"]' : '[data-view="dashboard"]',
       study: mobile ? '#slc-product-bottom-nav [data-v="estudar"]' : '[data-view="estudar"]',
       mentor: mobile ? '#slc-product-bottom-nav [data-v="mentor-ia"]' : '[data-view="mentor-ia"]',
       focus: mobile ? '#slc-product-bottom-nav [data-v="foco"]' : '[data-view="foco"]',
-      notifications: '[data-tutorial="notification-button"], #notification-badge',
-      more: mobile ? '#slc-product-bottom-nav [data-v="__more"]' : (tablet ? '#mobile-nav-toggle, .mobile-nav-toggle' : '[data-view="ajuda"]'),
+      notifications: '[data-tutorial="notification-button"], #notification-badge, #notification-button',
+      more: mobile ? '#slc-product-bottom-nav [data-v="__more"]' : null,
       learning: mobile ? '#slc-mobile-more [data-mobile-more-view="mapa-aprendizado"]' : '[data-view="mapa-aprendizado"]',
       organization: mobile ? '#slc-mobile-more [data-mobile-more-view="tarefas"]' : '[data-view="tarefas"]',
-      profile: mobile ? '#slc-mobile-more [data-mobile-more-view="configuracoes"], #slc-mobile-more [data-mobile-more-view="perfil"]' : '[data-view="configuracoes"], [data-slcnavigate="configuracoes"]',
+      profile: mobile ? '#slc-mobile-more [data-mobile-more-view="perfil"], #slc-mobile-more [data-mobile-more-view="configuracoes"]' : '[data-view="configuracoes"], [data-slcnavigate="configuracoes"]',
       help: mobile ? '#slc-mobile-more [data-mobile-more-view="ajuda"]' : '[data-view="ajuda"]',
       telegram: mobile ? '#slc-mobile-more [data-mobile-more-view="telegram"]' : '[data-view="telegram"]'
     };
     return selectors[kind] || selectors.home;
+  }
+
+  function resolveTarget(step) {
+    const mobile = deviceKind() === 'mobile';
+    const direct = targetFor(step.target);
+    if (direct) {
+      const node = document.querySelector(direct);
+      if (node) {
+        const r=node.getBoundingClientRect();
+        if(r.width>0 && r.height>0) return node;
+      }
+    }
+    if (mobile) {
+      const byText = {
+        learning:'Mapa de aprendizado',
+        organization:'Tarefas',
+        profile:'Perfil',
+        help:'Ajuda',
+        telegram:'Telegram'
+      };
+      return findVisibleNavItem(byText[step.target]);
+    }
+    const byText = {
+      home:'Início',
+      study:'Estudar',
+      mentor:'Mentor IA',
+      focus:'Modo Foco',
+      organization:'Tarefas',
+      learning:'Mapa de aprendizado',
+      profile:'Configurações',
+      telegram:'Telegram',
+      help:'Ajuda'
+    };
+    return findVisibleNavItem(byText[step.target]) ||
+      (step.target === 'notifications' ? document.querySelector('[data-tutorial="notification-button"], #notification-badge, #notification-button') : null);
   }
 
   function assignTargets() {
@@ -222,78 +268,77 @@
     next(){ if(this.index>=currentSteps().length-1){this.stop(true);return;} this.index++; this.showStep(); },
     prev(){ if(this.index>0){this.index--;this.showStep();} },
     async getTarget(step){
-      const selector=targetFor(step.target);
-      for(let i=0;i<16;i++){
+      for(let i=0;i<24;i++){
         assignTargets();
-        const target=document.querySelector(selector);
-        if(target && target.getBoundingClientRect().width>0 && target.getBoundingClientRect().height>0){
-          if(deviceKind()!=='mobile' && target.closest?.('.sidebar-nav')){
-            try{ target.scrollIntoView({block:'nearest',inline:'nearest',behavior:'auto'}); }catch(_){ }
-          }
-          return target;
+        const target=resolveTarget(step);
+        if(target){
+          const r=target.getBoundingClientRect();
+          if(r.width>0 && r.height>0) return target;
         }
-        await wait(100);
+        await wait(90);
       }
       return null;
     },
+
     async ensureView(step){
-      const viewByStep={home:'dashboard',study:'estudar',mentor:'mentor-ia',focus:'foco',learning:'mapa-aprendizado',organization:'tarefas',profile:'perfil',telegram:'telegram',help:'ajuda'};
+      const viewByStep={
+        home:'dashboard',study:'estudar',mentor:'mentor-ia',focus:'foco',
+        learning:'mapa-aprendizado',organization:'tarefas',profile:'configuracoes',
+        telegram:'telegram',help:'ajuda'
+      };
       const view=viewByStep[step.target];
-      if(view && window.app?.loadView && !['home','notifications','more'].includes(step.target)){
-        try{window.app.loadView(view);markNavActive(view);}catch(_){ }
+
+      if(view && window.app?.loadView && !['notifications','more'].includes(step.target)){
+        try{ window.app.loadView(view); markNavActive(view); }catch(_){}
       }
 
       if(deviceKind()==='mobile' && ['learning','organization','profile','help'].includes(step.target)){
         window.SLCProductShell?.openMobileMore?.();
       }
 
-      await wait(260);
+      await wait(220);
       assignTargets();
 
-      // No drawer mobile, o alvo fica deliberadamente no alto. O balão é
-      // colocado logo abaixo dele, evitando que os últimos botões do drawer
-      // fiquem atrás do próprio tutorial.
       if(deviceKind()==='mobile' && ['learning','organization','profile','help'].includes(step.target)){
-        const selector=targetFor(step.target);
         const sheet=document.querySelector('#slc-mobile-more .slc-mobile-more-sheet');
-        const target=document.querySelector(selector);
+        const target=resolveTarget(step);
         if(target && sheet){
-          const desiredTop=layoutFor(step).targetTop || 110;
+          // Posiciona o item em uma faixa previsível do drawer.
+          // Isso permite que cada balão escolha seu próprio espaço sem cobrir o alvo.
+          const desiredTop=step.target==='profile'||step.target==='help' ? 125 : 105;
           const move=()=>{
             const sr=sheet.getBoundingClientRect();
             const tr=target.getBoundingClientRect();
             const delta=tr.top-sr.top-desiredTop;
-            sheet.scrollTop=Math.max(0,Math.min(sheet.scrollHeight-sheet.clientHeight,sheet.scrollTop+delta));
+            const max=Math.max(0,sheet.scrollHeight-sheet.clientHeight);
+            sheet.scrollTop=Math.max(0,Math.min(max,sheet.scrollTop+delta));
           };
           move();
           await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
           move();
-          await wait(60);
+          await wait(80);
         }
       }
 
-      // No desktop/iPad, a sidebar é o eixo do tutorial. O item é levado para
-      // uma zona confortável da navegação antes de medir o balão.
       if(deviceKind()!=='mobile'){
-        const target=document.querySelector(targetFor(step.target));
-        const nav=target?.closest?.('.sidebar-nav') || document.querySelector('.sidebar-nav');
-        if(target && nav){
-          const nr=nav.getBoundingClientRect();
-          const tr=target.getBoundingClientRect();
-          const desired=nr.top + Math.max(20,(nr.height-target.offsetHeight)/2);
-          nav.scrollTop += tr.top-desired;
-          await wait(50);
+        const target=resolveTarget(step);
+        if(target){
+          try{ target.scrollIntoView({block:'nearest',inline:'nearest',behavior:'auto'}); }catch(_){}
+          await wait(60);
         }
       }
     },
 
+
     updateSpotlight(target){
       const overlay=ensureOverlay(),s=overlay.querySelector('.tutorial-spotlight'),backdrop=overlay.querySelector('.tutorial-backdrop');
       if(!s||!target)return;
-      const r=target.getBoundingClientRect(); const pad=deviceKind()==='mobile'?6:10;
-      const left=Math.max(4,r.left-pad), top=Math.max(4,r.top-pad), right=Math.min(innerWidth-4,r.right+pad), bottom=Math.min(innerHeight-4,r.bottom+pad);
-      s.style.top=`${top}px`;s.style.left=`${left}px`;s.style.width=`${Math.max(56,right-left)}px`;s.style.height=`${Math.max(32,bottom-top)}px`;
-      // Quatro painéis escurecem tudo ao redor e deixam o alvo totalmente limpo.
+      const r=target.getBoundingClientRect();
+      const pad=deviceKind()==='mobile'?5:8;
+      const left=Math.max(2,r.left-pad), top=Math.max(2,r.top-pad), right=Math.min(innerWidth-2,r.right+pad), bottom=Math.min(innerHeight-2,r.bottom+pad);
+      s.style.top=`${top}px`;s.style.left=`${left}px`;
+      s.style.width=`${Math.max(40,right-left)}px`;s.style.height=`${Math.max(30,bottom-top)}px`;
+
       if(backdrop){
         const panels=[
           ['top',0,0,innerWidth,top],
@@ -302,123 +347,153 @@
           ['bottom',0,bottom,innerWidth,Math.max(0,innerHeight-bottom)]
         ];
         panels.forEach(([name,x,y,w,h])=>{
-          const el=backdrop.querySelector(`.tutorial-backdrop-${name}`);
-          if(!el)return;
-          el.style.left=`${x}px`;el.style.top=`${y}px`;el.style.width=`${w}px`;el.style.height=`${h}px`;
+          const panel=backdrop.querySelector(`.tutorial-backdrop-${name}`);
+          if(!panel)return;
+          panel.style.left=`${x}px`;panel.style.top=`${y}px`;
+          panel.style.width=`${Math.max(0,w)}px`;panel.style.height=`${Math.max(0,h)}px`;
         });
         const blocker=backdrop.querySelector('.tutorial-target-blocker');
         if(blocker){
-          blocker.style.left=`${left}px`;blocker.style.top=`${top}px`;blocker.style.width=`${Math.max(0,right-left)}px`;blocker.style.height=`${Math.max(0,bottom-top)}px`;
+          blocker.style.left=`${left}px`;blocker.style.top=`${top}px`;
+          blocker.style.width=`${Math.max(0,right-left)}px`;blocker.style.height=`${Math.max(0,bottom-top)}px`;
         }
       }
     },
+
     positionCard(target){
       const card=el('tutorial-card'),arrow=el('tutorial-card-arrow');
       if(!card||!arrow||!target)return;
       const r=target.getBoundingClientRect(),vw=innerWidth,vh=innerHeight;
-      const layout=layoutFor(currentStep()||{target:'home'});
+      const step=currentStep()||{target:'home',id:'generic'};
+      const layout=layoutFor(step);
       const margin=deviceKind()==='mobile'?12:16;
+
       card.style.left='';card.style.right='';card.style.top='';card.style.bottom='';
+      card.style.width='';card.style.maxWidth='';
       arrow.style.left='';arrow.style.right='';arrow.style.top='';arrow.style.bottom='';
-      card.classList.remove('mobile','arrow-left','arrow-right','arrow-top','arrow-bottom','tutorial-layout-header','tutorial-layout-sidebar','tutorial-layout-bottom-nav','tutorial-layout-drawer');
-      card.classList.add(`tutorial-step-${currentStep()?.id||'generic'}`);
+      card.classList.remove('mobile','arrow-left','arrow-right','arrow-top','arrow-bottom',
+        'tutorial-layout-header','tutorial-layout-sidebar','tutorial-layout-bottom-nav','tutorial-layout-drawer');
+      card.classList.add(`tutorial-step-${step.id}`);
 
       if(deviceKind()==='mobile'){
         card.classList.add('mobile');
         const nav=document.getElementById('slc-product-bottom-nav');
         const navRect=nav?.getBoundingClientRect?.();
-        const navVisible=!!nav && getComputedStyle(nav).display!=='none' && !nav.classList.contains('slc-more-hidden');
-        const navTop=navVisible && navRect ? navRect.top : vh;
+        const navVisible=!!nav && getComputedStyle(nav).display!=='none';
+        const navTop=navVisible&&navRect?navRect.top:vh;
         const width=vw-margin*2;
-        const h=card.offsetHeight||290;
-        const centerX=Math.max(24,Math.min(width-30,r.left+r.width/2-margin-10));
+        const h=card.offsetHeight||280;
+        const centerX=Math.max(22,Math.min(width-22,r.left+r.width/2-margin));
 
-        if(layout.mode==='bottom-nav'){
-          // Espaço reservado para a barra inferior: o balão nunca invade os
-          // cinco botões. A seta aponta para cima/baixo conforme a relação.
-          const bottomGap=12;
-          const top=Math.max(margin,navTop-h-bottomGap);
+        // Cada família de tela tem seu próprio espaço reservado.
+        if(['home','study','mentor','focus','more'].includes(step.target)){
+          const top=Math.max(margin,navTop-h-10);
           card.classList.add('arrow-bottom','tutorial-layout-bottom-nav');
-          card.style.left=`${margin}px`;card.style.right=`${margin}px`;
-          card.style.top=`${top}px`;card.style.bottom='auto';
-          arrow.style.bottom='-10px';arrow.style.top='';
-          arrow.style.left=`${Math.max(24,Math.min(width-30,centerX))}px`;
+          card.style.left=`${margin}px`;card.style.right=`${margin}px`;card.style.top=`${top}px`;
+          arrow.style.bottom='-10px';arrow.style.left=`${centerX}px`;
           return;
         }
 
-        if(layout.mode==='drawer'){
-          // O alvo do drawer foi levado para o topo em ensureView(). O balão
-          // começa logo depois dele, portanto não cobre o botão destacado.
-          const top=Math.min(vh-h-margin,Math.max(margin,r.bottom+14));
-          card.classList.add('arrow-top','tutorial-layout-drawer');
-          card.style.left=`${margin}px`;card.style.right=`${margin}px`;
-          card.style.top=`${top}px`;card.style.bottom='auto';
-          arrow.style.top='-10px';arrow.style.bottom='';
-          arrow.style.left=`${Math.max(24,Math.min(width-30,centerX))}px`;
+        if(step.target==='notifications'){
+          const below=navTop-r.bottom-14;
+          if(below>=h){
+            card.classList.add('arrow-top');
+            card.style.left=`${margin}px`;card.style.right=`${margin}px`;
+            card.style.top=`${Math.min(navTop-h-8,r.bottom+14)}px`;
+            arrow.style.top='-10px';
+          }else{
+            card.classList.add('arrow-bottom');
+            card.style.left=`${margin}px`;card.style.right=`${margin}px`;
+            card.style.top=`${Math.max(margin,r.top-h-14)}px`;
+            arrow.style.bottom='-10px';
+          }
+          arrow.style.left=`${centerX}px`;
           return;
         }
 
-        // Notificações e outros alvos que não pertencem ao drawer/barra usam
-        // uma posição calculada, mas com a mesma área segura.
-        const bottomSafe=navVisible?navTop:vh;
-        const below=bottomSafe-r.bottom-14;
-        const above=r.top-margin-14;
+        // Drawer: o alvo é deliberadamente mantido perto do topo. O balão
+        // fica em uma faixa separada, normalmente abaixo do alvo; se não
+        // couber, ele vai para o topo sem jamais atravessar o alvo.
+        if(['learning','organization','profile','help'].includes(step.target)){
+          const targetBottom=r.bottom;
+          const gap=12;
+          let top=targetBottom+gap;
+          if(top+h+margin>vh){
+            top=Math.max(margin,r.top-h-gap);
+            card.classList.add('arrow-bottom');
+            arrow.style.bottom='-10px';
+          }else{
+            card.classList.add('arrow-top');
+            arrow.style.top='-10px';
+          }
+          card.classList.add('tutorial-layout-drawer');
+          card.style.left=`${margin}px`;card.style.right=`${margin}px`;
+          card.style.top=`${Math.max(margin,top)}px`;
+          arrow.style.left=`${centerX}px`;
+          return;
+        }
+
+        // Fallback mobile.
         card.style.left=`${margin}px`;card.style.right=`${margin}px`;
-        if(below>=h){
-          card.classList.add('arrow-top');
-          card.style.top=`${Math.min(bottomSafe-h-8,r.bottom+14)}px`;
-          arrow.style.top='-10px';
-        }else{
-          card.classList.add('arrow-bottom');
-          card.style.top=`${Math.max(margin,r.top-h-14)}px`;
-          arrow.style.bottom='-10px';
-        }
-        arrow.style.left=`${Math.max(24,Math.min(width-30,centerX))}px`;
+        card.style.top=`${Math.max(margin,Math.min(navTop-h-margin,r.bottom+12))}px`;
+        card.classList.add('arrow-top');
+        arrow.style.top='-10px';arrow.style.left=`${centerX}px`;
         return;
       }
 
-      const w=Math.min(Number(layout.width)||380,vw-margin*2),h=card.offsetHeight||230;
-      const sidebar=target.closest?.('.sidebar') || document.querySelector('.sidebar');
+      // Desktop + iPad: cada passo usa a sidebar como eixo quando o alvo
+      // realmente está na navegação. O card nunca fica sobre o alvo.
+      const w=Math.min(Number(layout.width)||380,vw-margin*2);
+      const h=card.offsetHeight||230;
+      card.style.width=`${w}px`;card.style.maxWidth=`${w}px`;
 
-      if(layout.mode==='sidebar' && sidebar){
-        const sr=sidebar.getBoundingClientRect();
-        const x=Math.min(vw-w-margin,Math.max(sr.right+(layout.offset||18),margin));
-        const top=Math.max(margin,Math.min(vh-h-margin,r.top+r.height/2-h/2));
-        card.classList.add('arrow-left','tutorial-layout-sidebar');
-        card.style.width=`${w}px`;card.style.maxWidth=`${w}px`;
-        card.style.left=`${x}px`;card.style.top=`${top}px`;
-        arrow.style.left='-10px';arrow.style.right='';
-        arrow.style.top=`${Math.max(24,Math.min(h-32,r.top+r.height/2-top-10))}px`;arrow.style.bottom='';
-        return;
-      }
-
-      if(layout.mode==='header'){
+      if(step.target==='notifications'){
         const x=Math.max(margin,Math.min(vw-w-margin,r.left+r.width/2-w/2));
-        const top=Math.min(vh-h-margin,r.bottom+(layout.offset||16));
+        const top=Math.min(vh-h-margin,r.bottom+16);
         card.classList.add('arrow-top','tutorial-layout-header');
-        card.style.width=`${w}px`;card.style.maxWidth=`${w}px`;
         card.style.left=`${x}px`;card.style.top=`${top}px`;
-        arrow.style.top='-10px';arrow.style.left=`${Math.max(24,Math.min(w-32,r.left+r.width/2-x-10))}px`;
+        arrow.style.top='-10px';
+        arrow.style.left=`${Math.max(24,Math.min(w-32,r.left+r.width/2-x-10))}px`;
         return;
       }
 
-      // Fallback desktop.
+      const sidebar=target.closest?.('#sidebar-nav, .sidebar-nav, .sidebar') || document.querySelector('#sidebar-nav, .sidebar-nav, .sidebar');
+      const sr=sidebar?.getBoundingClientRect?.();
+      if(sr && sr.width){
+        // Para a sidebar, o balão fica sempre à direita. Se não houver espaço,
+        // usa a esquerda; em nenhum caso ele cobre o item destacado.
+        const gap=18;
+        let left=sr.right+gap, arrowSide='left';
+        if(left+w>vw-margin){ left=Math.max(margin,sr.left-w-gap); arrowSide='right'; }
+        const top=Math.max(margin,Math.min(vh-h-margin,r.top+r.height/2-h/2));
+        card.style.left=`${left}px`;card.style.top=`${top}px`;
+        card.classList.add(arrowSide==='left'?'arrow-left':'arrow-right','tutorial-layout-sidebar');
+        if(arrowSide==='left'){
+          arrow.style.left='-10px';
+        }else{
+          arrow.style.right='-10px';
+        }
+        arrow.style.top=`${Math.max(24,Math.min(h-34,r.top+r.height/2-top-10))}px`;
+        return;
+      }
+
+      // Fallback para elementos fora da sidebar.
       const right=vw-r.right,left=r.left,bottom=vh-r.bottom;
       if(right>=w+28){
         const top=Math.max(margin,Math.min(vh-h-margin,r.top+r.height/2-h/2));
-        card.classList.add('arrow-left');card.style.width=`${w}px`;card.style.maxWidth=`${w}px`;
-        card.style.left=`${Math.min(vw-w-margin,r.right+18)}px`;card.style.top=`${top}px`;
-        arrow.style.left='-10px';arrow.style.top=`${Math.max(24,Math.min(h-32,r.top+r.height/2-top-10))}px`;
+        card.classList.add('arrow-left');card.style.left=`${Math.min(vw-w-margin,r.right+18)}px`;card.style.top=`${top}px`;
+        arrow.style.left='-10px';arrow.style.top=`${Math.max(24,Math.min(h-34,r.top+r.height/2-top-10))}px`;
       }else if(left>=w+28){
         const top=Math.max(margin,Math.min(vh-h-margin,r.top+r.height/2-h/2));
-        card.classList.add('arrow-right');card.style.width=`${w}px`;card.style.maxWidth=`${w}px`;
-        card.style.left=`${Math.max(margin,r.left-w-18)}px`;card.style.top=`${top}px`;
-        arrow.style.right='-10px';arrow.style.top=`${Math.max(24,Math.min(h-32,r.top+r.height/2-top-10))}px`;
+        card.classList.add('arrow-right');card.style.left=`${Math.max(margin,r.left-w-18)}px`;card.style.top=`${top}px`;
+        arrow.style.right='-10px';arrow.style.top=`${Math.max(24,Math.min(h-34,r.top+r.height/2-top-10))}px`;
       }else{
         const x=Math.max(margin,Math.min(vw-w-margin,r.left+r.width/2-w/2));
-        card.classList.add('arrow-bottom');card.style.width=`${w}px`;card.style.maxWidth=`${w}px`;
-        card.style.left=`${x}px`;card.style.top=`${Math.max(margin,r.top-h-16)}px`;
-        arrow.style.bottom='-10px';arrow.style.left=`${Math.max(24,Math.min(w-32,r.left+r.width/2-x-10))}px`;
+        const top=r.bottom+h+16<=vh-margin?r.bottom+16:Math.max(margin,r.top-h-16);
+        card.classList.add(top>r.top?'arrow-top':'arrow-bottom');
+        card.style.left=`${x}px`;card.style.top=`${top}px`;
+        if(top>r.top){arrow.style.top='-10px';}else{arrow.style.bottom='-10px';}
+        arrow.style.left=`${Math.max(24,Math.min(w-32,r.left+r.width/2-x-10))}px`;
       }
     },
 
