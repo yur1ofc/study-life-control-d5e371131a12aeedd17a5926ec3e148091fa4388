@@ -184,7 +184,8 @@ function subjectReport(data, subject, history) {
 function analyze(data) {
   const current = Core.current(data);
   const subjects = current.subjects || [];
-  const history = historyRecords(data);
+  const perfil = String(data?.user?.perfil || 'faculdade');
+  const history = ['faculdade','ensino_medio'].includes(perfil) ? historyRecords(data) : [];
   const reports = subjects.map(s => subjectReport(data, s, history));
   const priorities = reports.slice().sort((a,b) => b.priorityScore - a.priorityScore);
   const currentGrades = reports.map(r => r.grades.currentAverage).filter(Number.isFinite);
@@ -198,7 +199,7 @@ function analyze(data) {
   if (!current.classDiaries.length) gaps.push('diário');
   if (!current.reviews.length) gaps.push('revisões');
   return {
-    generatedAt: new Date().toISOString(), today: todayBR(), subjectCount: subjects.length,
+    generatedAt: new Date().toISOString(), today: todayBR(), profile: perfil, subjectCount: subjects.length,
     priorities: priorities.slice(0, 8), subjects: reports,
     overall: { currentAverage: currentGrades.length ? currentGrades.reduce((a,b)=>a+b,0)/currentGrades.length : null, studyMinutes: totalStudy, historicalFailures: history.filter(x=>failedStatus(x.status)||(x.grade!==null&&x.grade<5)).length, repeatedSubjects: reports.filter(r=>r.history.length>0).length },
     dataQuality, dataGaps: gaps,

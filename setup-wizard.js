@@ -606,7 +606,7 @@ Regras:
     { valor: 'faculdade',    icon: '🎓', title: 'Faculdade / Universidade', desc: 'Curso superior, com grade curricular e semestres.' },
     { valor: 'concurso',     icon: '📋', title: 'Concurso Público',         desc: 'Estudando pra um edital específico.' },
     { valor: 'ensino_medio', icon: '🏫', title: 'Escola',                    desc: 'Ensino Fundamental, Médio, técnico ou EJA.' },
-    { valor: 'geral',        icon: '📚', title: 'Estudo Geral / Pessoal',   desc: 'Idiomas, certificações, empreendedorismo ou o que quiser.' }
+    { valor: 'geral',        icon: '📚', title: 'Curso / Estudo Livre',       desc: 'Cursos, certificações, idiomas e objetivos pessoais.' }
   ];
 
   function renderProfileStep() {
@@ -757,8 +757,8 @@ Regras:
   function renderStep1Geral() {
     return `
 <div class="wiz-card" id="wiz-step-1">
-  <div class="wiz-card-title">📚 Seus Objetivos</div>
-  <div class="wiz-card-sub">Conte rapidamente o que você quer estudar ou organizar</div>
+  <div class="wiz-card-title">📚 Seu Curso ou Objetivo</div>
+  <div class="wiz-card-sub">Defina o curso, certificação, idioma ou objetivo que você quer acompanhar</div>
 
   <div class="wiz-field">
     <label>Seu nome</label>
@@ -766,8 +766,8 @@ Regras:
   </div>
 
   <div class="wiz-field">
-    <label>Qual é o seu objetivo principal?</label>
-    <input type="text" id="wiz-objetivo" placeholder="Ex: idiomas, empreender, certificações, organizar a rotina...">
+    <label>O que você quer acompanhar?</label>
+    <input type="text" id="wiz-objetivo" placeholder="Ex: curso de inglês, certificação, programação, concurso interno...">
   </div>
 </div>`;
   }
@@ -983,7 +983,7 @@ Regras:
 
     const subjects = wizardState.subjects.length ? wizardState.subjects : [{ nome:'', dificuldade:3, peso:3, notaDesejada:7 }];
 
-    const titulo = perfil === 'geral' ? '🎯 Perfil & Áreas de Estudo' : '🎯 Perfil & Matérias';
+    const titulo = perfil === 'geral' ? '🎯 Curso, Módulos & Objetivos' : '🎯 Perfil & Matérias';
     let subtitulo;
     if (perfil === 'faculdade') {
       subtitulo = `Matérias do <strong>${semestre ? semestre+'º' : 'seu'} semestre</strong>` +
@@ -997,7 +997,7 @@ Regras:
         ? `<span style="color:var(--accent-success)">${autoCount} matérias pré-preenchidas da sua série ✓</span> — ajuste como quiser`
         : 'Adicione as matérias que você está cursando';
     } else {
-      subtitulo = 'Adicione as áreas ou assuntos que você quer estudar';
+      subtitulo = 'Adicione módulos, disciplinas ou assuntos que fazem parte do seu objetivo';
     }
 
     return `

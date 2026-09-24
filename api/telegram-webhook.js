@@ -308,11 +308,13 @@ function compactForAI(data){
   const attendance=current.attendance||{};
   const archived=(Array.isArray(data.archivedSemesters)?data.archivedSemesters:[]).map(a=>({periodo:a.periodo,numero:a.numero,materias:(a.subjects||a.curriculum||[]).slice(0,80).map(s=>({nome:clean(s.nome),codigo:s.codigo,status:s.status,nota:s.notaFinal??s.nota,tentativas:s.tentativas?.length||0}))}));
   const user=data.user||{};
+  const perfilLabels={faculdade:'Faculdade / Universidade',concurso:'Concurso Público',ensino_medio:'Escola',geral:'Curso / Estudo Livre'};
+  const perfil=perfilLabels[user.perfil]||'Faculdade / Universidade';
   const intelligence=AcademicIntelligence.snapshotForMentor(data);
   const mentorMemory=(Array.isArray(data.telegramMentorMemory)?data.telegramMentorMemory:[]).slice(-6).map(x=>({role:x.role,text:clean(x.text),at:x.at}));
   return {
     agora:todayBR(),
-    perfil:{nome:user.nome||user.name||'',curso:user.curso||'',instituicao:user.instituicao||'',semestre:user.semestre||null},
+    perfil:{tipo:user.perfil||'faculdade',rotulo:perfil,nome:user.nome||user.name||'',objetivo:user.objetivo||user.curso||user.concurso||'',instituicao:user.universidade||user.instituicao||'',semestre:user.semestre||null,serie:user.serie||null},
     qualidade:AcademicCore.dataQuality(data),
     atual:{subjects:current.subjects.map(s=>({nome:clean(s.nome),codigo:s.codigo,status:s.status,dificuldade:s.dificuldade,notaDesejada:s.notaDesejada})),grades,exams,tasks,classSchedule:current.classSchedule||[],reviews,diarios:diaries,materiais:materials,frequencia:attendance},
     aprendizagem:{learning,evidence,adaptive:user.adaptiveLearning||{}},
@@ -490,6 +492,8 @@ REGRAS ACADÊMICAS:
 - Para recomendações: sempre que possível termine com uma próxima ação concreta e curta, baseada nos dados.
 - Se dados importantes estiverem ausentes, não invente. Aponte a lacuna sem transformar isso em bloqueio para tudo o que ainda pode ser respondido.
 - Se a pergunta comparar duas ou mais matérias, compare os sinais disponíveis de forma explícita e sem inventar dados.
+- Adapte a estratégia ao perfil do aluno: Faculdade/Universidade usa semestre, disciplinas, provas, notas, frequência e currículo; Concurso usa edital, disciplinas, questões, simulados, revisão e ciclo; Escola usa aulas, atividades, avaliações, frequência e notas; Curso/Estudo Livre usa módulos, aulas, objetivos, progresso, revisões e prazos.
+- Não force linguagem de semestre universitário em quem está em Escola, Concurso ou Curso/Estudo Livre.
 - Se a pergunta pedir 'o que fazer agora', priorize uma ação executável nas próximas horas, não um plano genérico.
 
 CONVERSA:

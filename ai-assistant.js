@@ -2277,6 +2277,8 @@ ${report.monthly}`;
           '- Materiais/PDFs disponíveis no contexto podem ser recomendados como fonte de estudo; não invente o conteúdo de um PDF cujo texto não esteja no contexto.',
           '- Seja direto, encorajador e realista, sem enrolação. Respostas de tamanho médio (não gigantes). Pode usar "-" para listas e "**negrito**" para destacar.',
           '- Você não tem acesso à internet nem a nada fora do contexto fornecido — não responda perguntas de conhecimento geral fora do escopo de estudos/organização acadêmica da pessoa; nesses casos, redirecione gentilmente de volta ao propósito do mentor.',
+          '- Adapte a leitura ao perfil: Faculdade/Universidade prioriza semestre, disciplinas, provas, notas, frequência e currículo; Concurso prioriza edital, disciplinas, questões, simulados, revisão e ciclo de estudos; Escola prioriza aulas, atividades, avaliações, frequência e notas; Curso/Estudo Livre prioriza módulos, aulas, objetivos, progresso, revisões e prazos.',
+          '- Não force conceitos de universidade em quem está em outro perfil. Use a estrutura e a linguagem do objetivo da pessoa.',
           '- Não repita o contexto inteiro na resposta; use-o só para embasar o que for perguntado.'
         ].join('\n')
       }]
@@ -2289,7 +2291,9 @@ ${report.monthly}`;
     const hoje = todayISO();
     const linhas = [];
 
-    linhas.push(`Perfil: nome=${user.nome || '?'}; curso=${user.curso || '?'}; universidade=${user.universidade || '?'}; semestre=${user.semestre || '?'}.`);
+    const perfilLabels = { faculdade: 'Faculdade / Universidade', concurso: 'Concurso Público', ensino_medio: 'Escola', geral: 'Curso / Estudo Livre' };
+    const perfilLabel = perfilLabels[user.perfil] || 'Faculdade / Universidade';
+    linhas.push(`Perfil de uso: ${perfilLabel}. Nome=${user.nome || '?'}; objetivo/curso=${user.objetivo || user.curso || user.concurso || '?'}; instituição=${user.universidade || '?'}; semestre/série=${user.semestre || user.serie || '?'}.`);
 
     const subjects = ctx.subjects || [];
     if (subjects.length) {

@@ -204,7 +204,7 @@
   }
 
   function mobileNav(){
-    const shouldShow = () => window.innerWidth <= 768 && !!document.getElementById('view-container') && !document.getElementById('login-screen')?.offsetParent && !document.getElementById('setup-screen')?.offsetParent;
+    const shouldShow = () => window.innerWidth <= 768 && !!window.app?.initialized && !!document.getElementById('view-container') && !document.getElementById('login-screen')?.offsetParent && !document.getElementById('setup-screen')?.offsetParent && document.getElementById('loading-screen')?.style.display === 'none';
     // O shell V19 é a única barra inferior. Remove qualquer barra legada que
     // possa ter sido injetada por versões anteriores.
     document.getElementById('slc-bottom-nav')?.remove();

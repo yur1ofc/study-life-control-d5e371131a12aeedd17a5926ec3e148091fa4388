@@ -1806,7 +1806,7 @@ class ViewRenderer {
                 <div class="card" style="padding:18px;">
                     <strong style="font-size:1.1rem">SLCampus</strong>
                     <p style="color:var(--text-secondary);margin-top:4px">Seu espaço inteligente para estudar, organizar materiais e acompanhar sua evolução</p>
-                    <p style="margin-top:8px;font-size:.88rem;color:var(--text-tertiary)">Versão 3.0.0 • Open Source</p>
+                    
                 </div>
                 <div class="card" style="padding:18px;">
                     <strong>Conta conectada</strong>
@@ -1816,12 +1816,7 @@ class ViewRenderer {
                     <button class="btn-secondary" id="btn-abrir-ajuda">
                         <i class="fas fa-question-circle"></i> Central de Ajuda
                     </button>
-                    <a href="https://github.com/yur1ofc/study-life-control" target="_blank" class="btn-secondary" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">
-                        <i class="fab fa-github"></i> GitHub
-                    </a>
-                    <button class="btn-secondary" id="btn-relatar-problema">
-                        <i class="fas fa-bug"></i> Relatar problema
-                    </button>
+
                 </div>
             </div>`;
         }
