@@ -67,6 +67,44 @@
   function currentSteps(){ return deviceKind()==='mobile' ? MOBILE_STEPS : DESKTOP_STEPS; }
   function currentStep(){ return currentSteps()[SiteTutorial.index]; }
 
+
+  // Cada etapa possui uma composição própria do balão. A ideia é não tentar
+  // encaixar todos os passos na mesma posição: alvos diferentes exigem áreas,
+  // tamanhos e setas diferentes.
+  const TUTORIAL_LAYOUTS = {
+    mobile: {
+      home:         { mode:'bottom-nav', width:'full',    arrow:'bottom' },
+      study:        { mode:'bottom-nav', width:'full',    arrow:'bottom' },
+      mentor:       { mode:'bottom-nav', width:'full',    arrow:'bottom' },
+      focus:        { mode:'bottom-nav', width:'full',    arrow:'bottom' },
+      notifications:{ mode:'auto',       width:'compact', arrow:'auto'   },
+      more:         { mode:'bottom-nav', width:'full',    arrow:'bottom' },
+      learning:     { mode:'drawer',     width:'full',    arrow:'top',   targetTop:110 },
+      organization: { mode:'drawer',     width:'full',    arrow:'top',   targetTop:110 },
+      profile:      { mode:'drawer',     width:'full',    arrow:'top',   targetTop:110 },
+      help:         { mode:'drawer',     width:'full',    arrow:'top',   targetTop:110 }
+    },
+    desktop: {
+      home:         { mode:'sidebar', width:360, arrow:'left',  offset:18 },
+      study:        { mode:'sidebar', width:390, arrow:'left',  offset:18 },
+      mentor:       { mode:'sidebar', width:400, arrow:'left',  offset:18 },
+      focus:        { mode:'sidebar', width:360, arrow:'left',  offset:18 },
+      notifications:{ mode:'header',  width:350, arrow:'bottom', offset:16 },
+      organization: { mode:'sidebar', width:380, arrow:'left',  offset:18 },
+      learning:     { mode:'sidebar', width:400, arrow:'left',  offset:18 },
+      profile:      { mode:'sidebar', width:360, arrow:'left',  offset:18 },
+      telegram:     { mode:'sidebar', width:390, arrow:'left',  offset:18 },
+      help:         { mode:'sidebar', width:360, arrow:'left',  offset:18 }
+    }
+  };
+
+  function layoutFor(step){
+    const device=deviceKind()==='mobile'?'mobile':'desktop';
+    return TUTORIAL_LAYOUTS[device]?.[step.target] || (device==='mobile'
+      ? {mode:'auto',width:'full',arrow:'auto'}
+      : {mode:'sidebar',width:380,arrow:'left',offset:18});
+  }
+
   function targetFor(kind) {
     const mobile = deviceKind() === 'mobile';
     const tablet = deviceKind() === 'tablet';
@@ -202,33 +240,53 @@
       const viewByStep={home:'dashboard',study:'estudar',mentor:'mentor-ia',focus:'foco',learning:'mapa-aprendizado',organization:'tarefas',profile:'perfil',telegram:'telegram',help:'ajuda'};
       const view=viewByStep[step.target];
       if(view && window.app?.loadView && !['home','notifications','more'].includes(step.target)){
-        // No computador, a sidebar continua sendo a referência visual.
-        // No celular, itens secundários continuam dentro do drawer Mais.
         try{window.app.loadView(view);markNavActive(view);}catch(_){ }
       }
-      // No celular, os itens secundários vivem dentro do menu Mais.
-      // Abra o menu somente para os passos que realmente apontam para um item dele.
+
       if(deviceKind()==='mobile' && ['learning','organization','profile','help'].includes(step.target)){
         window.SLCProductShell?.openMobileMore?.();
       }
-      await wait(260); assignTargets();
+
+      await wait(260);
+      assignTargets();
+
+      // No drawer mobile, o alvo fica deliberadamente no alto. O balão é
+      // colocado logo abaixo dele, evitando que os últimos botões do drawer
+      // fiquem atrás do próprio tutorial.
       if(deviceKind()==='mobile' && ['learning','organization','profile','help'].includes(step.target)){
         const selector=targetFor(step.target);
-        const target=document.querySelector(selector);
         const sheet=document.querySelector('#slc-mobile-more .slc-mobile-more-sheet');
+        const target=document.querySelector(selector);
         if(target && sheet){
-          // Deixe o item logo abaixo do cabeçalho sticky do drawer.
-          // Assim o card do tutorial pode ficar abaixo do alvo sem cobri-lo.
-          try{
+          const desiredTop=layoutFor(step).targetTop || 110;
+          const move=()=>{
             const sr=sheet.getBoundingClientRect();
             const tr=target.getBoundingClientRect();
-            const desiredTop=104;
-            sheet.scrollTop += (tr.top - sr.top) - desiredTop;
-          }catch(_){ }
-          await wait(100);
+            const delta=tr.top-sr.top-desiredTop;
+            sheet.scrollTop=Math.max(0,Math.min(sheet.scrollHeight-sheet.clientHeight,sheet.scrollTop+delta));
+          };
+          move();
+          await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+          move();
+          await wait(60);
+        }
+      }
+
+      // No desktop/iPad, a sidebar é o eixo do tutorial. O item é levado para
+      // uma zona confortável da navegação antes de medir o balão.
+      if(deviceKind()!=='mobile'){
+        const target=document.querySelector(targetFor(step.target));
+        const nav=target?.closest?.('.sidebar-nav') || document.querySelector('.sidebar-nav');
+        if(target && nav){
+          const nr=nav.getBoundingClientRect();
+          const tr=target.getBoundingClientRect();
+          const desired=nr.top + Math.max(20,(nr.height-target.offsetHeight)/2);
+          nav.scrollTop += tr.top-desired;
+          await wait(50);
         }
       }
     },
+
     updateSpotlight(target){
       const overlay=ensureOverlay(),s=overlay.querySelector('.tutorial-spotlight'),backdrop=overlay.querySelector('.tutorial-backdrop');
       if(!s||!target)return;
@@ -255,87 +313,115 @@
       }
     },
     positionCard(target){
-      const card=el('tutorial-card'),arrow=el('tutorial-card-arrow');if(!card||!arrow||!target)return;
-      const r=target.getBoundingClientRect(),vw=innerWidth,vh=innerHeight,margin=deviceKind()==='mobile'?12:16;
-      card.style.left='';card.style.right='';card.style.top='';card.style.bottom='';arrow.style.left='';arrow.style.right='';arrow.style.top='';arrow.style.bottom='';card.classList.remove('mobile','arrow-left','arrow-right','arrow-top','arrow-bottom');
+      const card=el('tutorial-card'),arrow=el('tutorial-card-arrow');
+      if(!card||!arrow||!target)return;
+      const r=target.getBoundingClientRect(),vw=innerWidth,vh=innerHeight;
+      const layout=layoutFor(currentStep()||{target:'home'});
+      const margin=deviceKind()==='mobile'?12:16;
+      card.style.left='';card.style.right='';card.style.top='';card.style.bottom='';
+      arrow.style.left='';arrow.style.right='';arrow.style.top='';arrow.style.bottom='';
+      card.classList.remove('mobile','arrow-left','arrow-right','arrow-top','arrow-bottom','tutorial-layout-header','tutorial-layout-sidebar','tutorial-layout-bottom-nav','tutorial-layout-drawer');
+      card.classList.add(`tutorial-step-${currentStep()?.id||'generic'}`);
+
       if(deviceKind()==='mobile'){
-        const bottomNav=document.getElementById('slc-product-bottom-nav');
-        const navRect=bottomNav?.getBoundingClientRect?.();
-        const navVisible=bottomNav && getComputedStyle(bottomNav).display !== 'none' && !bottomNav.classList.contains('slc-more-hidden');
-        const safeBottom=navVisible ? (navRect?.top || vh) : vh;
-        const cardLeft=margin, cardWidth=vw-margin*2;
-        const cardHeight=card.offsetHeight||280;
-        const gap=14;
-        const targetCenter=r.left+r.width/2;
-        const belowSpace=safeBottom-r.bottom-gap;
-        const aboveSpace=r.top-margin-gap;
         card.classList.add('mobile');
-        card.style.left=`${margin}px`;card.style.right=`${margin}px`;card.style.bottom='auto';
+        const nav=document.getElementById('slc-product-bottom-nav');
+        const navRect=nav?.getBoundingClientRect?.();
+        const navVisible=!!nav && getComputedStyle(nav).display!=='none' && !nav.classList.contains('slc-more-hidden');
+        const navTop=navVisible && navRect ? navRect.top : vh;
+        const width=vw-margin*2;
+        const h=card.offsetHeight||290;
+        const centerX=Math.max(24,Math.min(width-30,r.left+r.width/2-margin-10));
 
-        // Primeiro tente colocar o balão depois do alvo. Se não couber,
-        // coloque antes dele. Assim os últimos itens do menu Mais não ficam
-        // escondidos atrás do próprio tutorial.
-        if(belowSpace >= cardHeight){
-          card.classList.add('arrow-top');
-          card.style.top=`${Math.min(vh-cardHeight-margin,r.bottom+gap)}px`;
-          card.style.bottom='';
-          arrow.style.top='-10px';arrow.style.bottom='';
-        }else if(aboveSpace >= cardHeight){
-          card.classList.add('arrow-bottom');
-          card.style.top=`${Math.max(margin,r.top-cardHeight-gap)}px`;
-          card.style.bottom='';
+        if(layout.mode==='bottom-nav'){
+          // Espaço reservado para a barra inferior: o balão nunca invade os
+          // cinco botões. A seta aponta para cima/baixo conforme a relação.
+          const bottomGap=12;
+          const top=Math.max(margin,navTop-h-bottomGap);
+          card.classList.add('arrow-bottom','tutorial-layout-bottom-nav');
+          card.style.left=`${margin}px`;card.style.right=`${margin}px`;
+          card.style.top=`${top}px`;card.style.bottom='auto';
           arrow.style.bottom='-10px';arrow.style.top='';
-        }else{
-          // Fallback: mantém o card dentro da área segura. O alvo é rolado
-          // para o centro antes desta etapa quando estiver no menu Mais.
-          const top=Math.max(margin,Math.min(safeBottom-cardHeight-margin,r.top-cardHeight-gap));
-          const placeBelow=top>=r.bottom+gap;
-          if(placeBelow){
-            card.classList.add('arrow-top');
-            card.style.top=`${top}px`;card.style.bottom='';
-            arrow.style.top='-10px';arrow.style.bottom='';
-          }else{
-            card.classList.add('arrow-bottom');
-            card.style.top=`${top}px`;card.style.bottom='';
-            arrow.style.bottom='-10px';arrow.style.top='';
-          }
+          arrow.style.left=`${Math.max(24,Math.min(width-30,centerX))}px`;
+          return;
         }
-        arrow.style.left=`${Math.max(24,Math.min(cardWidth-30,targetCenter-cardLeft-10))}px`;
+
+        if(layout.mode==='drawer'){
+          // O alvo do drawer foi levado para o topo em ensureView(). O balão
+          // começa logo depois dele, portanto não cobre o botão destacado.
+          const top=Math.min(vh-h-margin,Math.max(margin,r.bottom+14));
+          card.classList.add('arrow-top','tutorial-layout-drawer');
+          card.style.left=`${margin}px`;card.style.right=`${margin}px`;
+          card.style.top=`${top}px`;card.style.bottom='auto';
+          arrow.style.top='-10px';arrow.style.bottom='';
+          arrow.style.left=`${Math.max(24,Math.min(width-30,centerX))}px`;
+          return;
+        }
+
+        // Notificações e outros alvos que não pertencem ao drawer/barra usam
+        // uma posição calculada, mas com a mesma área segura.
+        const bottomSafe=navVisible?navTop:vh;
+        const below=bottomSafe-r.bottom-14;
+        const above=r.top-margin-14;
+        card.style.left=`${margin}px`;card.style.right=`${margin}px`;
+        if(below>=h){
+          card.classList.add('arrow-top');
+          card.style.top=`${Math.min(bottomSafe-h-8,r.bottom+14)}px`;
+          arrow.style.top='-10px';
+        }else{
+          card.classList.add('arrow-bottom');
+          card.style.top=`${Math.max(margin,r.top-h-14)}px`;
+          arrow.style.bottom='-10px';
+        }
+        arrow.style.left=`${Math.max(24,Math.min(width-30,centerX))}px`;
         return;
       }
-      const w=Math.min(420,vw-margin*2),h=card.offsetHeight||230;
 
-      // Alvos da navegação lateral precisam manter o balão ao lado do menu.
-      // A lógica genérica pode escolher uma posição central quando existe muito
-      // espaço livre à direita, deixando a seta longe do item destacado.
-      // Navegação lateral: procure a barra pela árvore do alvo e, se necessário,
-      // use a sidebar visível do layout. Isso também cobre tablets/iPad em
-      // orientação/viewport em que o alvo é recriado dinamicamente.
-      const sidebarTarget = target.closest?.('.nav-item, .sidebar-nav, .sidebar');
-      const sidebar = target.closest?.('.sidebar') || target.closest?.('.sidebar-nav')?.closest?.('.sidebar') || document.querySelector('.dashboard-layout > .sidebar, .sidebar');
-      const isSidebarNav = !!sidebarTarget && !!sidebar && (target.matches?.('.nav-item') || !!target.closest?.('.sidebar-nav'));
-      if(isSidebarNav){
-        const sidebarRect=sidebar.getBoundingClientRect();
-        // O cartão começa imediatamente depois da sidebar e a seta fica na
-        // mesma altura do item. Não usamos a lógica genérica para estes alvos.
+      const w=Math.min(Number(layout.width)||380,vw-margin*2),h=card.offsetHeight||230;
+      const sidebar=target.closest?.('.sidebar') || document.querySelector('.sidebar');
+
+      if(layout.mode==='sidebar' && sidebar){
+        const sr=sidebar.getBoundingClientRect();
+        const x=Math.min(vw-w-margin,Math.max(sr.right+(layout.offset||18),margin));
         const top=Math.max(margin,Math.min(vh-h-margin,r.top+r.height/2-h/2));
-        const x=Math.min(vw-w-margin,Math.max(margin,sidebarRect.right+18));
-        card.classList.add('arrow-left');
-        card.style.left=`${x}px`;
-        card.style.top=`${top}px`;
-        arrow.style.left='-10px';
-        arrow.style.right='';
-        arrow.style.top=`${Math.max(22,Math.min(h-30,r.top+r.height/2-top-10))}px`;
-        arrow.style.bottom='';
+        card.classList.add('arrow-left','tutorial-layout-sidebar');
+        card.style.width=`${w}px`;card.style.maxWidth=`${w}px`;
+        card.style.left=`${x}px`;card.style.top=`${top}px`;
+        arrow.style.left='-10px';arrow.style.right='';
+        arrow.style.top=`${Math.max(24,Math.min(h-32,r.top+r.height/2-top-10))}px`;arrow.style.bottom='';
         return;
       }
 
+      if(layout.mode==='header'){
+        const x=Math.max(margin,Math.min(vw-w-margin,r.left+r.width/2-w/2));
+        const top=Math.min(vh-h-margin,r.bottom+(layout.offset||16));
+        card.classList.add('arrow-top','tutorial-layout-header');
+        card.style.width=`${w}px`;card.style.maxWidth=`${w}px`;
+        card.style.left=`${x}px`;card.style.top=`${top}px`;
+        arrow.style.top='-10px';arrow.style.left=`${Math.max(24,Math.min(w-32,r.left+r.width/2-x-10))}px`;
+        return;
+      }
+
+      // Fallback desktop.
       const right=vw-r.right,left=r.left,bottom=vh-r.bottom;
-      if(right>=w+28){const top=Math.max(margin,Math.min(vh-h-margin,r.top+r.height/2-h/2));card.classList.add('arrow-left');card.style.left=`${Math.min(vw-w-margin,r.right+18)}px`;card.style.top=`${top}px`;arrow.style.left='-10px';arrow.style.top=`${Math.max(22,Math.min(h-30,r.top+r.height/2-top-10))}px`;}
-      else if(left>=w+28){const top=Math.max(margin,Math.min(vh-h-margin,r.top+r.height/2-h/2));card.classList.add('arrow-right');card.style.left=`${Math.max(margin,r.left-w-18)}px`;card.style.top=`${top}px`;arrow.style.right='-10px';arrow.style.top=`${Math.max(22,Math.min(h-30,r.top+r.height/2-top-10))}px`;}
-      else if(bottom>=h+24){const x=Math.max(margin,Math.min(vw-w-margin,r.left+r.width/2-w/2));card.classList.add('arrow-top');card.style.left=`${x}px`;card.style.top=`${Math.min(vh-h-margin,r.bottom+16)}px`;arrow.style.top='-10px';arrow.style.left=`${Math.max(24,Math.min(w-30,r.left+r.width/2-x-10))}px`;}
-      else{const x=Math.max(margin,Math.min(vw-w-margin,r.left+r.width/2-w/2));card.classList.add('arrow-bottom');card.style.left=`${x}px`;card.style.top=`${Math.max(margin,r.top-h-16)}px`;arrow.style.bottom='-10px';arrow.style.left=`${Math.max(24,Math.min(w-30,r.left+r.width/2-x-10))}px`;}
+      if(right>=w+28){
+        const top=Math.max(margin,Math.min(vh-h-margin,r.top+r.height/2-h/2));
+        card.classList.add('arrow-left');card.style.width=`${w}px`;card.style.maxWidth=`${w}px`;
+        card.style.left=`${Math.min(vw-w-margin,r.right+18)}px`;card.style.top=`${top}px`;
+        arrow.style.left='-10px';arrow.style.top=`${Math.max(24,Math.min(h-32,r.top+r.height/2-top-10))}px`;
+      }else if(left>=w+28){
+        const top=Math.max(margin,Math.min(vh-h-margin,r.top+r.height/2-h/2));
+        card.classList.add('arrow-right');card.style.width=`${w}px`;card.style.maxWidth=`${w}px`;
+        card.style.left=`${Math.max(margin,r.left-w-18)}px`;card.style.top=`${top}px`;
+        arrow.style.right='-10px';arrow.style.top=`${Math.max(24,Math.min(h-32,r.top+r.height/2-top-10))}px`;
+      }else{
+        const x=Math.max(margin,Math.min(vw-w-margin,r.left+r.width/2-w/2));
+        card.classList.add('arrow-bottom');card.style.width=`${w}px`;card.style.maxWidth=`${w}px`;
+        card.style.left=`${x}px`;card.style.top=`${Math.max(margin,r.top-h-16)}px`;
+        arrow.style.bottom='-10px';arrow.style.left=`${Math.max(24,Math.min(w-32,r.left+r.width/2-x-10))}px`;
+      }
     },
+
     positionCurrentStep(){const t=this._target;if(t&&document.body.contains(t)){this.updateSpotlight(t);this.positionCard(t);}},
     async showStep(){
       const steps=currentSteps();

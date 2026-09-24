@@ -7,7 +7,6 @@
   'use strict';
 
   const STORAGE_KEY = 'slc_onboarding_v1';
-  const SIMPLE_MODE_KEY = 'slc_simple_mode';
 
   // Passos do checklist — ordem importa
   const STEPS = [
@@ -67,81 +66,15 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
-  function isSimpleModeEnabled() {
-    const val = localStorage.getItem(SIMPLE_MODE_KEY);
-    return val === null ? true : val === '1'; // padrão: ligado
+  // O antigo modo iniciante escondia partes do produto para novos usuários.
+  // Ele foi removido: todos os recursos ficam disponíveis desde o primeiro acesso.
+  function isSimpleModeEnabled() { return false; }
+  function setSimpleMode() {
+    localStorage.removeItem('slc_simple_mode');
+    document.body.classList.remove('slc-simple-mode');
+    document.getElementById('slc-mode-badge')?.remove();
   }
 
-  function setSimpleMode(enabled) {
-    localStorage.setItem(SIMPLE_MODE_KEY, enabled ? '1' : '0');
-    applySimpleMode(enabled);
-  }
-
-  // ─── Modo simplificado: oculta grupos avançados no menu ───────────────────
-
-  const ADVANCED_GROUPS = ['analise']; // grupo que fica oculto no modo simples
-  const SIMPLE_HIDE_VIEWS = ['grade-curricular', 'cursos-extras', 'situacao-academica', 'previsao-notas', 'mapa-aprendizado', 'materiais', 'estatisticas'];
-
-  function applySimpleMode(enabled) {
-    // Adiciona/remove classe no body
-    document.body.classList.toggle('slc-simple-mode', enabled);
-
-    // Injeta estilos se ainda não existir
-    if (!document.getElementById('slc-simple-mode-style')) {
-      const style = document.createElement('style');
-      style.id = 'slc-simple-mode-style';
-      style.textContent = `
-        /* Modo simplificado: oculta grupo de análise no menu */
-        .slc-simple-mode #group-analise,
-        .slc-simple-mode [data-group="analise"] {
-          display: none !important;
-        }
-        /* Itens avançados dentro de grupos visíveis */
-        .slc-simple-mode .nav-item[data-view="grade-curricular"],
-        .slc-simple-mode .nav-item[data-view="cursos-extras"],
-        .slc-simple-mode .nav-item[data-view="situacao-academica"],
-        .slc-simple-mode .nav-item[data-view="previsao-notas"] {
-          display: none !important;
-        }
-        /* Badge "simplificado" no sidebar */
-        #slc-mode-badge {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          padding: 5px 10px;
-          background: rgba(37,99,235,.12);
-          border-radius: 20px;
-          font-size: .7rem;
-          color: #2563eb;
-          font-weight: 500;
-          cursor: pointer;
-          margin: 4px 12px;
-          transition: background .15s;
-        }
-        #slc-mode-badge:hover { background: rgba(37,99,235,.2); }
-      `;
-      document.head.appendChild(style);
-    }
-
-    // Badge no sidebar
-    let badge = document.getElementById('slc-mode-badge');
-    if (enabled && !badge) {
-      badge = document.createElement('div');
-      badge.id = 'slc-mode-badge';
-      badge.innerHTML = '<i class="fas fa-seedling"></i> Modo iniciante · <span style="text-decoration:underline;">ver tudo</span>';
-      badge.title = 'Clique para ver todas as seções';
-      badge.addEventListener('click', () => {
-        setSimpleMode(false);
-        badge.remove();
-        if (typeof showToast === 'function') showToast('Modo avançado ativado! Todas as seções estão visíveis.', 'info');
-      });
-
-      const nav = document.getElementById('sidebar-nav');
-      if (nav) nav.insertBefore(badge, nav.firstChild);
-    } else if (!enabled && badge) {
-      badge.remove();
-    }
-  }
 
   // ─── Checklist de onboarding no dashboard ─────────────────────────────────
 
@@ -290,10 +223,6 @@
           if (!data || wasDismissedRecently()) return;
           injectChecklistIntoDashboard();
 
-          // Ativa modo simples para novos usuários
-          if (isNewUser(data) && isSimpleModeEnabled()) {
-            applySimpleMode(true);
-          }
         }, 150);
       }
 
@@ -339,13 +268,9 @@
       return result;
     };
 
-    // Aplica modo simples imediatamente se for novo usuário
-    setTimeout(() => {
-      const data = window.app?.data;
-      if (data && isNewUser(data) && isSimpleModeEnabled()) {
-        applySimpleMode(true);
-      }
-    }, 500);
+    // O modo iniciante foi removido; garante que sessões antigas não deixem
+    // o usuário preso em uma interface reduzida.
+    setSimpleMode();
   }
 
   // ─── Marcar quando o usuário pergunta ao Mentor IA ─────────────────────────
