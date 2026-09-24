@@ -4,6 +4,21 @@
   function el(id) { return document.getElementById(id); }
   function wait(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
   function deviceKind() {
+    // A decisão é baseada no shell realmente visível, não somente na largura.
+    // Isso corrige iPad/Safari em modo desktop, onde a viewport pode ser
+    // estreita, mas a interface exibida continua sendo a versão desktop.
+    const sidebar = document.querySelector('.sidebar');
+    const bottomNav = document.getElementById('slc-product-bottom-nav');
+    const visible = node => {
+      if (!node) return false;
+      const cs = getComputedStyle(node);
+      const r = node.getBoundingClientRect();
+      return cs.display !== 'none' && cs.visibility !== 'hidden' && r.width > 0 && r.height > 0;
+    };
+    const hasDesktopShell = visible(sidebar);
+    const hasMobileShell = visible(bottomNav);
+    if (hasDesktopShell && !hasMobileShell) return 'desktop';
+    if (hasMobileShell && !hasDesktopShell) return 'mobile';
     const w = window.innerWidth;
     if (w <= 768) return 'mobile';
     if (w <= 1100) return 'tablet';
@@ -120,17 +135,17 @@
   function targetFor(kind) {
     const mobile = deviceKind() === 'mobile';
     const selectors = {
-      home: mobile ? '#slc-product-bottom-nav [data-v="dashboard"]' : '[data-view="dashboard"]',
-      study: mobile ? '#slc-product-bottom-nav [data-v="estudar"]' : '[data-view="estudar"]',
-      mentor: mobile ? '#slc-product-bottom-nav [data-v="mentor-ia"]' : '[data-view="mentor-ia"]',
-      focus: mobile ? '#slc-product-bottom-nav [data-v="foco"]' : '[data-view="foco"]',
+      home: mobile ? '#slc-product-bottom-nav [data-v="dashboard"]' : '#sidebar-nav .nav-item[data-view="dashboard"]',
+      study: mobile ? '#slc-product-bottom-nav [data-v="estudar"]' : '#sidebar-nav .nav-item[data-view="estudar"]',
+      mentor: mobile ? '#slc-product-bottom-nav [data-v="mentor-ia"]' : '#sidebar-nav .nav-item[data-view="mentor-ia"]',
+      focus: mobile ? '#slc-product-bottom-nav [data-v="foco"]' : '#sidebar-nav .nav-item[data-view="foco"]',
       notifications: '[data-tutorial="notification-button"], #notification-badge, #notification-button',
       more: mobile ? '#slc-product-bottom-nav [data-v="__more"]' : null,
-      learning: mobile ? '#slc-mobile-more [data-mobile-more-view="mapa-aprendizado"]' : '[data-view="mapa-aprendizado"]',
-      organization: mobile ? '#slc-mobile-more [data-mobile-more-view="tarefas"]' : '[data-view="tarefas"]',
-      profile: mobile ? '#slc-mobile-more [data-mobile-more-view="perfil"], #slc-mobile-more [data-mobile-more-view="configuracoes"]' : '[data-view="configuracoes"], [data-slcnavigate="configuracoes"]',
-      help: mobile ? '#slc-mobile-more [data-mobile-more-view="ajuda"]' : '[data-view="ajuda"]',
-      telegram: mobile ? '#slc-mobile-more [data-mobile-more-view="telegram"]' : '[data-view="telegram"]'
+      learning: mobile ? '#slc-mobile-more [data-mobile-more-view="mapa-aprendizado"]' : '#sidebar-nav .nav-item[data-view="mapa-aprendizado"]',
+      organization: mobile ? '#slc-mobile-more [data-mobile-more-view="tarefas"]' : '#sidebar-nav .nav-item[data-view="tarefas"]',
+      profile: mobile ? '#slc-mobile-more [data-mobile-more-view="perfil"], #slc-mobile-more [data-mobile-more-view="configuracoes"]' : '#sidebar-nav .nav-item[data-view="configuracoes"]',
+      help: mobile ? '#slc-mobile-more [data-mobile-more-view="ajuda"]' : '#sidebar-nav .nav-item[data-view="ajuda"]',
+      telegram: mobile ? '#slc-mobile-more [data-mobile-more-view="telegram"]' : '#sidebar-nav .nav-item[data-view="telegram"]'
     };
     return selectors[kind] || selectors.home;
   }
@@ -256,6 +271,7 @@
       this._runToken++;
       this._lastDevice=deviceKind();
       const overlay=ensureOverlay();
+      overlay.classList.toggle('tutorial-desktop-mode', deviceKind() !== 'mobile');
       overlay.classList.add('open');
       document.body.classList.add('slc-tutorial-open');
       this.bindControls();
@@ -270,7 +286,7 @@
       this.running=false;
       this._target=null;
       const overlay=ensureOverlay();
-      overlay.classList.remove('open');
+      overlay.classList.remove('open','tutorial-desktop-mode');
       document.body.classList.remove('slc-tutorial-open');
       document.querySelectorAll('.tutorial-target-active').forEach(n=>n.classList.remove('tutorial-target-active'));
       window.removeEventListener('resize',this.handleViewportChange);
@@ -535,58 +551,89 @@
         return;
       }
 
-      // DESKTOP: cada reposicionamento deve ser imediato. O card não pode
-      // permanecer na posição da etapa anterior enquanto a nova etapa é
-      // calculada (isso fazia alguns passos aparecerem presos no rodapé).
-      card.style.right='auto';
-      card.style.bottom='auto';
+      // DESKTOP / iPAD: posicionamento rígido e determinístico.
+      // Não dependemos de bottom/transition/estilos legados. O alvo é sempre
+      // um item real da sidebar e o card é colocado imediatamente ao lado dele.
+      const w=Math.min(Number(layout.width)||380, Math.max(300, vw-margin*2));
+      const sidebar = document.querySelector('#sidebar-nav');
+      const sr = sidebar?.getBoundingClientRect?.();
+      const tr = target.getBoundingClientRect();
+      const sidebarUsable = sr && sr.width > 0 && sr.right <= vw + 2;
 
-      const w=Math.min(Number(layout.width)||400,vw-margin*2);
-      card.style.width=`${w}px`;
-      card.style.maxWidth=`${w}px`;
-      card.style.bottom='auto';
-      card.style.height='auto';
-      const h=Math.max(1,card.offsetHeight||230);
+      const setFixed = (prop, value) => card.style.setProperty(prop, `${value}px`, 'important');
+      card.style.setProperty('position','fixed','important');
+      card.style.setProperty('bottom','auto','important');
+      card.style.setProperty('right','auto','important');
+      card.style.setProperty('width',`${w}px`,'important');
+      card.style.setProperty('max-width',`${w}px`,'important');
+      card.style.setProperty('height','auto','important');
+      card.style.setProperty('min-height','0','important');
+      card.style.setProperty('transform','none','important');
+      card.style.setProperty('transition','opacity .18s ease','important');
+
+      // Primeiro mede a altura com a largura final já aplicada.
+      const h=Math.max(1,card.getBoundingClientRect().height || card.offsetHeight || 220);
 
       if(step.target==='notifications'){
-        const x=Math.max(margin,Math.min(vw-w-margin,r.left+r.width/2-w/2));
-        const top=Math.min(vh-h-margin,r.bottom+16);
+        const x=Math.max(margin,Math.min(vw-w-margin,tr.left+tr.width/2-w/2));
+        let top=tr.bottom+18;
+        if(top+h>vh-margin) top=Math.max(margin,tr.top-h-18);
         card.classList.add('arrow-top','tutorial-layout-header');
-        card.style.left=`${x}px`;card.style.top=`${top}px`;
-        arrow.style.top='-10px';arrow.style.left=`${Math.max(24,Math.min(w-32,r.left+r.width/2-x-10))}px`;
+        setFixed('left',x); setFixed('top',top);
+        arrow.style.setProperty('top','-10px','important');
+        arrow.style.removeProperty('bottom');
+        arrow.style.setProperty('left',`${Math.max(24,Math.min(w-32,tr.left+tr.width/2-x-10))}px`,'important');
         return;
       }
 
-      const sidebar=target.closest?.('#sidebar-nav, .sidebar-nav, .sidebar')||document.querySelector('#sidebar-nav, .sidebar-nav, .sidebar');
-      const sr=sidebar?.getBoundingClientRect?.();
-      if(sr&&sr.width){
+      if(sidebarUsable){
+        // O card fica sempre do lado externo da sidebar, alinhado ao centro
+        // vertical do item destacado. Nunca cai para o rodapé.
         const gap=18;
-        let left=sr.right+gap, arrowSide='left';
-        if(left+w>vw-margin){left=Math.max(margin,sr.left-w-gap);arrowSide='right';}
-        const top=Math.max(margin,Math.min(vh-h-margin,r.top+r.height/2-h/2));
-        card.style.left=`${left}px`;card.style.top=`${top}px`;
+        let left=sr.right+gap;
+        let arrowSide='left';
+        if(left+w>vw-margin){
+          left=Math.max(margin,sr.left-w-gap);
+          arrowSide='right';
+        }
+        let top=tr.top + tr.height/2 - h/2;
+        top=Math.max(margin,Math.min(vh-h-margin,top));
+
         card.classList.add(arrowSide==='left'?'arrow-left':'arrow-right','tutorial-layout-sidebar');
-        arrow.style.top=`${Math.max(24,Math.min(h-34,r.top+r.height/2-top-10))}px`;
-        if(arrowSide==='left')arrow.style.left='-10px';else arrow.style.right='-10px';
+        setFixed('left',left); setFixed('top',top);
+        arrow.style.removeProperty('top');
+        arrow.style.removeProperty('bottom');
+        arrow.style.setProperty('top',`${Math.max(24,Math.min(h-34,tr.top+tr.height/2-top-10))}px`,'important');
+        if(arrowSide==='left'){
+          arrow.style.setProperty('left','-10px','important');
+          arrow.style.removeProperty('right');
+        }else{
+          arrow.style.setProperty('right','-10px','important');
+          arrow.style.removeProperty('left');
+        }
         return;
       }
 
-      const right=vw-r.right,left=r.left,bottom=vh-r.bottom;
-      if(right>=w+28){
-        const top=Math.max(margin,Math.min(vh-h-margin,r.top+r.height/2-h/2));
-        card.classList.add('arrow-left');card.style.left=`${Math.min(vw-w-margin,r.right+18)}px`;card.style.top=`${top}px`;
-        arrow.style.left='-10px';arrow.style.top=`${Math.max(24,Math.min(h-34,r.top+r.height/2-top-10))}px`;
-      }else if(left>=w+28){
-        const top=Math.max(margin,Math.min(vh-h-margin,r.top+r.height/2-h/2));
-        card.classList.add('arrow-right');card.style.left=`${Math.max(margin,r.left-w-18)}px`;card.style.top=`${top}px`;
-        arrow.style.right='-10px';arrow.style.top=`${Math.max(24,Math.min(h-34,r.top+r.height/2-top-10))}px`;
+      // Fallback para layouts desktop sem sidebar.
+      const rightSpace=vw-tr.right, leftSpace=tr.left;
+      if(rightSpace>=w+28){
+        const top=Math.max(margin,Math.min(vh-h-margin,tr.top+tr.height/2-h/2));
+        card.classList.add('arrow-left'); setFixed('left',tr.right+18); setFixed('top',top);
+        arrow.style.setProperty('left','-10px','important');
+        arrow.style.setProperty('top',`${Math.max(24,Math.min(h-34,tr.top+tr.height/2-top-10))}px`,'important');
+      }else if(leftSpace>=w+28){
+        const top=Math.max(margin,Math.min(vh-h-margin,tr.top+tr.height/2-h/2));
+        card.classList.add('arrow-right'); setFixed('left',tr.left-w-18); setFixed('top',top);
+        arrow.style.setProperty('right','-10px','important');
+        arrow.style.setProperty('top',`${Math.max(24,Math.min(h-34,tr.top+tr.height/2-top-10))}px`,'important');
       }else{
-        const x=Math.max(margin,Math.min(vw-w-margin,r.left+r.width/2-w/2));
-        const top=r.bottom+h+16<=vh-margin?r.bottom+16:Math.max(margin,r.top-h-16);
-        card.classList.add(top>r.top?'arrow-top':'arrow-bottom');
-        card.style.left=`${x}px`;card.style.top=`${top}px`;
-        if(top>r.top)arrow.style.top='-10px';else arrow.style.bottom='-10px';
-        arrow.style.left=`${Math.max(24,Math.min(w-32,r.left+r.width/2-x-10))}px`;
+        const x=Math.max(margin,Math.min(vw-w-margin,tr.left+tr.width/2-w/2));
+        const top=tr.bottom+h+16<=vh-margin?tr.bottom+16:Math.max(margin,tr.top-h-16);
+        card.classList.add(top>tr.top?'arrow-top':'arrow-bottom');
+        setFixed('left',x); setFixed('top',top);
+        if(top>tr.top) arrow.style.setProperty('top','-10px','important');
+        else arrow.style.setProperty('bottom','-10px','important');
+        arrow.style.setProperty('left',`${Math.max(24,Math.min(w-32,tr.left+tr.width/2-x-10))}px`,'important');
       }
     },
 

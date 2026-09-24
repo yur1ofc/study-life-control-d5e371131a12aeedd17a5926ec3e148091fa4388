@@ -6884,3 +6884,38 @@ body.slc-tutorial-open { overscroll-behavior:none !important; }
     padding: 0 22px !important;
   }
 }
+
+
+/* ================================================================
+   SLCampus Tutorial V52 — desktop/iPad hard anchoring
+   O layout mobile da V50 permanece intacto. Aqui só eliminamos qualquer
+   regra antiga que possa devolver o card para bottom/left e fazemos o
+   posicionamento desktop obedecer às coordenadas inline do controller.
+================================================================ */
+@media (min-width: 769px) {
+  #tutorial-overlay.tutorial-desktop-mode {
+    pointer-events: none !important;
+  }
+
+  #tutorial-overlay.tutorial-desktop-mode .tutorial-card {
+    position: fixed !important;
+    right: auto !important;
+    bottom: auto !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    transform: none !important;
+    transition: opacity .18s ease !important;
+    z-index: 2147483646 !important;
+  }
+
+  #tutorial-overlay.tutorial-desktop-mode .tutorial-card.tutorial-layout-sidebar {
+    max-height: min(520px, calc(100vh - 32px)) !important;
+    overflow: hidden !important;
+  }
+
+  #tutorial-overlay.tutorial-desktop-mode .tutorial-card.tutorial-layout-sidebar p {
+    max-height: 250px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+}
