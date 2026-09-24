@@ -159,7 +159,7 @@
          mentor IA em tela cheia — a bolha flutuante some pra não duplicar
          o mesmo atalho e não brigar de posição com o FAB de "+". */
       @media (max-width: 768px){ .floating-ai-launcher{ display:none !important; } }
-      .notification-popover{position:absolute;top:calc(100% + 10px);right:0;width:min(420px,calc(100vw - 32px));background:rgba(2,6,23,.96);border:1px solid rgba(148,163,184,.16);border-radius:20px;box-shadow:0 24px 60px rgba(2,6,23,.35);padding:14px;display:none;z-index:50;}
+      .notification-popover{position:fixed;top:var(--slc-notif-top,76px);right:var(--slc-notif-right,16px);width:min(420px,calc(100vw - 32px));max-width:calc(100vw - 24px);box-sizing:border-box;background:rgba(2,6,23,.97);border:1px solid rgba(148,163,184,.16);border-radius:20px;box-shadow:0 24px 60px rgba(2,6,23,.35);padding:14px;display:none;z-index:10050;overflow:hidden;}
       .notification-popover.open{display:block;}
       .notification-popover-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:10px;}
       .notification-popover-actions{display:flex;gap:8px;flex-shrink:0;}
@@ -236,7 +236,7 @@
       .level-up-copy{margin-top:8px;opacity:.82;}
       @keyframes slcSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
       @media (max-width: 980px){.today-hero{grid-template-columns:1fr;}}
-      @media (max-width: 820px){.compact-weekly-schedule{overflow-x:auto;}.compact-weekly-schedule .weekly-timeline{min-width:860px;}.floating-ai-panel{right:12px;left:12px;width:auto;bottom:88px;}.notification-popover{position:fixed;right:12px;left:12px;top:76px;width:auto;}.gamification-page-grid{grid-template-columns:1fr;}}
+      @media (max-width: 820px){.compact-weekly-schedule{overflow-x:auto;}.compact-weekly-schedule .weekly-timeline{min-width:860px;}.floating-ai-panel{right:12px;left:12px;width:auto;bottom:88px;}.notification-popover{position:fixed!important;left:12px!important;right:12px!important;top:72px!important;width:auto!important;max-width:none!important;}.gamification-page-grid{grid-template-columns:1fr;}}
     `;
     document.head.appendChild(style);
   }
@@ -1315,7 +1315,9 @@
           </div>
         </div>
         <div class="notification-popover-list" id="notification-popover-list"></div>`;
-      badge.appendChild(pop);
+      // Portaliza o popover no body. Isso evita que `backdrop-filter`/overflow
+      // do cabeçalho móvel crie um containing block que corte o painel.
+      document.body.appendChild(pop);
     }
     return pop;
   }
@@ -1325,8 +1327,20 @@
   // — única fonte de verdade, com marcação de lido). Aqui só montamos a casca
   // do popover (cabeçalho + botão fechar) pra evitar dois painéis competindo.
 
+  function positionNotificationPopover(pop) {
+    if (!pop) return;
+    const badge = el('notification-badge');
+    if (!badge) return;
+    const r = badge.getBoundingClientRect();
+    pop.style.setProperty('--slc-notif-top', `${Math.round(r.bottom + 10)}px`);
+    pop.style.setProperty('--slc-notif-right', `${Math.max(12, Math.round(window.innerWidth - r.right))}px`);
+  }
+
   function openNotificationPopover() {
-    ensureNotificationPopover()?.classList.add('open');
+    const pop = ensureNotificationPopover();
+    if (!pop) return;
+    positionNotificationPopover(pop);
+    pop.classList.add('open');
   }
 
   function closeNotificationPopover() {
@@ -1397,8 +1411,12 @@
       badge.dataset.bound = '1';
       badge.addEventListener('click', (e) => {
         e.stopPropagation();
-        pop.classList.toggle('open');
+        if (pop.classList.contains('open')) closeNotificationPopover();
+        else openNotificationPopover();
       });
+      window.addEventListener('resize', () => {
+        if (pop.classList.contains('open')) positionNotificationPopover(pop);
+      }, { passive: true });
       document.addEventListener('click', (e) => {
         if (!pop.contains(e.target) && !badge.contains(e.target)) closeNotificationPopover();
       });
