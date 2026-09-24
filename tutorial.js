@@ -35,18 +35,37 @@
     'Como está minha preparação?'
   ];
 
-  const STEPS = [
+  // O tutorial é realmente diferente por plataforma.
+  // Celular: usa a barra inferior e o drawer Mais.
+  // Computador (PC, notebook e iPad/Safari): usa somente a navegação lateral.
+  const MOBILE_STEPS = [
     { id:'home', title:'Seu Início', text:'Aqui fica a visão rápida do que merece atenção. O conteúdo se adapta ao seu perfil: faculdade, concurso, escola ou curso/estudo livre.', target:'home' },
-    { id:'study', title:'Área Estudar', text:'No computador você encontra essa área na navegação lateral. No celular ela fica na barra inferior. É onde o planejamento vira sessão de estudo.', target:'study' },
+    { id:'study', title:'Área Estudar', text:'Na barra inferior você encontra a área Estudar. É onde o planejamento vira sessão de estudo.', target:'study' },
     { id:'mentor', title:'Mentor IA', text:'Use perguntas naturais. O Mentor cruza seus dados atuais, aprendizagem, prazos e histórico para responder dentro do seu contexto.', target:'mentor' },
     { id:'focus', title:'Modo Foco', text:'Quando você realmente vai estudar, comece uma sessão. Ao terminar, registre o resultado para alimentar a aprendizagem do sistema.', target:'focus' },
     { id:'notifications', title:'Notificações', text:'O sino reúne alertas. As notificações inteligentes também respeitam seus horários ocupados e procuram janelas em que você ainda consegue agir.', target:'notifications' },
-    { id:'more', title:'Mais funções', text:'No celular e em telas menores, a barra inferior concentra os atalhos principais e o botão Mais abre o restante das funções.', target:'more' },
+    { id:'more', title:'Mais funções', text:'A barra inferior concentra os atalhos principais e o botão Mais abre o restante das funções do SLCampus.', target:'more' },
     { id:'learning', title:'Aprendizagem', text:'Mapa, revisões e evidências ajudam o sistema a entender não só quanto você estudou, mas onde ainda precisa recuperar conhecimento.', target:'learning' },
     { id:'organization', title:'Organização', text:'Tarefas, avaliações, agenda e materiais formam a parte operacional. Cadastre os prazos para que as recomendações tenham dados reais.', target:'organization' },
-    { id:'profile', title:'Seu perfil', text:'Em Configurações, você pode ajustar seu contexto e rotina. A escolha do perfil muda a experiência para o tipo de estudo que você realmente faz.', target:'profile' },
+    { id:'profile', title:'Seu perfil', text:'Em Perfil, você pode ajustar seu contexto e rotina. A escolha do perfil muda a experiência para o tipo de estudo que você realmente faz.', target:'profile' },
     { id:'help', title:'Central de Ajuda', text:'Quando precisar, volte aqui. Você pode rever este tutorial e abrir perguntas prontas para o Mentor.', target:'help' }
   ];
+
+  const DESKTOP_STEPS = [
+    { id:'home', title:'Seu Início', text:'Aqui fica a visão rápida do que merece atenção. O conteúdo se adapta ao seu perfil: faculdade, concurso, escola ou curso/estudo livre.', target:'home' },
+    { id:'study', title:'Área Estudar', text:'No computador você encontra essa área na navegação lateral. É onde o planejamento vira sessão de estudo.', target:'study' },
+    { id:'mentor', title:'Mentor IA', text:'Use perguntas naturais. O Mentor cruza seus dados atuais, aprendizagem, prazos e histórico para responder dentro do seu contexto.', target:'mentor' },
+    { id:'focus', title:'Modo Foco', text:'Quando você realmente vai estudar, comece uma sessão. Ao terminar, registre o resultado para alimentar a aprendizagem do sistema.', target:'focus' },
+    { id:'notifications', title:'Notificações', text:'O sino reúne alertas. As notificações inteligentes também respeitam seus horários ocupados e procuram janelas em que você ainda consegue agir.', target:'notifications' },
+    { id:'organization', title:'Organização', text:'Na navegação lateral você encontra tarefas, provas, calendário e outras ferramentas para organizar sua rotina acadêmica.', target:'organization' },
+    { id:'learning', title:'Aprendizagem', text:'O Mapa de Aprendizado, revisões e evidências ajudam o sistema a entender não só quanto você estudou, mas onde ainda precisa recuperar conhecimento.', target:'learning' },
+    { id:'profile', title:'Seu perfil', text:'Em Configurações, você pode ajustar seu contexto e rotina. A escolha do perfil muda a experiência para o tipo de estudo que você realmente faz.', target:'profile' },
+    { id:'telegram', title:'Telegram', text:'O Telegram funciona como outra entrada para o mesmo contexto do SLCampus. Quando vinculado, ele pode consultar sua agenda, tarefas, provas e estudos.', target:'telegram' },
+    { id:'help', title:'Central de Ajuda', text:'Na navegação lateral você pode voltar à Central de Ajuda para rever este tutorial e abrir perguntas prontas para o Mentor.', target:'help' }
+  ];
+
+  function currentSteps(){ return deviceKind()==='mobile' ? MOBILE_STEPS : DESKTOP_STEPS; }
+  function currentStep(){ return currentSteps()[SiteTutorial.index]; }
 
   function targetFor(kind) {
     const mobile = deviceKind() === 'mobile';
@@ -61,7 +80,8 @@
       learning: mobile ? '#slc-mobile-more [data-mobile-more-view="mapa-aprendizado"]' : '[data-view="mapa-aprendizado"]',
       organization: mobile ? '#slc-mobile-more [data-mobile-more-view="tarefas"]' : '[data-view="tarefas"]',
       profile: mobile ? '#slc-mobile-more [data-mobile-more-view="configuracoes"], #slc-mobile-more [data-mobile-more-view="perfil"]' : '[data-view="configuracoes"], [data-slcnavigate="configuracoes"]',
-      help: mobile ? '#slc-mobile-more [data-mobile-more-view="ajuda"]' : '[data-view="ajuda"]'
+      help: mobile ? '#slc-mobile-more [data-mobile-more-view="ajuda"]' : '[data-view="ajuda"]',
+      telegram: mobile ? '#slc-mobile-more [data-mobile-more-view="telegram"]' : '[data-view="telegram"]'
     };
     return selectors[kind] || selectors.home;
   }
@@ -135,7 +155,8 @@
     },
     start(startIndex=0){
       assignTargets();
-      this.index=Math.max(0,Math.min(startIndex,STEPS.length-1));
+      const steps=currentSteps();
+      this.index=Math.max(0,Math.min(startIndex,steps.length-1));
       this.running=true;
       ensureOverlay().classList.add('open');
       document.body.classList.add('slc-tutorial-open');
@@ -160,22 +181,29 @@
       const blocker=overlay.querySelector('.tutorial-target-blocker');
       if(blocker) blocker.onclick=(e)=>{e.preventDefault();e.stopPropagation();};
     },
-    next(){ if(this.index>=STEPS.length-1){this.stop(true);return;} this.index++; this.showStep(); },
+    next(){ if(this.index>=currentSteps().length-1){this.stop(true);return;} this.index++; this.showStep(); },
     prev(){ if(this.index>0){this.index--;this.showStep();} },
     async getTarget(step){
       const selector=targetFor(step.target);
       for(let i=0;i<16;i++){
         assignTargets();
         const target=document.querySelector(selector);
-        if(target && target.getBoundingClientRect().width>0 && target.getBoundingClientRect().height>0)return target;
+        if(target && target.getBoundingClientRect().width>0 && target.getBoundingClientRect().height>0){
+          if(deviceKind()!=='mobile' && target.closest?.('.sidebar-nav')){
+            try{ target.scrollIntoView({block:'nearest',inline:'nearest',behavior:'auto'}); }catch(_){ }
+          }
+          return target;
+        }
         await wait(100);
       }
       return null;
     },
     async ensureView(step){
-      const viewByStep={home:'dashboard',study:'estudar',mentor:'mentor-ia',focus:'foco',learning:'mapa-aprendizado',organization:'tarefas',profile:'configuracoes',help:'ajuda'};
+      const viewByStep={home:'dashboard',study:'estudar',mentor:'mentor-ia',focus:'foco',learning:'mapa-aprendizado',organization:'tarefas',profile:'perfil',telegram:'telegram',help:'ajuda'};
       const view=viewByStep[step.target];
       if(view && window.app?.loadView && !['home','notifications','more'].includes(step.target)){
+        // No computador, a sidebar continua sendo a referência visual.
+        // No celular, itens secundários continuam dentro do drawer Mais.
         try{window.app.loadView(view);markNavActive(view);}catch(_){ }
       }
       // No celular, os itens secundários vivem dentro do menu Mais.
@@ -189,8 +217,15 @@
         const target=document.querySelector(selector);
         const sheet=document.querySelector('#slc-mobile-more .slc-mobile-more-sheet');
         if(target && sheet){
-          try{ target.scrollIntoView({block:'center',inline:'nearest',behavior:'auto'}); }catch(_){ }
-          await wait(80);
+          // Deixe o item logo abaixo do cabeçalho sticky do drawer.
+          // Assim o card do tutorial pode ficar abaixo do alvo sem cobri-lo.
+          try{
+            const sr=sheet.getBoundingClientRect();
+            const tr=target.getBoundingClientRect();
+            const desiredTop=104;
+            sheet.scrollTop += (tr.top - sr.top) - desiredTop;
+          }catch(_){ }
+          await wait(100);
         }
       }
     },
@@ -235,7 +270,7 @@
         const belowSpace=safeBottom-r.bottom-gap;
         const aboveSpace=r.top-margin-gap;
         card.classList.add('mobile');
-        card.style.left=`${margin}px`;card.style.right=`${margin}px`;
+        card.style.left=`${margin}px`;card.style.right=`${margin}px`;card.style.bottom='auto';
 
         // Primeiro tente colocar o balão depois do alvo. Se não couber,
         // coloque antes dele. Assim os últimos itens do menu Mais não ficam
@@ -276,18 +311,22 @@
       // Navegação lateral: procure a barra pela árvore do alvo e, se necessário,
       // use a sidebar visível do layout. Isso também cobre tablets/iPad em
       // orientação/viewport em que o alvo é recriado dinamicamente.
-      const sidebarTarget = target.closest?.('.sidebar, .sidebar-nav, .nav-item');
-      const sidebar = target.closest?.('.sidebar') || document.querySelector('.sidebar');
-      const isSidebarNav = !!sidebarTarget && !!sidebar;
+      const sidebarTarget = target.closest?.('.nav-item, .sidebar-nav, .sidebar');
+      const sidebar = target.closest?.('.sidebar') || target.closest?.('.sidebar-nav')?.closest?.('.sidebar') || document.querySelector('.dashboard-layout > .sidebar, .sidebar');
+      const isSidebarNav = !!sidebarTarget && !!sidebar && (target.matches?.('.nav-item') || !!target.closest?.('.sidebar-nav'));
       if(isSidebarNav){
         const sidebarRect=sidebar.getBoundingClientRect();
+        // O cartão começa imediatamente depois da sidebar e a seta fica na
+        // mesma altura do item. Não usamos a lógica genérica para estes alvos.
         const top=Math.max(margin,Math.min(vh-h-margin,r.top+r.height/2-h/2));
         const x=Math.min(vw-w-margin,Math.max(margin,sidebarRect.right+18));
         card.classList.add('arrow-left');
         card.style.left=`${x}px`;
         card.style.top=`${top}px`;
         arrow.style.left='-10px';
+        arrow.style.right='';
         arrow.style.top=`${Math.max(22,Math.min(h-30,r.top+r.height/2-top-10))}px`;
+        arrow.style.bottom='';
         return;
       }
 
@@ -299,13 +338,14 @@
     },
     positionCurrentStep(){const t=this._target;if(t&&document.body.contains(t)){this.updateSpotlight(t);this.positionCard(t);}},
     async showStep(){
-      const step=STEPS[this.index];if(!step)return;
+      const steps=currentSteps();
+      const step=steps[this.index];if(!step)return;
       // Nunca rola a página automaticamente. O tutorial usa alvos fixos da navegação.
       window.scrollTo(0,0);
       await this.ensureView(step);
       document.querySelectorAll('.tutorial-target-active').forEach(n=>n.classList.remove('tutorial-target-active'));
       const target=await this.getTarget(step);
-      if(!target){if(this.index<STEPS.length-1){this.index++;return this.showStep();}return;}
+      if(!target){if(this.index<steps.length-1){this.index++;return this.showStep();}return;}
       if(step.target==='more' && deviceKind()==='mobile'){
         // O botão Mais deve continuar fechado enquanto o destaque é mostrado.
         window.SLCProductShell?.closeMobileMore?.();
@@ -315,9 +355,9 @@
       const device=deviceKind();
       el('tutorial-title').textContent=step.title;
       el('tutorial-text').textContent=step.text;
-      el('tutorial-progress-text').textContent=`Passo ${this.index+1} de ${STEPS.length}`;
-      el('tutorial-device-note').textContent=device==='desktop'?'Desktop':device==='tablet'?'Tablet':'Celular';
-      el('tutorial-next').textContent=this.index===STEPS.length-1?'Finalizar':'Próximo';
+      el('tutorial-progress-text').textContent=`Passo ${this.index+1} de ${steps.length}`;
+      el('tutorial-device-note').textContent=device==='mobile'?'Celular':'Computador';
+      el('tutorial-next').textContent=this.index===steps.length-1?'Finalizar':'Próximo';
       await wait(80);this.updateSpotlight(target);this.positionCard(target);
       await wait(120);this.updateSpotlight(target);this.positionCard(target);
     }
