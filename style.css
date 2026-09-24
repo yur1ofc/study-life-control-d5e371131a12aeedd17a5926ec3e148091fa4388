@@ -6594,3 +6594,23 @@ body.slc-tutorial-open .slc-mobile-more-backdrop{pointer-events:none!important;}
 .help-shortcut-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.help-shortcut-grid button{display:flex;align-items:center;gap:9px;padding:12px 14px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);border-radius:14px;cursor:pointer;font-weight:700;text-align:left}.help-shortcut-grid button i{color:var(--accent-primary);width:18px;text-align:center}
 .tutorial-device-note{font-size:.68rem;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px;font-weight:800}
 @media(max-width:640px){.help-shortcut-grid{grid-template-columns:1fr 1fr}.help-profile-chip{width:100%;box-sizing:border-box}}
+
+/* Tutorial V45 — o tutorial sempre fica acima da navegação móvel e do drawer Mais. */
+body.slc-tutorial-open .tutorial-overlay{z-index:2147483647!important;pointer-events:none!important}
+body.slc-tutorial-open .tutorial-overlay .tutorial-backdrop{z-index:0!important;pointer-events:none!important}
+body.slc-tutorial-open .tutorial-overlay .tutorial-backdrop > i{pointer-events:auto!important}
+body.slc-tutorial-open .tutorial-overlay .tutorial-spotlight{z-index:1!important}
+body.slc-tutorial-open .tutorial-overlay .tutorial-card{z-index:3!important}
+body.slc-tutorial-open #slc-product-bottom-nav,
+body.slc-tutorial-open #slc-mobile-more,
+body.slc-tutorial-open #slc-mobile-more .slc-mobile-more-sheet{z-index:2147483000!important}
+body.slc-tutorial-open #slc-mobile-more .slc-mobile-more-backdrop{pointer-events:none!important}
+
+@media(max-width:768px){
+  body.slc-tutorial-open #slc-product-bottom-nav{z-index:2147483000!important;pointer-events:none!important}
+  body.slc-tutorial-open #slc-product-bottom-nav button{pointer-events:none!important}
+  body.slc-tutorial-open #slc-mobile-more{z-index:2147483000!important;pointer-events:none!important}
+  body.slc-tutorial-open #slc-mobile-more .slc-mobile-more-sheet,
+  body.slc-tutorial-open #slc-mobile-more .slc-mobile-more-grid button,
+  body.slc-tutorial-open #slc-mobile-more .slc-mobile-more-head button{pointer-events:none!important}
+}

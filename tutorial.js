@@ -183,7 +183,16 @@
       if(deviceKind()==='mobile' && ['learning','organization','profile','help'].includes(step.target)){
         window.SLCProductShell?.openMobileMore?.();
       }
-      await wait(220); assignTargets();
+      await wait(260); assignTargets();
+      if(deviceKind()==='mobile' && ['learning','organization','profile','help'].includes(step.target)){
+        const selector=targetFor(step.target);
+        const target=document.querySelector(selector);
+        const sheet=document.querySelector('#slc-mobile-more .slc-mobile-more-sheet');
+        if(target && sheet){
+          try{ target.scrollIntoView({block:'center',inline:'nearest',behavior:'auto'}); }catch(_){ }
+          await wait(80);
+        }
+      }
     },
     updateSpotlight(target){
       const overlay=ensureOverlay(),s=overlay.querySelector('.tutorial-spotlight'),backdrop=overlay.querySelector('.tutorial-backdrop');
@@ -217,26 +226,45 @@
       if(deviceKind()==='mobile'){
         const bottomNav=document.getElementById('slc-product-bottom-nav');
         const navRect=bottomNav?.getBoundingClientRect?.();
-        const navTop=navRect?.top || vh;
+        const navVisible=bottomNav && getComputedStyle(bottomNav).display !== 'none' && !bottomNav.classList.contains('slc-more-hidden');
+        const safeBottom=navVisible ? (navRect?.top || vh) : vh;
         const cardLeft=margin, cardWidth=vw-margin*2;
         const cardHeight=card.offsetHeight||280;
-        const targetNearBottom=r.bottom >= navTop-18 || r.top > vh*.68;
+        const gap=14;
+        const targetCenter=r.left+r.width/2;
+        const belowSpace=safeBottom-r.bottom-gap;
+        const aboveSpace=r.top-margin-gap;
         card.classList.add('mobile');
         card.style.left=`${margin}px`;card.style.right=`${margin}px`;
 
-        if(!targetNearBottom && r.bottom + cardHeight + 18 <= navTop){
-          // Alvo no topo/meio: card fica abaixo dele e a seta aponta para cima.
+        // Primeiro tente colocar o balão depois do alvo. Se não couber,
+        // coloque antes dele. Assim os últimos itens do menu Mais não ficam
+        // escondidos atrás do próprio tutorial.
+        if(belowSpace >= cardHeight){
           card.classList.add('arrow-top');
-          card.style.top=`${Math.max(margin,r.bottom+16)}px`;
+          card.style.top=`${Math.min(vh-cardHeight-margin,r.bottom+gap)}px`;
+          card.style.bottom='';
           arrow.style.top='-10px';arrow.style.bottom='';
-        }else{
-          // Alvo na barra inferior (ou sem espaço abaixo): card fica acima e a seta aponta para baixo.
+        }else if(aboveSpace >= cardHeight){
           card.classList.add('arrow-bottom');
-          const cardBottom=Math.max(margin+8, vh-navTop+10);
-          card.style.bottom=`${cardBottom}px`;card.style.top='';
+          card.style.top=`${Math.max(margin,r.top-cardHeight-gap)}px`;
+          card.style.bottom='';
           arrow.style.bottom='-10px';arrow.style.top='';
+        }else{
+          // Fallback: mantém o card dentro da área segura. O alvo é rolado
+          // para o centro antes desta etapa quando estiver no menu Mais.
+          const top=Math.max(margin,Math.min(safeBottom-cardHeight-margin,r.top-cardHeight-gap));
+          const placeBelow=top>=r.bottom+gap;
+          if(placeBelow){
+            card.classList.add('arrow-top');
+            card.style.top=`${top}px`;card.style.bottom='';
+            arrow.style.top='-10px';arrow.style.bottom='';
+          }else{
+            card.classList.add('arrow-bottom');
+            card.style.top=`${top}px`;card.style.bottom='';
+            arrow.style.bottom='-10px';arrow.style.top='';
+          }
         }
-        const targetCenter=r.left+r.width/2;
         arrow.style.left=`${Math.max(24,Math.min(cardWidth-30,targetCenter-cardLeft-10))}px`;
         return;
       }
@@ -245,9 +273,14 @@
       // Alvos da navegação lateral precisam manter o balão ao lado do menu.
       // A lógica genérica pode escolher uma posição central quando existe muito
       // espaço livre à direita, deixando a seta longe do item destacado.
-      const sidebarTarget=target.closest?.('.sidebar');
-      if(sidebarTarget){
-        const sidebarRect=sidebarTarget.getBoundingClientRect();
+      // Navegação lateral: procure a barra pela árvore do alvo e, se necessário,
+      // use a sidebar visível do layout. Isso também cobre tablets/iPad em
+      // orientação/viewport em que o alvo é recriado dinamicamente.
+      const sidebarTarget = target.closest?.('.sidebar, .sidebar-nav, .nav-item');
+      const sidebar = target.closest?.('.sidebar') || document.querySelector('.sidebar');
+      const isSidebarNav = !!sidebarTarget && !!sidebar;
+      if(isSidebarNav){
+        const sidebarRect=sidebar.getBoundingClientRect();
         const top=Math.max(margin,Math.min(vh-h-margin,r.top+r.height/2-h/2));
         const x=Math.min(vw-w-margin,Math.max(margin,sidebarRect.right+18));
         card.classList.add('arrow-left');
