@@ -5,7 +5,7 @@
 // adicione ele aqui também — senão ele só entra no cache dinâmico depois
 // do primeiro acesso online, e falha se o usuário abrir o app offline
 // (ou logo após instalar como PWA) antes disso acontecer.
-const CACHE_VERSION = 'slc-v52-desktop-ipad-hard-anchor';
+const CACHE_VERSION = 'slc-v53-security-hardening';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 
@@ -78,11 +78,10 @@ const STATIC_ASSETS = [
   './adaptive-learning-engine.js',
   './notification-ui.js',
   './telegram-integration.js',
-  './app-enhancements.js',
-  './curriculum-catalog.js',
+  './resource-library.js',
+  './account-security.js',
   './concursos-brasil.js',
   './ensino-medio-curriculo.js',
-  './quick-search.js'
 ];
 
 // Firebase SDK vem da CDN (gstatic.com) — não existe cópia local no repo.
@@ -95,6 +94,7 @@ const FIREBASE_CDN_ASSETS = [
   'https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js',
   'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js',
   'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js',
+  'https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js',
   'https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics-compat.js'
 ];
 

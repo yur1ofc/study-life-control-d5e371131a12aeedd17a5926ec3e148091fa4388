@@ -55,9 +55,9 @@ function providerIsCoolingDown(provider){return providerCooldowns[provider]>Date
 function providerCooldownRemaining(provider){return Math.max(0,providerCooldowns[provider]-Date.now());}
 
 function providerOrder(){
-  const raw=String(process.env.SLC_AI_PROVIDER_ORDER||'gemini,groq').toLowerCase();
+  const raw=String(process.env.SLC_AI_PROVIDER_ORDER||'groq,gemini').toLowerCase();
   const list=raw.split(',').map(x=>x.trim()).filter(x=>x==='gemini'||x==='groq');
-  return [...new Set(list.length?list:['gemini','groq'])];
+  return [...new Set(list.length?list:['groq','gemini'])];
 }
 
 function geminiContentsToGroq(contents){

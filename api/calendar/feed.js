@@ -289,6 +289,7 @@ module.exports = async function handler(req, res) {
     res.setHeader('Cache-Control', 'public, max-age=900');
     return res.status(200).send(ics);
   } catch (err) {
-    return res.status(500).send(`Erro interno ao gerar o calendário: ${err.message}`);
+    console.error('[calendar-feed]', err);
+    return res.status(500).send('Erro interno ao gerar o calendário. Tente novamente mais tarde.');
   }
 };

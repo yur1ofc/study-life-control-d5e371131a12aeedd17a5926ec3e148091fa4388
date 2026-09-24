@@ -27,6 +27,6 @@ module.exports = async function handler(req, res) {
     return res.status(200).json(data);
   } catch (err) {
     console.error('[admin-ai-usage]', err);
-    return res.status(503).json({ error: 'Não foi possível carregar o painel de IA.', detail: err.message });
+    return res.status(503).json({ error: 'Não foi possível carregar o painel de IA.' });
   }
 };

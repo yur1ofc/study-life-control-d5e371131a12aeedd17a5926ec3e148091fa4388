@@ -1,0 +1,1879 @@
+SLCAMPUS — CONTEXTO COMPLETO ATUAL + ESTADO DO PROJETO + O QUE
+FUNCIONA + O QUE PRECISA DE ATENÇÃO + PRÓXIMOS PASSOS
+
+INSTRUÇÃO PARA A IA QUE RECEBER ESTE DOCUMENTO
+
+Você está assumindo o desenvolvimento de um projeto chamado SLCampus.
+
+Não trate este projeto como um site simples de tarefas. Leia todo este
+contexto antes de alterar qualquer coisa.
+
+Sua prioridade deve ser:
+
+1.  entender a arquitetura existente;
+2.  preservar funcionalidades que já funcionam;
+3.  não substituir módulos bons por versões simplificadas;
+4.  corrigir problemas estruturais em vez de criar remendos;
+5.  não alterar uma área que já foi aprovada sem necessidade;
+6.  testar regressões depois de qualquer alteração;
+7.  distinguir claramente:
+    -   o que está implementado;
+    -   o que foi validado pelo usuário;
+    -   o que existe no código mas ainda precisa de teste real;
+    -   o que é arquitetura planejada;
+    -   o que ainda falta construir.
+
+REGRA MUITO IMPORTANTE: O tutorial guiado foi recentemente corrigido e
+aprovado pelo usuário.
+
+A versão MOBILE está aprovada e NÃO DEVE SER ALTERADA. A versão
+DESKTOP/PC/iPad também foi corrigida e aprovada. Não refatore novamente
+o tutorial só por estética. Se uma alteração futura tocar tutorial.js,
+style.css ou service-worker.js, preserve o comportamento aprovado e faça
+testes de regressão em mobile + desktop/iPad.
+
+============================================================ 1. O QUE É
+O SLCAMPUS ============================================================
+
+Nome: SLCampus Ecossistema/marca: SL Produto futuro relacionado: SLGym
+
+O SLCampus é uma plataforma web de organização acadêmica e inteligência
+de estudos.
+
+Ele não deve ser entendido como:
+
+-   simples calendário;
+-   lista de tarefas;
+-   calculadora de notas;
+-   cronômetro;
+-   bloco de anotações.
+
+A ideia do produto é integrar os dados acadêmicos e comportamentais do
+aluno para transformar dados em decisões.
+
+Filosofia central:
+
+DADOS → CONTEXTO → ANÁLISE → PRIORIDADE → PLANO → EXECUÇÃO → EVIDÊNCIA
+DE APRENDIZAGEM → ADAPTAÇÃO
+
+Exemplo:
+
+Uma nota baixa não deve existir somente na tela de notas.
+
+Ela pode influenciar:
+
+-   prioridade;
+-   Mentor IA;
+-   plano de estudos;
+-   dificuldade;
+-   revisão;
+-   dashboard;
+-   recomendações;
+-   histórico;
+-   previsão matemática de média.
+
+Da mesma forma, uma sessão de estudo não é apenas histórico.
+
+Ela pode alimentar:
+
+-   horas estudadas;
+-   consistência;
+-   dificuldade;
+-   aprendizagem;
+-   revisão;
+-   mapa de aprendizagem;
+-   adaptação;
+-   prioridade futura.
+
+============================================================ 2. STACK
+ATUAL ============================================================
+
+Frontend:
+
+-   HTML
+-   CSS
+-   JavaScript puro
+-   Font Awesome
+-   Google Fonts
+-   PWA/service worker
+
+Backend:
+
+-   Vercel Functions
+-   Firebase
+-   Firestore
+-   Firebase Authentication
+-   Firebase Storage
+-   web-push
+-   pdf-parse
+
+IA:
+
+-   arquitetura atual baseada em Groq;
+-   backend/gateway para chamadas de IA;
+-   frontend não deve receber a chave da IA;
+-   modelos planejados/atuais incluem openai/gpt-oss-120b e fallback
+    openai/gpt-oss-20b;
+-   visão pode usar modelo Qwen;
+-   o endpoint /api/gemini existe por compatibilidade histórica, mas
+    isso NÃO significa que o provider atual seja Google Gemini.
+
+Deploy:
+
+-   Vercel
+-   domínio/site web
+-   cron da Vercel para lembretes
+-   Service Worker para PWA/cache
+
+============================================================ 3.
+ARQUITETURA REAL DO PROJETO
+============================================================
+
+O projeto atualmente é um sistema grande em JavaScript puro e possui
+muitos módulos.
+
+Arquivos centrais:
+
+-   index.html
+-   style.css
+-   app.js
+-   auth.js
+-   database.js
+-   firebase-config.js
+-   views.js
+-   utils.js
+-   service-worker.js
+
+Módulos importantes:
+
+-   smart-dashboard.js
+-   dashboard-prioritario.js
+-   academic-intelligence.js
+-   adaptive-learning-engine.js
+-   learning-intelligence-v18.js
+-   subject-difficulty.js
+-   focus-engine.js
+-   review-system.js
+-   grade-calculator.js
+-   grade-ia-import.js
+-   grade-structure-modal.js
+-   schedule.js
+-   schedule-ia-import.js
+-   class-diary.js
+-   diary-view.js
+-   daily-log.js
+-   resource-library.js
+-   curriculum-catalog.js
+-   curriculum-import-template.json
+-   subjects-curriculum-sync.js
+-   semester-context.js
+-   semester-history-manager.js
+-   semester-archive-viewer.js
+-   semester-finish.js
+-   profile-experience.js
+-   perfil-adaptativo.js
+-   onboarding-simplificado.js
+-   setup-wizard.js
+-   setup-onboarding-enhancer.js
+-   product-shell.js
+-   quick-search.js
+-   notification-ui.js
+-   push-notifications.js
+-   auto-notification-prompt.js
+-   calendar-feed.js
+-   telegram-integration.js
+-   export-data.js
+-   account-security.js
+-   feedback-widget.js
+-   theme-engine.js
+-   xp-widget.js
+-   reprovado-ecosystem.js
+
+IA/backend:
+
+-   ai-assistant.js
+-   ai-core.js
+-   api/mentor-chat.js
+-   api/gemini.js
+-   api/_lib/ai-core.js
+-   api/_lib/academic-intelligence-server.js
+-   api/_lib/gemini-admin-quota.js
+-   api/_lib/gemini-shared-quota.js
+-   api/admin-ai-usage.js
+-   api/send-reminders.js
+
+Segurança:
+
+-   security.js
+-   account-security.js
+-   firestore.rules
+-   api/telegram-webhook.js
+-   api/delete-account.js
+
+============================================================ 4. USUÁRIO,
+AUTENTICAÇÃO E DADOS
+============================================================
+
+Cada usuário possui dados próprios.
+
+Firebase Authentication identifica o usuário.
+
+Firestore armazena dados acadêmicos e operacionais.
+
+As regras do Firestore isolam os dados por UID.
+
+Um usuário não deve conseguir ler ou modificar dados acadêmicos de outro
+usuário.
+
+Perfis de uso existentes/conceituais:
+
+-   faculdade;
+-   concurso;
+-   ensino médio;
+-   geral.
+
+O perfil altera a experiência e o contexto relevante.
+
+============================================================ 5. ACADEMIC
+CONTEXT ============================================================
+
+Existe um conceito central chamado AcademicContext.
+
+Ele deve funcionar como fonte comum de contexto acadêmico.
+
+O objetivo é impedir que:
+
+-   Dashboard;
+-   Mentor;
+-   Telegram;
+-   inteligência;
+-   histórico;
+-   importações;
+-   planejamento
+
+tenham interpretações diferentes do mesmo aluno.
+
+O contexto precisa considerar:
+
+-   usuário;
+-   semestre atual;
+-   disciplinas atuais;
+-   disciplinas históricas;
+-   histórico;
+-   tentativas anteriores;
+-   notas;
+-   provas;
+-   tarefas;
+-   sessões;
+-   revisões;
+-   frequência;
+-   horários;
+-   currículo;
+-   pré-requisitos;
+-   dificuldade;
+-   mapa de aprendizagem;
+-   comportamento.
+
+============================================================ 6. SEMESTRE
+ATUAL VS HISTÓRICO
+============================================================
+
+Esse é um dos princípios mais importantes do projeto.
+
+SEMESTRE ATUAL:
+
+representa o que o aluno está cursando agora.
+
+HISTÓRICO:
+
+representa períodos anteriores.
+
+Se o aluno reprovou em Física em 2025.1 e está cursando Física novamente
+em 2026.2:
+
+-   2025.1 permanece histórico;
+-   2026.2 é a tentativa atual;
+-   a nota atual domina a análise atual;
+-   a reprovação anterior pode ser usada como contexto de dificuldade;
+-   a reprovação anterior não pode substituir a nota atual;
+-   o sistema não deve tratar o aluno como permanentemente ruim naquela
+    disciplina.
+
+Consultas atuais não podem misturar silenciosamente dados antigos.
+
+Exemplo:
+
+“Quais provas tenho esta semana?”
+
+Deve consultar o semestre atual.
+
+“Já reprovei Física?”
+
+Pode consultar o histórico.
+
+============================================================ 7.
+HISTÓRICO ACADÊMICO
+============================================================
+
+Existe suporte para importar histórico acadêmico, especialmente
+documentos do SIGAA.
+
+O histórico pode conter:
+
+-   períodos;
+-   disciplinas;
+-   códigos;
+-   carga horária;
+-   notas;
+-   frequência;
+-   situação;
+-   aprovação;
+-   reprovação;
+-   matrícula atual;
+-   componentes pendentes.
+
+Situações possíveis incluem:
+
+APR REP MATR REC CANC TRANC INCORP etc.
+
+Existe parser determinístico para formatos conhecidos e IA para
+documentos que precisam de interpretação.
+
+Fluxo ideal:
+
+SIGAA PDF → pdf-parse → parser SIGAA → períodos → disciplinas → situação
+→ notas → frequência → identificação do período atual → histórico.
+
+Não usar IA desnecessariamente quando um parser determinístico consegue
+resolver.
+
+============================================================ 8.
+CURRÍCULO / GRADE CURRICULAR
+============================================================
+
+O SLCampus possui catálogo/importação de currículo.
+
+Pode trabalhar com:
+
+-   disciplinas;
+-   códigos;
+-   semestre;
+-   carga horária;
+-   créditos;
+-   obrigatórias/eletivas;
+-   pré-requisitos.
+
+Currículo e histórico são entidades diferentes.
+
+Currículo: “O que faz parte do curso?”
+
+Histórico: “O que este aluno já cursou?”
+
+Os dois podem ser cruzados para descobrir:
+
+-   concluídas;
+-   em andamento;
+-   pendentes;
+-   próximos componentes;
+-   reprovações;
+-   progresso.
+
+Também existe sincronização entre matérias cadastradas e currículo.
+
+============================================================ 9. MATÉRIAS
+============================================================
+
+O usuário consegue trabalhar com suas disciplinas.
+
+As matérias são utilizadas por praticamente todos os módulos:
+
+-   tarefas;
+-   provas;
+-   notas;
+-   sessões;
+-   diário;
+-   materiais;
+-   revisões;
+-   mapa de aprendizagem;
+-   Mentor;
+-   prioridade;
+-   calendário;
+-   histórico.
+
+Existe preocupação específica em manter os seletores de disciplina
+sincronizados.
+
+============================================================ 10. NOTAS E
+PREVISÃO ============================================================
+
+O SLCampus possui cálculo de notas.
+
+Avaliações podem possuir:
+
+-   valor;
+-   peso;
+-   data;
+-   contexto;
+-   disciplina.
+
+O sistema calcula:
+
+-   média atual;
+-   peso acumulado;
+-   peso restante;
+-   média necessária;
+-   máximo possível;
+-   situação objetiva.
+
+Exemplo:
+
+Se o aluno possui 5,5 em uma avaliação que representa 20% e deseja média
+7,0, o sistema deve calcular matematicamente quanto precisa obter no
+restante.
+
+Não inventar probabilidades como:
+
+“você tem 73% de chance de passar”.
+
+A inteligência deve trabalhar com dados objetivos.
+
+Também existe importação de notas com IA e estrutura de avaliações.
+
+ATENÇÃO: Esse fluxo precisa de testes reais com diferentes combinações
+de pesos, avaliações e histórico para garantir que nenhum caso limite
+quebre o cálculo.
+
+============================================================ 11. PROVAS
+E TRABALHOS ============================================================
+
+Provas/exames podem possuir:
+
+-   nome;
+-   data;
+-   horário;
+-   disciplina;
+-   conteúdo;
+-   peso;
+-   nota;
+-   status.
+
+Alimentam:
+
+-   dashboard;
+-   calendário;
+-   prioridade;
+-   planejamento;
+-   Mentor;
+-   Telegram;
+-   notificações.
+
+Também existe lógica de estudo orientado por prova.
+
+============================================================ 12. TAREFAS
+============================================================
+
+Tarefas podem possuir:
+
+-   disciplina;
+-   título;
+-   descrição;
+-   prazo;
+-   prioridade;
+-   status;
+-   conclusão.
+
+Tarefas aparecem em:
+
+-   dashboard;
+-   agenda;
+-   calendário;
+-   prioridades;
+-   planejamento;
+-   Telegram;
+-   notificações.
+
+Tarefas atrasadas são identificadas.
+
+============================================================ 13. SESSÕES
+DE ESTUDO ============================================================
+
+Sessões registram comportamento real.
+
+Podem conter:
+
+-   disciplina;
+-   conteúdo;
+-   duração;
+-   data;
+-   horário;
+-   tipo;
+-   sessão programada;
+-   conclusão.
+
+Esses dados alimentam:
+
+-   horas estudadas;
+-   consistência;
+-   horários reais;
+-   distribuição por matéria;
+-   adaptação;
+-   aprendizagem.
+
+Um ponto central do produto é comparar:
+
+DISPONIBILIDADE DECLARADA vs EXECUÇÃO REAL.
+
+Exemplo:
+
+Usuário declara 4h/dia.
+
+Mas executa 1h30.
+
+O sistema deve aprender com essa diferença ao longo do tempo.
+
+============================================================ 14. MODO
+FOCO ============================================================
+
+Existe um Focus Engine real.
+
+Estados principais:
+
+-   idle;
+-   running;
+-   overtime;
+-   paused;
+-   break.
+
+O cronômetro deve ser baseado em tempo real transcorrido.
+
+O sistema pode:
+
+-   iniciar foco;
+-   pausar;
+-   iniciar pausa;
+-   retomar;
+-   finalizar;
+-   registrar sessão;
+-   gerar evidência de aprendizagem;
+-   enviar notificações;
+-   vincular sessão planejada.
+
+Depois do foco pode existir coleta de evidência de aprendizagem.
+
+O sistema também pode inferir:
+
+-   matéria;
+-   tópico;
+-   material disponível;
+-   sessão relacionada.
+
+IMPORTANTE: Tempo de foco precisa continuar correto mesmo se a aba
+sofrer atraso de renderização. Não usar simplesmente contador de +1 por
+segundo como fonte da verdade.
+
+============================================================ 15.
+EVIDÊNCIA DE APRENDIZAGEM
+============================================================
+
+Depois de uma sessão o aluno pode registrar algo como:
+
+1.  Consigo explicar sem olhar.
+2.  Consigo resolver exercícios.
+3.  Ainda tenho dúvidas.
+4.  Preciso revisar.
+
+Isso alimenta o motor de aprendizagem.
+
+Respostas de dúvida/revisão devem aumentar a necessidade de atenção.
+
+Domínio pode permitir espaçamento maior.
+
+O sistema deve diferenciar:
+
+-   exposição;
+-   compreensão;
+-   recuperação;
+-   aplicação;
+-   necessidade de revisão.
+
+============================================================ 16.
+REVISÕES / REPETIÇÃO ESPAÇADA
+============================================================
+
+Existe review-system.js e estrutura de revisões.
+
+Revisões podem se relacionar a:
+
+-   matéria;
+-   conteúdo;
+-   data;
+-   dificuldade;
+-   domínio;
+-   evidência.
+
+Não revisar tudo igualmente.
+
+Conteúdos difíceis/dúvidas devem ter prioridade maior.
+
+Conteúdos dominados podem ser espaçados.
+
+============================================================ 17. MAPA DE
+APRENDIZAGEM
+============================================================
+
+Existe learning map.
+
+A ideia é representar:
+
+“o que o aluno realmente sabe”
+
+e não apenas:
+
+“quais matérias possui”.
+
+Pode considerar:
+
+-   tópicos;
+-   dificuldade;
+-   desempenho;
+-   evidência;
+-   revisões;
+-   exercícios;
+-   consistência;
+-   tempo.
+
+Existe learning-intelligence-v18.js e estruturas relacionadas.
+
+============================================================ 18.
+INTELIGÊNCIA ACADÊMICA
+============================================================
+
+Existe academic-intelligence.js.
+
+Também existem:
+
+-   subject-difficulty.js;
+-   adaptive-learning-engine.js;
+-   learning-intelligence-v18.js;
+-   dashboard-prioritario.js;
+-   smart-dashboard.js.
+
+A inteligência considera sinais como:
+
+-   notas;
+-   avaliações;
+-   provas;
+-   tarefas;
+-   revisões;
+-   dúvidas;
+-   sessões;
+-   frequência;
+-   histórico;
+-   pré-requisitos;
+-   tempo desde último estudo;
+-   evidência de aprendizagem;
+-   comportamento.
+
+Não reduzir dificuldade simplesmente a nota.
+
+Uma matéria com nota baixa e pouca exposição não é igual a uma matéria
+com muitas horas de estudo e baixo desempenho.
+
+============================================================ 19.
+ADAPTIVE LEARNING ENGINE
+============================================================
+
+Existe motor adaptativo.
+
+Ele tenta separar:
+
+CAPACIDADE: quanto o aluno consegue estudar.
+
+EFICIÊNCIA: quanto o aluno consegue aprender com o tempo investido.
+
+Considera:
+
+-   minutos disponíveis;
+-   sessões;
+-   carga;
+-   execução histórica;
+-   desempenho;
+-   retenção;
+-   revisões;
+-   dúvidas.
+
+O sistema não deve simplesmente recomendar cada vez mais horas quando o
+aluno está mal.
+
+Pode ser necessário identificar:
+
+-   falta de tempo;
+-   falta de consistência;
+-   método ruim;
+-   conteúdo difícil;
+-   excesso de carga;
+-   baixa retenção.
+
+Também existem preferências de horário e duração de sessão.
+
+============================================================ 20.
+PRIORIDADE ACADÊMICA
+============================================================
+
+Existe conceito de prioridade determinística.
+
+Ela não é probabilidade de aprovação.
+
+Pode combinar:
+
+-   proximidade de prova;
+-   nota atual;
+-   peso restante;
+-   média necessária;
+-   dificuldade;
+-   atraso;
+-   tarefas;
+-   dúvidas;
+-   revisões;
+-   tempo desde estudo;
+-   frequência;
+-   carga;
+-   histórico;
+-   pré-requisitos;
+-   tendência.
+
+Exemplo:
+
+Prova em 2 dias + média necessária alta + conteúdo difícil + revisão
+atrasada → prioridade alta.
+
+Prova distante + domínio alto + notas boas + revisão recente →
+prioridade menor.
+
+A prioridade deve ser explicável.
+
+============================================================ 21.
+DECISION ENGINE
+============================================================
+
+O produto deve evoluir de “mostrar dados” para “tomar decisões
+explicáveis”.
+
+Exemplo:
+
+Dados:
+
+-   prova sexta;
+-   média atual 5,2;
+-   precisa de 7,8;
+-   assunto X com dúvidas;
+-   assunto Y dominado;
+-   3h disponíveis.
+
+Decisão:
+
+-   priorizar disciplina;
+-   priorizar assunto X;
+-   praticar exercícios;
+-   reservar tempo;
+-   deixar Y para revisão posterior.
+
+Toda recomendação importante deve ter motivo compreensível.
+
+============================================================ 22.
+DASHBOARD / INÍCIO
+============================================================
+
+O dashboard é a visão geral.
+
+Pode apresentar:
+
+-   situação acadêmica;
+-   matérias;
+-   notas;
+-   próximas provas;
+-   tarefas;
+-   horas;
+-   sessões;
+-   revisões;
+-   prioridades;
+-   agenda;
+-   alertas;
+-   atalhos;
+-   progresso.
+
+A versão atual também possui camadas de dashboard prioritário/smart
+dashboard.
+
+Não misturar silenciosamente histórico com o atual.
+
+============================================================ 23. ESTUDAR
+============================================================
+
+A área Estudar concentra a execução.
+
+Inclui/integra:
+
+-   iniciar sessão;
+-   Modo Foco;
+-   revisões;
+-   materiais;
+-   planejamento;
+-   atalhos de estudo.
+
+A filosofia é:
+
+planejamento → execução → evidência → adaptação.
+
+============================================================ 24. MODO
+FOCO ============================================================
+
+O Modo Foco possui:
+
+-   cronômetro;
+-   seleção de matéria;
+-   tópico;
+-   duração;
+-   pausa;
+-   retomada;
+-   finalização;
+-   evidência;
+-   integração com sessões;
+-   notificações.
+
+É uma das partes mais importantes porque gera dados comportamentais
+reais.
+
+============================================================ 25.
+MATERIAIS / BIBLIOTECA
+============================================================
+
+Existe resource-library.js.
+
+Materiais podem ser:
+
+-   PDF;
+-   vídeo;
+-   e-book;
+-   link;
+-   site.
+
+Podem possuir:
+
+-   título;
+-   matéria;
+-   descrição;
+-   URL;
+-   tags;
+-   favorito.
+
+Há suporte para Firebase Storage em determinados fluxos.
+
+A biblioteca deve futuramente se conectar ainda mais ao:
+
+-   Mentor;
+-   foco;
+-   tópicos;
+-   revisão;
+-   aprendizagem.
+
+============================================================ 26. DIÁRIO
+DE AULA ============================================================
+
+Existe:
+
+-   class-diary.js;
+-   diary-view.js;
+-   daily-log.js.
+
+O diário pode registrar:
+
+-   disciplina;
+-   data;
+-   conteúdo;
+-   observações;
+-   dúvidas;
+-   tarefas;
+-   pontos importantes;
+-   algo que o aluno não entendeu.
+
+Dúvidas do diário podem alimentar inteligência e Mentor.
+
+============================================================ 27. GRADE
+HORÁRIA ============================================================
+
+Existe schedule.js.
+
+Pode representar:
+
+-   disciplina;
+-   dia;
+-   horário;
+-   local;
+-   professor.
+
+Também existe importação de horário via IA.
+
+Os códigos de dia usados no projeto da UFOB incluem:
+
+2 = segunda 3 = terça 4 = quarta 5 = quinta 6 = sexta
+
+A grade deve influenciar disponibilidade e planejamento.
+
+============================================================ 28.
+CALENDÁRIO ============================================================
+
+Existe calendário/agenda e integração com feed.
+
+Pode reunir:
+
+-   aulas;
+-   provas;
+-   tarefas;
+-   sessões;
+-   revisões.
+
+Existe calendar-feed.js e API para feed.
+
+Também existe geração de link/URL de calendário para uso externo.
+
+ATENÇÃO: Integração externa com Google/Apple/Outlook deve ser testada no
+mundo real, porque a disponibilidade do calendário depende de como cada
+provedor atualiza feeds.
+
+============================================================ 29. MENTOR
+IA ============================================================
+
+O Mentor IA é a camada conversacional do SLCampus.
+
+Exemplos de perguntas:
+
+-   Qual matéria estudar hoje?
+-   O que está mais urgente?
+-   Como estão minhas notas?
+-   Quanto preciso tirar?
+-   Quais matérias estão mais difíceis?
+-   O que tenho hoje?
+-   Como evoluí?
+-   Quais provas estão próximas?
+-   O que devo revisar?
+
+O Mentor deve usar contexto real.
+
+Arquitetura:
+
+Frontend: ai-assistant.js
+
+Backend: api/mentor-chat.js
+
+Gateway: api/_lib/ai-core.js
+
+Provider: Groq
+
+Endpoint histórico: api/gemini.js
+
+IMPORTANTE: O nome gemini em arquivos antigos não significa que o
+provider atual seja Gemini.
+
+A chave da IA deve ficar apenas no servidor.
+
+============================================================ 30. IA /
+QUOTAS ============================================================
+
+Existe quota interna do próprio SLCampus.
+
+Ela é diferente da quota da Groq.
+
+Existem nomes legados como:
+
+-   gemini-admin-quota.js;
+-   gemini-shared-quota.js;
+-   gemini_usage_global;
+-   gemini_ai_logs;
+-   GEMINI_TOTAL_DAILY_LIMIT.
+
+Não renomear tudo automaticamente sem avaliar compatibilidade.
+
+A quota interna controla consumo do próprio produto.
+
+GLOBAL_AI_LIMIT não significa necessariamente que a Groq acabou.
+
+============================================================ 31.
+IMPORTAÇÃO POR IA
+============================================================
+
+Existem importadores para:
+
+-   currículo;
+-   notas;
+-   histórico;
+-   grade horária.
+
+A arquitetura desejada é:
+
+1.  tentar parser determinístico quando o formato é conhecido;
+2.  usar IA quando é necessário interpretar estrutura desconhecida;
+3.  validar o resultado;
+4.  mostrar revisão/confirmação quando apropriado;
+5.  salvar somente dados coerentes.
+
+IA não deve ser usada para algo que um parser simples resolve melhor.
+
+============================================================ 32. VISÃO /
+IMAGENS ============================================================
+
+O sistema possui arquitetura para análise de imagens.
+
+Casos:
+
+-   print;
+-   documento;
+-   questão;
+-   página de material;
+-   imagem acadêmica.
+
+Formatos principais:
+
+-   PNG;
+-   JPG/JPEG;
+-   WEBP.
+
+PDF não deve ser enviado incorretamente como image_url.
+
+PDF textual deve passar por extração.
+
+PDF escaneado pode exigir OCR/visão.
+
+============================================================ 33.
+TELEGRAM ============================================================
+
+Existe integração com:
+
+@SLCampus_bot
+
+Telegram deve funcionar como outra interface do mesmo contexto
+acadêmico.
+
+Não criar uma segunda base acadêmica independente.
+
+Fluxo de vinculação:
+
+SLCampus gera código → usuário envia /start CODE → backend identifica
+UID → Telegram é vinculado.
+
+O bot pode consultar:
+
+-   agenda;
+-   aulas;
+-   provas;
+-   tarefas;
+-   sessões;
+-   compromissos;
+-   notas;
+-   prioridades.
+
+Também existe suporte a linguagem natural.
+
+Existe inbox/integração com arquivos.
+
+============================================================ 34. WEB
+PUSH / NOTIFICAÇÕES
+============================================================
+
+Existe:
+
+-   push-notifications.js;
+-   notification-ui.js;
+-   auto-notification-prompt.js;
+-   api/send-reminders.js;
+-   api/notification-health.js;
+-   api/push-test.js.
+
+Possíveis eventos:
+
+-   fim do foco;
+-   pausa;
+-   prova;
+-   tarefa;
+-   lembrete;
+-   sessão.
+
+Há monitoramento da saúde do agendador.
+
+Existe deduplicação de lembretes.
+
+ATENÇÃO IMPORTANTE: O cron atualmente configurado na Vercel roda uma vez
+por dia:
+
+0 9 * * *
+
+Isso NÃO é um scheduler em tempo real.
+
+Portanto, não assumir que o SLCampus consegue encontrar qualquer janela
+livre imediatamente durante o dia apenas com esse cron.
+
+Para lembretes realmente adaptativos será necessário:
+
+-   cron mais frequente;
+-   scheduler;
+-   eventos;
+-   ou infraestrutura externa.
+
+============================================================ 35.
+SEGURANÇA ============================================================
+
+O projeto possui:
+
+-   Firestore Rules;
+-   autenticação;
+-   isolamento por UID;
+-   limites de tamanho;
+-   endpoints server-side;
+-   proteção de quotas;
+-   validação do webhook Telegram;
+-   exclusão de conta.
+
+Firestore tem proteção para:
+
+-   dados do usuário;
+-   recursos;
+-   catálogos;
+-   quotas;
+-   feedback;
+-   feeds.
+
+O webhook Telegram usa secret token.
+
+Chaves da IA nunca devem ir para o frontend.
+
+ATENÇÃO: Sempre validar segurança em produção, não apenas olhando o
+código.
+
+============================================================ 36.
+EXCLUSÃO DE CONTA
+============================================================
+
+Excluir usuário não pode significar somente apagar users/{uid}.
+
+Também precisam ser considerados:
+
+-   dados acadêmicos;
+-   histórico;
+-   sessões;
+-   recursos;
+-   Telegram;
+-   feeds;
+-   push subscriptions;
+-   tokens;
+-   dados relacionados.
+
+Existe api/delete-account.js e account-security.js.
+
+Esse fluxo precisa ser testado com conta de teste para confirmar limpeza
+completa.
+
+============================================================ 37. BACKUP
+/ EXPORTAÇÃO
+============================================================
+
+Existe export-data.js.
+
+O projeto possui exportação de dados e mecanismos de backup local.
+
+Isso é importante porque o produto armazena bastante informação.
+
+A próxima evolução deve garantir:
+
+-   export completo;
+-   import confiável;
+-   versionamento do formato;
+-   validação;
+-   compatibilidade entre versões.
+
+============================================================ 38.
+GAMIFICAÇÃO ============================================================
+
+Existe XP.
+
+Pode ser relacionado a:
+
+-   tarefa concluída;
+-   sessão;
+-   execução;
+-   consistência.
+
+XP é motivacional.
+
+Nunca deve substituir prioridade acadêmica.
+
+O sistema não deve recomendar estudar uma matéria apenas porque dá mais
+XP.
+
+============================================================ 39. PERFIL
+ADAPTATIVO ============================================================
+
+Existe perfil adaptativo/experiência de perfil.
+
+O usuário pode ter contexto de:
+
+-   faculdade;
+-   concurso;
+-   ensino médio;
+-   geral.
+
+A experiência deve se adaptar ao objetivo.
+
+Isso influencia:
+
+-   textos;
+-   prioridades;
+-   recomendações;
+-   contexto do Mentor;
+-   experiência inicial.
+
+============================================================ 40.
+ONBOARDING E SETUP
+============================================================
+
+Existe:
+
+-   setup-wizard.js;
+-   onboarding-simplificado.js;
+-   setup-onboarding-enhancer.js.
+
+O onboarding ajuda o usuário a:
+
+-   configurar perfil;
+-   informar faculdade/curso;
+-   cadastrar matérias;
+-   importar currículo;
+-   configurar rotina;
+-   começar a usar o produto.
+
+IMPORTANTE: Não existe mais lógica desejada de esconder funcionalidades
+para novos usuários.
+
+Todos os recursos devem ficar disponíveis desde o primeiro acesso.
+
+O tutorial é apresentação, não bloqueio de funcionalidade.
+
+============================================================ 41.
+TUTORIAL — ESTADO ATUAL APROVADO
+============================================================
+
+ESTA PARTE É ESPECIALMENTE IMPORTANTE.
+
+O tutorial já passou por várias correções estruturais.
+
+Problemas anteriores incluíam:
+
+-   card cobrindo alvo;
+-   spotlight atrás da bottom nav;
+-   drawer acima do tutorial;
+-   card gigante;
+-   posicionamento fixo;
+-   etapas mobile em desktop;
+-   iPad sendo interpretado incorretamente;
+-   Voltar não restaurando estado;
+-   drawer ficando aberto/fechado errado;
+-   scroll incorreto;
+-   z-index conflitante.
+
+Esses problemas foram tratados.
+
+ESTADO ATUAL CONFIRMADO PELO USUÁRIO:
+
+MOBILE: APROVADO. NÃO ALTERAR.
+
+DESKTOP/PC: APROVADO. NÃO ALTERAR sem necessidade.
+
+iPad/Safari desktop: tratado no fluxo desktop e aprovado pelo usuário.
+
+O tutorial possui 10 etapas no mobile e 10 no desktop.
+
+MOBILE:
+
+1.  Início
+2.  Estudar
+3.  Mentor IA
+4.  Modo Foco
+5.  Notificações
+6.  Mais funções
+7.  Aprendizagem
+8.  Organização
+9.  Seu perfil
+10. Central de Ajuda
+
+DESKTOP:
+
+1.  Início
+2.  Estudar
+3.  Mentor IA
+4.  Modo Foco
+5.  Notificações
+6.  Organização
+7.  Aprendizagem
+8.  Perfil
+9.  Telegram
+10. Central de Ajuda
+
+Desktop NÃO possui “Mais funções” como no mobile.
+
+O tutorial deve usar o alvo real e calcular o posicionamento.
+
+O spotlight pertence ao tutorial, não ao elemento real.
+
+Não usar z-index gigantes no elemento da interface para fazê-lo
+aparecer.
+
+============================================================ 42.
+IMPORTANTE: SNAPSHOT DO ZIP VS ESTADO ATUAL
+============================================================
+
+O ZIP usado como base para este contexto é um snapshot do projeto e pode
+estar atrás da versão atualmente instalada/deployada.
+
+No snapshot analisado, o service-worker.js ainda aparece com:
+
+slc-v48-tutorial-windowed-spotlight
+
+Mas durante o trabalho mais recente do tutorial foram feitas versões
+posteriores até a versão aprovada pelo usuário.
+
+Portanto:
+
+NÃO concluir que o tutorial atual está na V48 só porque o ZIP contém
+V48.
+
+O estado funcional mais recente do tutorial é o estado aprovado pelo
+usuário.
+
+Ao receber arquivos novos do projeto, sempre considerar esses arquivos
+como fonte da verdade mais recente.
+
+============================================================ 43. O QUE
+ESTÁ IMPLEMENTADO NO CÓDIGO
+============================================================
+
+A base atual possui implementação para:
+
+-   autenticação Firebase;
+-   Firestore;
+-   Storage;
+-   matérias;
+-   tarefas;
+-   provas;
+-   notas;
+-   previsão;
+-   sessões;
+-   foco;
+-   revisões;
+-   diário;
+-   diário de aula;
+-   materiais/biblioteca;
+-   grade horária;
+-   currículo;
+-   importação de currículo;
+-   importação de notas;
+-   importação de histórico;
+-   importação de horário;
+-   histórico de semestres;
+-   arquivamento de semestre;
+-   contexto acadêmico;
+-   dificuldade;
+-   inteligência acadêmica;
+-   aprendizagem;
+-   mapa de aprendizagem;
+-   motor adaptativo;
+-   dashboard;
+-   Mentor IA;
+-   Telegram;
+-   notificações push;
+-   lembretes;
+-   feed de calendário;
+-   exportação;
+-   segurança;
+-   exclusão de conta;
+-   feedback;
+-   gamificação;
+-   perfil adaptativo;
+-   tutorial;
+-   PWA/service worker.
+
+Isso significa “há implementação/estrutura no código”, NÃO significa
+automaticamente “cada fluxo foi testado ponta a ponta em produção”.
+
+============================================================ 44. O QUE
+FOI VALIDADO PELO USUÁRIO
+============================================================
+
+Até o momento, a validação visual mais clara e recente foi:
+
+TUTORIAL MOBILE: funcionando e aprovado.
+
+TUTORIAL PC/iPad: funcionando e aprovado após correção.
+
+Essa parte deve ser preservada.
+
+============================================================ 45. O QUE
+PRECISA DE TESTE REAL
+============================================================
+
+Mesmo existindo código, uma IA que assumir o projeto deve criar uma
+matriz de testes.
+
+Testar com conta de teste:
+
+AUTENTICAÇÃO - criar conta; - login; - logout; - recuperação; - conta
+nova; - conta existente.
+
+SETUP - faculdade; - curso; - perfil; - matérias; - currículo; -
+importação.
+
+MATÉRIAS - criar; - editar; - excluir; - sincronização com currículo.
+
+TAREFAS - criar; - editar; - concluir; - atrasar; - excluir.
+
+PROVAS - criar; - editar; - concluir; - nota; - conteúdo; - impacto no
+dashboard.
+
+NOTAS - vários pesos; - peso 100%; - peso incompleto; - avaliações
+múltiplas; - notas limite; - média necessária; - máximo possível.
+
+FOCO - iniciar; - pausar; - retomar; - break; - finalizar; - fechar
+aba; - voltar; - evidência; - sessão gerada.
+
+REVISÕES - criar; - concluir; - adiar; - atualizar domínio.
+
+DIÁRIO - criar; - editar; - dúvidas; - tarefas geradas.
+
+MATERIAIS - adicionar; - favorito; - abrir; - remover; - Storage quando
+aplicável.
+
+CURRÍCULO - importar; - editar; - pré-requisitos; - sincronização.
+
+HISTÓRICO - importar SIGAA; - identificar semestre atual; - arquivar
+períodos; - repetir disciplina; - não misturar histórico e atual.
+
+MENTOR - pergunta simples; - pergunta sobre notas; - pergunta sobre
+prova; - pergunta sobre prioridade; - contexto correto; - erro de API; -
+quota; - fallback.
+
+TELEGRAM - gerar código; - vincular; - /agenda; - perguntas; -
+lembretes; - desvincular.
+
+PUSH - pedir permissão; - assinar; - testar; - receber; - renovar
+subscription; - deduplicar; - agendador.
+
+CALENDÁRIO - gerar feed; - abrir no Google/Apple/Outlook; - atualizar; -
+revogar; - gerar novo token.
+
+SEGURANÇA - usuário A não acessar usuário B; - webhook inválido; - quota
+protegida; - endpoint sem auth; - exclusão completa.
+
+PWA - instalar; - atualizar; - cache; - service worker novo; - offline
+básico; - não servir JS antigo.
+
+TUTORIAL - mobile; - desktop; - iPad; - Safari; - voltar; - avançar; -
+pular; - finalizar; - abrir tutorial novamente; - drawer; - scroll; -
+resize/orientação.
+
+============================================================ 46.
+PRINCIPAIS PONTOS DE ATENÇÃO ARQUITETURAIS
+============================================================
+
+1.  PROJETO GRANDE EM JS PURO
+
+app.js e views.js concentram muita responsabilidade.
+
+Existe documentação anterior indicando necessidade de refatoração.
+
+Não fazer uma reescrita total de uma vez.
+
+Preferir migração incremental.
+
+2.  MUITOS PATCHES/MÓDULOS
+
+O projeto possui muitos arquivos que fazem patches sobre outros
+arquivos.
+
+Antes de alterar uma função, procurar:
+
+-   quem chama;
+-   quem sobrescreve;
+-   quem faz patch;
+-   quem depende dela;
+-   ordem dos scripts.
+
+3.  FIRESTORE / CRESCIMENTO DE DADOS
+
+Há muitos arrays no documento do usuário.
+
+Existem limites nas rules, mas isso não elimina o limite estrutural de
+tamanho do documento do Firestore.
+
+A arquitetura futura já prevê:
+
+users/{uid}/semesters/{semesterId}
+
+Isso deve ser priorizado antes de o produto crescer muito.
+
+4.  NOMES LEGADOS DE GEMINI
+
+Há muitos nomes históricos “gemini”.
+
+Não renomear indiscriminadamente.
+
+Mapear dependências primeiro.
+
+5.  CRON
+
+O cron diário não é suficiente para inteligência em tempo real.
+
+6.  SERVICE WORKER
+
+Sempre atualizar cache version quando alterar assets críticos.
+
+7.  IA
+
+Nunca confiar cegamente na resposta da IA.
+
+Importações precisam de validação.
+
+8.  HISTÓRICO
+
+Não permitir que períodos antigos contaminem consultas atuais.
+
+9.  NOTAS
+
+Nunca produzir probabilidades inventadas.
+
+10. DELETE ACCOUNT
+
+Testar limpeza de dados relacionados.
+
+============================================================ 47.
+PRIORIDADES RECOMENDADAS PARA OS PRÓXIMOS PASSOS
+============================================================
+
+PRIORIDADE 0 — PRESERVAR O QUE ESTÁ APROVADO
+
+Não mexer no tutorial sem necessidade.
+
+Não quebrar mobile para corrigir desktop.
+
+Não quebrar desktop para melhorar mobile.
+
+Criar regressão visual antes de mexer.
+
+------------------------------------------------------------------------
+
+PRIORIDADE 1 — TESTE DE REGRESSÃO COMPLETO
+
+Criar checklist de todos os módulos.
+
+Executar com conta de teste.
+
+Registrar:
+
+-   OK;
+-   erro;
+-   parcialmente funcional;
+-   não testado.
+
+Não chamar “funcionando” só porque existe código.
+
+------------------------------------------------------------------------
+
+PRIORIDADE 2 — GARANTIR INTEGRIDADE DOS DADOS
+
+Validar:
+
+-   semestre atual;
+-   histórico;
+-   notas;
+-   tarefas;
+-   provas;
+-   sessões;
+-   currículo;
+-   matérias.
+
+Especialmente:
+
+reprovação antiga + nova tentativa.
+
+------------------------------------------------------------------------
+
+PRIORIDADE 3 — FORTALECER ACADEMIC CONTEXT
+
+Garantir que:
+
+Dashboard Mentor Telegram Inteligência Planejamento Histórico
+
+usem a mesma interpretação dos dados.
+
+Evitar regras duplicadas.
+
+------------------------------------------------------------------------
+
+PRIORIDADE 4 — EVOLUIR DECISION ENGINE
+
+O SLCampus deve passar de:
+
+“mostrar muitas informações”
+
+para:
+
+“explicar o que fazer agora e por quê”.
+
+Exemplo:
+
+“Estude Física hoje por 50 minutos, priorizando integrais, porque a
+prova é em 3 dias, sua média necessária é 7,4 e há uma revisão
+atrasada.”
+
+Isso deve ser explicável pelos dados.
+
+------------------------------------------------------------------------
+
+PRIORIDADE 5 — ADAPTIVE LEARNING
+
+Usar dados reais de execução.
+
+Comparar:
+
+planejado vs executado vs aprendido.
+
+Ajustar:
+
+-   duração;
+-   horário;
+-   matéria;
+-   revisão;
+-   método.
+
+Não reduzir metas por causa de um único dia ruim.
+
+------------------------------------------------------------------------
+
+PRIORIDADE 6 — NOTIFICAÇÕES
+
+Evoluir de cron diário para arquitetura realmente adaptativa.
+
+Idealmente:
+
+-   scheduler mais frequente;
+-   eventos;
+-   janela livre;
+-   prioridade;
+-   deduplicação.
+
+------------------------------------------------------------------------
+
+PRIORIDADE 7 — MIGRAÇÃO DE DADOS
+
+Preparar arquitetura:
+
+users/{uid}/semesters/{semesterId}
+
+para evitar documento gigante.
+
+Fazer migração sem perder dados.
+
+------------------------------------------------------------------------
+
+PRIORIDADE 8 — MENTOR IA
+
+Garantir que o Mentor:
+
+-   não inventa dados;
+-   cita contexto real;
+-   entende semestre atual;
+-   diferencia histórico;
+-   entende notas;
+-   entende tarefas;
+-   entende provas;
+-   entende aprendizagem;
+-   explica recomendações.
+
+------------------------------------------------------------------------
+
+PRIORIDADE 9 — IMPORTADORES
+
+Testar:
+
+-   SIGAA;
+-   currículo;
+-   grade;
+-   notas.
+
+Garantir parser determinístico primeiro e IA somente quando necessário.
+
+------------------------------------------------------------------------
+
+PRIORIDADE 10 — UX E PERFORMANCE
+
+Depois da estabilidade:
+
+-   reduzir JS carregado desnecessariamente;
+-   organizar módulos;
+-   melhorar inicialização;
+-   melhorar mobile;
+-   melhorar acessibilidade;
+-   reduzir duplicação;
+-   melhorar estados de loading/erro.
+
+============================================================ 48. O QUE
+NÃO FAZER ============================================================
+
+Não:
+
+-   reescrever o projeto inteiro;
+-   trocar JavaScript puro por React só por preferência;
+-   remover módulos antigos sem rastrear dependências;
+-   esconder funcionalidades;
+-   criar feature gating;
+-   misturar histórico com atual;
+-   usar IA para tudo;
+-   inventar probabilidades;
+-   colocar chave da IA no frontend;
+-   depender de um cron diário para tempo real;
+-   aumentar z-index sem entender stacking context;
+-   alterar tutorial mobile que já foi aprovado;
+-   “corrigir” uma área sem testar regressão;
+-   afirmar que algo foi testado em dispositivo físico quando não foi.
+
+============================================================ 49. COMO
+UMA IA DEVE TRABALHAR NESTE PROJETO
+============================================================
+
+Antes de alterar qualquer coisa:
+
+1.  localizar o módulo;
+2.  entender quem chama;
+3.  procurar patches;
+4.  procurar IDs/classes;
+5.  verificar script order;
+6.  entender persistência;
+7.  entender impacto no AcademicContext;
+8.  verificar impacto no Mentor/inteligência;
+9.  alterar o mínimo necessário;
+10. validar sintaxe;
+11. executar testes possíveis;
+12. listar exatamente os arquivos alterados;
+13. explicar riscos;
+14. não alegar teste que não foi realizado.
+
+Para bugs de UI:
+
+-   reproduzir;
+-   identificar causa;
+-   corrigir estrutura;
+-   não criar regra específica para um print;
+-   testar outras telas e breakpoints.
+
+Para bugs de dados:
+
+-   reproduzir com dados mínimos;
+-   verificar origem;
+-   corrigir fonte;
+-   validar persistência;
+-   testar histórico/atual.
+
+Para IA:
+
+-   validar payload;
+-   validar contexto;
+-   validar quota;
+-   validar backend;
+-   validar fallback;
+-   validar resposta.
+
+============================================================ 50. VISÃO
+DE PRODUTO A LONGO PRAZO
+============================================================
+
+O objetivo final do SLCampus é ser um “sistema operacional acadêmico
+pessoal”.
+
+O ciclo deve ser:
+
+O aluno cadastra/importa seus dados → SLCampus entende o contexto →
+identifica prioridades → cria plano → aluno executa → sistema registra o
+que realmente aconteceu → aluno fornece evidência de aprendizagem →
+sistema atualiza o mapa de aprendizagem → adapta
+dificuldade/tempo/revisão → recalcula prioridades → Mentor explica →
+Telegram/notificações lembram → ciclo continua.
+
+O produto deve aprender sobre o processo de estudo sem transformar o
+aluno em apenas uma coleção de notas.
+
+============================================================ 51. RESUMO
+EXECUTIVO PARA A PRÓXIMA IA
+============================================================
+
+SLCampus é uma plataforma acadêmica web em JavaScript puro + Firebase +
+Vercel, com IA via backend/Groq.
+
+Já existe uma base grande e funcional com:
+
+-   autenticação;
+-   matérias;
+-   tarefas;
+-   provas;
+-   notas;
+-   currículo;
+-   histórico;
+-   grade horária;
+-   diário;
+-   materiais;
+-   sessões;
+-   foco;
+-   revisões;
+-   mapa de aprendizagem;
+-   inteligência acadêmica;
+-   adaptação;
+-   dashboard;
+-   Mentor IA;
+-   Telegram;
+-   push;
+-   calendário;
+-   exportação;
+-   segurança;
+-   onboarding;
+-   gamificação;
+-   tutorial.
+
+O maior valor do produto está na integração desses módulos.
+
+O principal risco atual não é falta de funcionalidades. É complexidade,
+duplicação, dependências entre patches e necessidade de validação ponta
+a ponta.
+
+O tutorial é uma área já corrigida e aprovada: MOBILE = NÃO MEXER.
+DESKTOP/PC/iPad = NÃO MEXER sem necessidade.
+
+Os próximos grandes trabalhos devem priorizar:
+
+1.  testes reais;
+2.  integridade dos dados;
+3.  AcademicContext;
+4.  Decision Engine;
+5.  Adaptive Learning;
+6.  notificações adaptativas;
+7.  arquitetura de histórico/semestres;
+8.  Mentor contextual;
+9.  importadores;
+10. performance/refatoração incremental.
+
+A regra geral é:
+
+CORRIGIR A CAUSA > NÃO REMENDAR O SINTOMA.
+
+ESTABILIDADE > FUNCIONALIDADE NOVA.
+
+INTEGRIDADE DOS DADOS > ESTÉTICA.
+
+DECISÕES EXPLICÁVEIS > “IA MÁGICA”.
+
+E SEMPRE PRESERVAR O QUE JÁ FOI VALIDADO PELO USUÁRIO.

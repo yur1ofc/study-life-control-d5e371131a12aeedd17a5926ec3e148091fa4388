@@ -37,5 +37,5 @@ module.exports=async function(req,res){
     const merged=subs.filter(s=>!selected.some(x=>x.endpoint===s.endpoint)||valid.some(x=>x.endpoint===s.endpoint));
     await getDb().collection('users').doc(decoded.uid).update({pushSubscriptions:merged,lastPushTestAt:new Date().toISOString()});
     return res.status(200).json({ok:true,sent});
-  }catch(e){console.error('[push-test]',e);return res.status(500).json({error:e.message||'Falha no teste de Push.'});}
+  }catch(e){console.error('[push-test]',e);console.error('[push-test]', e);return res.status(500).json({error:'Falha no teste de Push.'});}
 };

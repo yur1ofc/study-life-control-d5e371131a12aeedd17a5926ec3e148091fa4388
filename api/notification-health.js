@@ -17,12 +17,16 @@ module.exports=async function(req,res){
     const h=healthSnap.exists?healthSnap.data():null;
     const lastRunMs=h?.lastRunAt?new Date(h.lastRunAt).getTime():null;
     const recent=h?.lastRunAt?Math.max(0,Math.round((Date.now()-lastRunMs)/60000)):null;
+    // O cron do Vercel roda 1x/dia às 09:00 UTC. Considerar saudável
+    // apenas os últimos 15 minutos marcaria um cron perfeitamente funcional
+    // como quebrado durante quase todo o dia.
+    const schedulerHealthy=!!(lastRunMs && Date.now()-lastRunMs<=26*60*60*1000 && ['ok','completed_with_errors'].includes(String(h?.status||'')));
     if(isCron){
-      return res.status(200).json({ok:true,mode:'cron',status:h?.status||'never_run',healthy:!!(lastRunMs&&Date.now()-lastRunMs<=15*60000),lastRunAt:h?.lastRunAt||null,lastAttemptAt:h?.lastAttemptAt||null,finishedAt:h?.finishedAt||null,minutesSinceRun:recent,lastRunSummary:h?.summary||null,lastRunError:h?.error||null,runId:h?.runId||null,lockUntil:h?.lockUntil||null});
+      return res.status(200).json({ok:true,mode:'cron',status:h?.status||'never_run',healthy:schedulerHealthy,lastRunAt:h?.lastRunAt||null,lastAttemptAt:h?.lastAttemptAt||null,finishedAt:h?.finishedAt||null,minutesSinceRun:recent,lastRunSummary:h?.summary||null,lastRunError:h?.error||null,runId:h?.runId||null,lockUntil:h?.lockUntil||null});
     }
     const userSnap=await db.collection('users').doc(decoded.uid).get();
     const data=userSnap.data()||{};
     const subs=Array.isArray(data.pushSubscriptions)?data.pushSubscriptions:[];
-    return res.status(200).json({ok:true,mode:'user',permission:!!data.settings?.studyReminders?.enabled,focusPush:!!data.settings?.focusPushEnabled,subscriptions:subs.length,lastRunAt:h?.lastRunAt||null,minutesSinceRun:recent,lastRunSummary:h?.summary||null,lastRunError:h?.error||null,schedulerStatus:h?.status||'never_run',schedulerHealthy:!!(lastRunMs&&Date.now()-lastRunMs<=15*60000)});
-  }catch(e){return res.status(500).json({error:e.message||'Não foi possível consultar a saúde das notificações.'});}
+    return res.status(200).json({ok:true,mode:'user',permission:!!data.settings?.studyReminders?.enabled,focusPush:!!data.settings?.focusPushEnabled,subscriptions:subs.length,lastRunAt:h?.lastRunAt||null,minutesSinceRun:recent,lastRunSummary:h?.summary||null,lastRunError:h?.error||null,schedulerStatus:h?.status||'never_run',schedulerHealthy});
+  }catch(e){console.error('[notification-health]',e);return res.status(500).json({error:'Não foi possível consultar a saúde das notificações.'});}
 };

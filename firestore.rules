@@ -64,8 +64,12 @@ service cloud.firestore {
     }
 
     match /users/{userId}/resources/{resourceId} {
+      // Recursos são privados e têm schema próprio. Não existe um wildcard
+      // permissivo abaixo desta regra: no Firestore, allows sobrepostos são
+      // combinados com OR, então um wildcard poderia anular estas validações.
       allow read, delete: if isOwner(userId);
-      allow create, update: if isOwner(userId)
+
+      allow create: if isOwner(userId)
         && request.resource.data.titulo is string
         && request.resource.data.titulo.size() <= 180
         && request.resource.data.tipo in ['pdf','video','ebook','link','site']
@@ -75,12 +79,35 @@ service cloud.firestore {
         && request.resource.data.descricao.size() <= 800
         && request.resource.data.url is string
         && request.resource.data.url.size() <= 2000
+        && request.resource.data.storagePath is string
+        && request.resource.data.storagePath.size() <= 500
         && request.resource.data.tags is list
-        && request.resource.data.tags.size() <= 10;
-    }
-    match /users/{userId}/{document=**} {
-      allow read: if isOwner(userId);
-      allow write: if isOwner(userId);
+        && request.resource.data.tags.size() <= 10
+        && request.resource.data.favorito is bool
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp;
+
+      allow update: if isOwner(userId)
+        && request.resource.data.titulo is string
+        && request.resource.data.titulo.size() <= 180
+        && request.resource.data.tipo in ['pdf','video','ebook','link','site']
+        && request.resource.data.materia is string
+        && request.resource.data.materia.size() <= 120
+        && request.resource.data.descricao is string
+        && request.resource.data.descricao.size() <= 800
+        && request.resource.data.url is string
+        && request.resource.data.url.size() <= 2000
+        && request.resource.data.storagePath is string
+        && request.resource.data.storagePath.size() <= 500
+        && request.resource.data.tags is list
+        && request.resource.data.tags.size() <= 10
+        && request.resource.data.favorito is bool
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'titulo', 'tipo', 'materia', 'descricao', 'url', 'storagePath',
+          'tags', 'favorito', 'updatedAt'
+        ]);
     }
 
     // ─── Catálogo comunitário ────────────────────────────────────────────────

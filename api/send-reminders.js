@@ -450,7 +450,8 @@ module.exports = async function handler(req, res) {
   try {
     db = getDb();
   } catch (err) {
-    return res.status(503).json({ error: err.message, scheduler: 'database_unavailable' });
+    console.error('[send-reminders] database:', err);
+    return res.status(503).json({ error: 'Agendador temporariamente indisponível.', scheduler: 'database_unavailable' });
   }
 
   const now = Date.now();
@@ -468,7 +469,7 @@ module.exports = async function handler(req, res) {
       webpush = setupWebPush();
     } catch (err) {
       await markScheduler(db, { status: 'failed', runId, finishedAt: new Date().toISOString(), error: err.message, summary });
-      return res.status(503).json({ error: err.message, ...summary });
+      return res.status(503).json({ error: 'Serviço de notificações temporariamente indisponível.', ...summary });
     }
     // Dois conjuntos: lembretes gerais e término de foco. O segundo é
     // separado para que ativar Push para o Modo Foco não obrigue o usuário a
@@ -620,6 +621,7 @@ module.exports = async function handler(req, res) {
       error: err.message,
       summary
     });
-    return res.status(500).json({ error: err.message, ...summary, runId });
+    console.error('[send-reminders] fatal:', err);
+    return res.status(500).json({ error: 'Falha interna no agendador de notificações.', ...summary, runId });
   }
 };

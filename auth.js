@@ -149,7 +149,9 @@ async function logout() {
     window.showToast?.('Desconectado com sucesso', 'success');
   } catch (error) {
     console.error('Erro no logout:', error);
-    const message = error && error.message ? error.message : 'Falha ao sair';
+    const message = error?.code === 'auth/network-request-failed'
+      ? 'Verifique sua conexão e tente novamente.'
+      : 'Não foi possível encerrar a sessão agora.';
     window.showToast?.('Erro ao sair: ' + message, 'error');
   }
 }

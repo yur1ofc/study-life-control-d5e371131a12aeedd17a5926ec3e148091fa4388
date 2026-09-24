@@ -23,5 +23,5 @@ module.exports=async function(req,res){
       try{await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/setWebhook`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});}catch(e){console.warn('[telegram-link] webhook setup failed:',e.message);}
     }
     return res.status(200).json({ok:true,code:c,expiresAt});
-  }catch(e){return res.status(500).json({error:e.message||'Não foi possível gerar o código do Telegram.'});}
+  }catch(e){console.error('[telegram-link]',e);return res.status(500).json({error:'Não foi possível gerar o código do Telegram.'});}
 };
