@@ -6836,3 +6836,51 @@ body.slc-tutorial-open { overscroll-behavior:none !important; }
     max-height: 132px;
   }
 }
+
+/* ================================================================
+   SLCampus Tutorial V51 — Desktop / iPad positioning
+   Mobile permanece intocado. No desktop, o balão é ancorado ao alvo
+   lateral sem animar top/left entre etapas; isso evita capturas no
+   meio da transição, nas quais o card ficava preso no rodapé.
+================================================================ */
+@media (min-width: 769px) {
+  #tutorial-overlay .tutorial-card {
+    box-sizing: border-box !important;
+    width: min(400px, calc(100vw - 32px)) !important;
+    max-width: 420px !important;
+    min-height: 0 !important;
+    height: auto !important;
+    bottom: auto !important;
+    right: auto !important;
+    padding: 20px 20px 18px !important;
+    border-radius: 20px !important;
+    transition: opacity .24s ease, transform .24s ease !important;
+  }
+
+  #tutorial-overlay .tutorial-card.tutorial-layout-sidebar {
+    width: min(400px, calc(100vw - 330px)) !important;
+    max-width: 420px !important;
+  }
+
+  #tutorial-overlay .tutorial-card h3 {
+    font-size: 1.22rem !important;
+    line-height: 1.2 !important;
+    margin-bottom: 9px !important;
+  }
+
+  #tutorial-overlay .tutorial-card p {
+    font-size: .98rem !important;
+    line-height: 1.52 !important;
+  }
+
+  #tutorial-overlay .tutorial-actions {
+    margin-top: 16px !important;
+    gap: 10px !important;
+  }
+
+  #tutorial-overlay .tutorial-actions .btn-secondary,
+  #tutorial-overlay .tutorial-actions .btn-primary {
+    min-height: 48px !important;
+    padding: 0 22px !important;
+  }
+}

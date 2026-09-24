@@ -85,16 +85,16 @@
       help:         { mode:'drawer',     width:'full',    arrow:'top',   targetTop:110 }
     },
     desktop: {
-      home:         { mode:'sidebar', width:360, arrow:'left',  offset:18 },
-      study:        { mode:'sidebar', width:390, arrow:'left',  offset:18 },
-      mentor:       { mode:'sidebar', width:400, arrow:'left',  offset:18 },
-      focus:        { mode:'sidebar', width:360, arrow:'left',  offset:18 },
-      notifications:{ mode:'header',  width:350, arrow:'bottom', offset:16 },
-      organization: { mode:'sidebar', width:380, arrow:'left',  offset:18 },
-      learning:     { mode:'sidebar', width:400, arrow:'left',  offset:18 },
-      profile:      { mode:'sidebar', width:360, arrow:'left',  offset:18 },
-      telegram:     { mode:'sidebar', width:390, arrow:'left',  offset:18 },
-      help:         { mode:'sidebar', width:360, arrow:'left',  offset:18 }
+      home:         { mode:'sidebar', width:400, arrow:'left',  offset:22 },
+      study:        { mode:'sidebar', width:400, arrow:'left',  offset:22 },
+      mentor:       { mode:'sidebar', width:420, arrow:'left',  offset:22 },
+      focus:        { mode:'sidebar', width:400, arrow:'left',  offset:22 },
+      notifications:{ mode:'header',  width:380, arrow:'bottom', offset:18 },
+      organization: { mode:'sidebar', width:410, arrow:'left',  offset:22 },
+      learning:     { mode:'sidebar', width:420, arrow:'left',  offset:22 },
+      profile:      { mode:'sidebar', width:400, arrow:'left',  offset:22 },
+      telegram:     { mode:'sidebar', width:410, arrow:'left',  offset:22 },
+      help:         { mode:'sidebar', width:400, arrow:'left',  offset:22 }
     }
   };
 
@@ -535,7 +535,13 @@
         return;
       }
 
-      const w=Math.min(Number(layout.width)||380,vw-margin*2);
+      // DESKTOP: cada reposicionamento deve ser imediato. O card não pode
+      // permanecer na posição da etapa anterior enquanto a nova etapa é
+      // calculada (isso fazia alguns passos aparecerem presos no rodapé).
+      card.style.right='auto';
+      card.style.bottom='auto';
+
+      const w=Math.min(Number(layout.width)||400,vw-margin*2);
       card.style.width=`${w}px`;
       card.style.maxWidth=`${w}px`;
       card.style.bottom='auto';
