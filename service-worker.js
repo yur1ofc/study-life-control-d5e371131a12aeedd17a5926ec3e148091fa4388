@@ -5,7 +5,7 @@
 // adicione ele aqui também — senão ele só entra no cache dinâmico depois
 // do primeiro acesso online, e falha se o usuário abrir o app offline
 // (ou logo após instalar como PWA) antes disso acontecer.
-const CACHE_VERSION = 'slc-v54-focus-v18';
+const CACHE_VERSION = 'slc-v55-availability';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 
@@ -61,6 +61,8 @@ const STATIC_ASSETS = [
   './push-notifications.js',
   './auto-notification-prompt.js',
   './exam-study-popup.js',
+  './study-availability.js',
+  './availability-ui.js',
   './quick-search.js',
   './export-data.js',
   './feedback-widget.js',
