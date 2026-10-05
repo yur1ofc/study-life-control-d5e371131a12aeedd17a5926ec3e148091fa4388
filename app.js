@@ -1726,9 +1726,14 @@ class StudyLifeControl {
         e.preventDefault();
 
         const materia = document.getElementById('nota-materia').value;
-        const valor = parseFloat(document.getElementById('nota-valor').value);
+        const valorRaw = document.getElementById('nota-valor').value.trim();
+        // Aceita notas decimais com vírgula ou ponto (ex.: 0,25 ou 0.25).
+        // O campo é texto de propósito: input[type=number] com step=0.1
+        // rejeita valores válidos como 0,25 antes mesmo de chegarem aqui.
+        const valorNormalizado = valorRaw.replace(',', '.');
+        const valor = Number(valorNormalizado);
         const peso = parseFloat(document.getElementById('nota-peso').value);
-        if (!materia || !Number.isFinite(valor) || valor < 0 || valor > 10 || !Number.isFinite(peso) || peso <= 0 || peso > 100) {
+        if (!materia || valorRaw === '' || !Number.isFinite(valor) || valor < 0 || valor > 10 || !Number.isFinite(peso) || peso <= 0 || peso > 100) {
             showToast('Informe uma nota de 0 a 10 e um peso entre 0,1% e 100%.', 'warning');
             return;
         }
