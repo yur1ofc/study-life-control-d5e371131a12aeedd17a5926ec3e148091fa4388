@@ -5,7 +5,7 @@
 // adicione ele aqui também — senão ele só entra no cache dinâmico depois
 // do primeiro acesso online, e falha se o usuário abrir o app offline
 // (ou logo após instalar como PWA) antes disso acontecer.
-const CACHE_VERSION = 'slc-v56-modalfix';
+const CACHE_VERSION = 'slc-v57-habits';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 
@@ -49,6 +49,7 @@ const STATIC_ASSETS = [
   './launch-ready.js',
   './script.js',
   './dashboard-prioritario.js',
+  './smart-habits.js',
   './onboarding-simplificado.js',
   './schedule-ia-import.js',
   './subjects-curriculum-sync.js',
