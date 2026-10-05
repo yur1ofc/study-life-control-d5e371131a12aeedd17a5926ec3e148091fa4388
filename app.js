@@ -1769,11 +1769,6 @@ class StudyLifeControl {
             document.getElementById('modal-nota').style.display = 'none';
             this.editingGradeId = null;
             this.resetModalStates();
-            // Após registrar/atualizar uma nota, a origem da ação pode ser
-            // qualquer tela que tenha aberto o modal. A nota já foi persistida
-            // e sincronizada em this.data pelo dbService; agora levamos o usuário
-            // diretamente para Previsão de Notas para conferir o lançamento e
-            // ver os cálculos atualizados.
             this.loadView('previsao-notas');
             showToast(isEditing ? 'Nota atualizada!' : 'Nota registrada!');
         }
@@ -4161,23 +4156,101 @@ StudyLifeControl.prototype.applyImportedSetupCurriculum = function(parsed, sourc
 };
 
 StudyLifeControl.prototype.parseCurriculumImportJson = function(raw = '') {
+    // O ChatGPT pode devolver o JSON dentro de ```json ...```, com uma frase antes/depois,
+    // ou usando nomes de campos equivalentes. A importação deve aceitar essas variações
+    // sem obrigar o usuário a gerar o arquivo novamente.
+    let text = typeof raw === 'string' ? raw.trim() : '';
+    if (!text) throw new Error('Cole o JSON da grade antes de importar.');
+
+    text = text
+        .replace(/^\s*```(?:json|javascript|js)?\s*/i, '')
+        .replace(/\s*```\s*$/i, '')
+        .trim();
+
     let data;
-    try { data = typeof raw === 'string' ? JSON.parse(raw) : raw; }
-    catch (error) { throw new Error('O arquivo não está em JSON válido.'); }
-    if (!data || typeof data !== 'object') throw new Error('JSON inválido.');
-    const sourceItems = Array.isArray(data.disciplinas) ? data.disciplinas : Array.isArray(data.curriculum) ? data.curriculum : Array.isArray(data.items) ? data.items : [];
-    const items = sourceItems.map((item, index) => ({
-        id: generateId(),
-        nome: item.nome || item.name || item.disciplina || item.componente || `Disciplina ${index + 1}`,
-        codigo: item.codigo || item.code || '',
-        semestre: item.semestre || item.semester || item.periodo || '',
-        cargaHoraria: Number(item.cargaHoraria || item.carga_horaria || item.ch || item.hours || 0) || 0,
-        creditos: Number(item.creditos || item.credits || 0) || 0,
-        prerequisitos: Array.isArray(item.prerequisitos) ? item.prerequisitos : Array.isArray(item.prerequisites) ? item.prerequisites : (item.prerequisitos ? [item.prerequisitos] : []),
-        tipo: item.tipo || item.type || 'obrigatoria',
-        status: item.status || 'nao-cursada'
-    }));
-    return { meta: { faculdade: data.faculdade || data.universidade || data.faculty || '', curso: data.curso || data.course || '', versao: data.versao || data.version || '' }, items };
+    try {
+        data = JSON.parse(text);
+    } catch (firstError) {
+        // Tenta extrair somente o objeto/array JSON quando o modelo acrescentou texto.
+        const firstObject = text.indexOf('{');
+        const lastObject = text.lastIndexOf('}');
+        const firstArray = text.indexOf('[');
+        const lastArray = text.lastIndexOf(']');
+        const candidates = [];
+        if (firstObject >= 0 && lastObject > firstObject) candidates.push(text.slice(firstObject, lastObject + 1));
+        if (firstArray >= 0 && lastArray > firstArray) candidates.push(text.slice(firstArray, lastArray + 1));
+
+        let parsed = null;
+        for (const candidate of candidates) {
+            try { parsed = JSON.parse(candidate); break; } catch (_) {}
+        }
+        if (!parsed) throw new Error('O JSON não pôde ser lido. Cole a resposta completa do ChatGPT, mesmo que ela venha dentro de ```json ...```.');
+        data = parsed;
+    }
+
+    // Aceita tanto o formato esperado quanto uma lista direta ou wrappers comuns.
+    const findItems = (value, depth = 0) => {
+        if (depth > 3 || value == null) return [];
+        if (Array.isArray(value)) return value;
+        if (typeof value !== 'object') return [];
+
+        const directKeys = ['disciplinas', 'curriculum', 'curriculo', 'materias', 'matérias', 'items', 'componentes', 'components', 'subjects'];
+        for (const key of directKeys) {
+            if (Array.isArray(value[key])) return value[key];
+        }
+        for (const key of directKeys) {
+            if (value[key] && typeof value[key] === 'object') {
+                const found = findItems(value[key], depth + 1);
+                if (found.length) return found;
+            }
+        }
+        // Alguns geradores colocam o resultado dentro de {data:{...}},
+        // {result:{...}} ou outro wrapper. Procura recursivamente nesses casos.
+        for (const child of Object.values(value)) {
+            if (child && typeof child === 'object') {
+                const found = findItems(child, depth + 1);
+                if (found.length) return found;
+            }
+        }
+        return [];
+    };
+
+    const sourceItems = findItems(data);
+    const normalizeSemester = value => {
+        if (typeof value === 'number' && Number.isFinite(value)) return value;
+        const match = String(value ?? '').match(/\d+/);
+        return match ? Number(match[0]) : '';
+    };
+    const firstDefined = (...values) => values.find(v => v !== undefined && v !== null && v !== '');
+
+    const items = sourceItems.map((item, index) => {
+        const rawPrereqs = firstDefined(item?.prerequisitos, item?.prerequisites, item?.preRequisitos, item?.pre_requisitos);
+        const prerequisitos = Array.isArray(rawPrereqs)
+            ? rawPrereqs.filter(Boolean).map(String)
+            : rawPrereqs ? String(rawPrereqs).split(/\s*(?:\||;|,|\be\b)\s*/i).filter(Boolean) : [];
+
+        return {
+            id: generateId(),
+            nome: firstDefined(item?.nome, item?.name, item?.disciplina, item?.materia, item?.matéria, item?.componente, item?.componenteCurricular, item?.title) || `Disciplina ${index + 1}`,
+            codigo: firstDefined(item?.codigo, item?.code, item?.sigla, item?.idDisciplina) || '',
+            semestre: normalizeSemester(firstDefined(item?.semestre, item?.semester, item?.periodo, item?.period, item?.período)),
+            cargaHoraria: Number(firstDefined(item?.cargaHoraria, item?.carga_horaria, item?.carga, item?.ch, item?.hours, item?.horas, 0)) || 0,
+            creditos: Number(firstDefined(item?.creditos, item?.credits, item?.credito, 0)) || 0,
+            prerequisitos,
+            tipo: firstDefined(item?.tipo, item?.type, item?.categoria) || 'obrigatoria',
+            status: firstDefined(item?.status, item?.situacao, item?.situação) || 'nao-cursada'
+        };
+    }).filter(item => String(item.nome || '').trim());
+
+    const metaSource = Array.isArray(data) ? {} : (data || {});
+    return {
+        meta: {
+            faculdade: firstDefined(metaSource.faculdade, metaSource.universidade, metaSource.faculty, metaSource.instituicao, metaSource.instituição) || '',
+            curso: firstDefined(metaSource.curso, metaSource.course, metaSource.nomeCurso, metaSource.nome_curso) || '',
+            versao: firstDefined(metaSource.versao, metaSource.version) || ''
+        },
+        items
+    };
 };
 
 StudyLifeControl.prototype.getChatGPTCurriculumPrompt = function() {
