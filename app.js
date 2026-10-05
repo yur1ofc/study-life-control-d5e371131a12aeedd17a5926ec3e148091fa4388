@@ -1769,7 +1769,12 @@ class StudyLifeControl {
             document.getElementById('modal-nota').style.display = 'none';
             this.editingGradeId = null;
             this.resetModalStates();
-            this.loadView(this.currentView);
+            // Após registrar/atualizar uma nota, a origem da ação pode ser
+            // qualquer tela que tenha aberto o modal. A nota já foi persistida
+            // e sincronizada em this.data pelo dbService; agora levamos o usuário
+            // diretamente para Previsão de Notas para conferir o lançamento e
+            // ver os cálculos atualizados.
+            this.loadView('previsao-notas');
             showToast(isEditing ? 'Nota atualizada!' : 'Nota registrada!');
         }
     }
