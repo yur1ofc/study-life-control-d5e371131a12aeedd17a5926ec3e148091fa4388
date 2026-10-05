@@ -19,7 +19,7 @@ module.exports=async function(req,res){
     if(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_AUTO_WEBHOOK !== 'false'){
       const secret=process.env.TELEGRAM_WEBHOOK_SECRET;
       const webhook=`${process.env.APP_PUBLIC_URL||'https://slcampus.vercel.app'}/api/telegram-webhook`;
-      const body={url:webhook,allowed_updates:['message'],secret_token:secret};
+      const body={url:webhook,allowed_updates:['message','callback_query'],secret_token:secret};
       try{await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/setWebhook`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});}catch(e){console.warn('[telegram-link] webhook setup failed:',e.message);}
     }
     return res.status(200).json({ok:true,code:c,expiresAt});

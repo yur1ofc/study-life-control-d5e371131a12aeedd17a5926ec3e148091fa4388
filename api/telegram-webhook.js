@@ -5,6 +5,7 @@ const AcademicCore=require('../shared/academic-context.js');
 const AI=require('./_lib/ai-core');
 const quota=require('./_lib/gemini-admin-quota');
 const AcademicIntelligence=require('./_lib/academic-intelligence-server');
+const Avail=require('./_lib/study-availability');
 let app;
 function init(){if(app)return app;const raw=process.env.FIREBASE_SERVICE_ACCOUNT_KEY;if(!raw)throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY não configurada.');const service=JSON.parse(Buffer.from(raw,'base64').toString('utf8'));app=admin.apps.length?admin.app():admin.initializeApp({credential:admin.credential.cert(service)});return app;}
 const DAY={dom:0,domingo:0,seg:1,segunda:1,"segunda-feira":1,ter:2,terça:2,terca:2,"terça-feira":2,"terca-feira":2,qua:3,quarta:3,"quarta-feira":3,qui:4,quinta:4,"quinta-feira":4,sex:5,sexta:5,"sexta-feira":5,sab:6,sábado:6,sabado:6,"sábado-feira":6};
@@ -565,7 +566,7 @@ async function processTelegramHistory(ref,data,inboxItem){
   const merged=mergeTelegramHistory(data,result); await ref.set({archivedSemesters:data.archivedSemesters,telegramInbox:addInbox(data,{...inboxItem,type:'document-history-processed',processedAt:new Date().toISOString(),text:`Histórico processado: ${merged.periods} período(s).`})},{merge:true}); return merged;
 }
 
-function help(){return `SLCampus conectado.\n\nFale comigo naturalmente; comandos são opcionais.\n\nConsultas:\n• O que tenho amanhã?\n• Que aulas tenho quinta?\n• Qual é minha próxima aula?\n• Quais tarefas tenho essa semana?\n• Quando é minha próxima prova?\n• Tenho alguma prova de GA?\n• Minhas notas de Cálculo / GA / FI\n• Quanto estudei hoje / essa semana?\n• Como está meu dia amanhã?\n\nAções:\n• Tenho aula de GA quarta 7:30 às 9:10 sala PD04\n• P1 de Cálculo é sexta\n• Tirei 8,5 em GA na P1 valendo 20%\n• Me lembra da lista de Física sexta\n• Estudei FI por 1h30\n• Anota: revisar regra da cadeia\n\nEntendo nomes, abreviações, siglas e códigos cadastrados para as matérias. Se uma sigla for ambígua, prefiro pedir confirmação a escolher errado.\n\nComandos: /aula, /tarefa, /prova, /nota, /anotar, /agenda, /status, /ajuda, /desvincular.\n\nFotos e PDFs enviados ao bot entram na Caixa de Entrada do SLCampus.`;}
+function help(){return `SLCampus conectado.\n\nFale comigo naturalmente; comandos são opcionais.\n\nConsultas:\n• O que tenho amanhã?\n• Que aulas tenho quinta?\n• Qual é minha próxima aula?\n• Quais tarefas tenho essa semana?\n• Quando é minha próxima prova?\n• Tenho alguma prova de GA?\n• Minhas notas de Cálculo / GA / FI\n• Quanto estudei hoje / essa semana?\n• Como está meu dia amanhã?\n\nAções:\n• Tenho aula de GA quarta 7:30 às 9:10 sala PD04\n• P1 de Cálculo é sexta\n• Tirei 8,5 em GA na P1 valendo 20%\n• Me lembra da lista de Física sexta\n• Estudei FI por 1h30\n• Anota: revisar regra da cadeia\n\nEntendo nomes, abreviações, siglas e códigos cadastrados para as matérias. Se uma sigla for ambígua, prefiro pedir confirmação a escolher errado.\n\nComandos: /aula, /tarefa, /prova, /nota, /anotar, /agenda, /ocupado, /disponibilidade, /status, /ajuda, /desvincular.\n\nDisponibilidade: diga /ocupado trabalho até 18h e eu não te chamo para estudar nesse horário.\n\nFotos e PDFs enviados ao bot entram na Caixa de Entrada do SLCampus.`;}
 async function saveArray(ref,data,key,item){
   await ref.firestore.runTransaction(async tx=>{
     const snap=await tx.get(ref);
@@ -573,6 +574,61 @@ async function saveArray(ref,data,key,item){
     if(item?.id && latest.some(x=>x?.id===item.id)) return;
     tx.set(ref,{[key]:[...latest,item]},{merge:true});
   });
+}
+
+
+// ── Disponibilidade para estudar (aprende com as respostas) ────────────────
+const CHEER_YES=['Bora! 🔥 Abre o modo foco e começa agora — o primeiro minuto é o mais difícil.','Boa! 💪 Cada bloco desses pesa na hora da prova. Me conta quando terminar.','Perfeito! 🚀 Celular longe, cronômetro ligado. Vai!'];
+function availSave(ref,data){return ref.set({studyAvailability:Avail.getState(data)},{merge:true});}
+function availAskReason(chatId){return reply(chatId,'Sem problema! Me conta o que você vai fazer e até quando, que eu me ajusto. 👇\nEx.: "trabalho até 18h", "academia por 1 hora", "toda segunda e quarta trabalho das 8 às 17".\nPode ser qualquer coisa. Se for rotina fixa, diga os dias.');}
+async function availCallback(db,cb){
+  const chatId=String(cb.message?.chat?.id||cb.from?.id||'');
+  const [tag,qid,action]=String(cb.data||'').split(':'); if(tag!=='av'||!chatId)return;
+  await tg('answerCallbackQuery',{callback_query_id:cb.id}).catch(()=>null);
+  const q=await db.collection('users').where('telegram.chatId','==',chatId).limit(1).get(); if(q.empty)return;
+  const ref=q.docs[0].ref,data=q.docs[0].data()||{},st=Avail.getState(data),pend=st.pending;
+  if(!pend||pend.id!==qid||pend.kind!=='ask'){await reply(chatId,'Essa pergunta já passou. Eu te chamo de novo no próximo horário livre. 😉');return;}
+  const now=Date.now();
+  if(action==='yes'){Avail.recordAnswer(data,pend.slot,'yes');st.pending=null;st.ask.ignored=0;await availSave(ref,data);await reply(chatId,CHEER_YES[Math.floor(now/60000)%CHEER_YES.length]+(pend.subject?`\nSugestão: ${pend.subject} por ${pend.minutes} min.`:''));return;}
+  if(action==='later'){Avail.recordAnswer(data,pend.slot,'later');st.pending=null;st.ask.ignored=0;st.snoozeUntil=new Date(now+30*60000).toISOString();await availSave(ref,data);await reply(chatId,'Fechado, volto em 30 min. Até lá, deixa o material à mão. ⏰');return;}
+  if(action==='no'){st.pending={...pend,kind:'reason',expiresAt:new Date(now+3*3600000).toISOString()};st.ask.ignored=0;await availSave(ref,data);await availAskReason(chatId);return;}
+}
+// Retorna true se a mensagem foi tratada como resposta à pergunta de disponibilidade.
+async function availReply(ref,data,chatId,text){
+  const st=Avail.getState(data),pend=st.pending; if(!pend||(pend.kind!=='reason'&&pend.kind!=='when'))return false;
+  if(Date.parse(pend.expiresAt||0)<Date.now()){st.pending=null;await availSave(ref,data);return false;}
+  const lp=Avail.localParts(Date.now()),q=Avail.quietBounds(data);
+  const parsed=Avail.parseBusyReply(text,{date:lp.date,nowMin:lp.min,askedStart:pend.startMin,sleepMin:q.sleep});
+  if(pend.kind==='when'&&pend.label&&(!parsed.label||parsed.label==='Compromisso'))parsed.label=pend.label;
+  if(parsed.needWhen){st.pending={...pend,kind:'when',label:parsed.label,expiresAt:new Date(Date.now()+3*3600000).toISOString()};await availSave(ref,data);await reply(chatId,`Entendi: ${parsed.label}. Até que horas, ou por quanto tempo? (ex.: "até 18h" ou "2 horas")`);return true;}
+  const blk=Avail.addBlock(data,{label:parsed.label,start:Avail.fmt(parsed.start),end:Avail.fmt(parsed.end),days:parsed.days,date:parsed.date,source:'telegram'});
+  Avail.recordAnswer(data,pend.slot,'no',{label:parsed.label});
+  const rec=Avail.autoRecurring(data,blk,lp.weekday);
+  st.pending=null;await availSave(ref,data);
+  const when=parsed.days.length?Avail.describeBlock(blk):`${parsed.label}, hoje das ${blk.start} às ${blk.end}`;
+  let msg=`Anotado: ${when}.`;
+  if(parsed.days.length)msg+='\nDeixei como rotina fixa — você pode editar em Configurações → Disponibilidade.';
+  else if(rec)msg+=`\nNotei que isso se repete toda ${['domingo','segunda','terça','quarta','quinta','sexta','sábado'][lp.weekday]}; já salvei como rotina fixa.`;
+  const endMin=parsed.end,sleep=q.sleep;
+  msg+=(endMin!=null&&endMin<sleep-60)?`\nTe chamo depois das ${blk.end} para encaixar um estudo. 😉`:'\nAmanhã a gente recupera. Mas não deixa a meta escapar!';
+  await reply(chatId,msg);return true;
+}
+async function availCommand(ref,data,chatId,text){
+  const lp=Avail.localParts(Date.now()),q=Avail.quietBounds(data);
+  const body=text.replace(/^\/ocupado\s*/i,'').trim();
+  if(!body){await reply(chatId,'Diga o que vai fazer. Ex.: /ocupado trabalho até 18h  ·  /ocupado toda terça e quinta faculdade das 19 às 22');return;}
+  const parsed=Avail.parseBusyReply(body,{date:lp.date,nowMin:lp.min,askedStart:lp.min,sleepMin:q.sleep});
+  if(parsed.needWhen){await reply(chatId,'Faltou o horário. Ex.: /ocupado '+parsed.label+' até 18h');return;}
+  const blk=Avail.addBlock(data,{label:parsed.label,start:Avail.fmt(parsed.start),end:Avail.fmt(parsed.end),days:parsed.days,date:parsed.date,source:'telegram'});
+  await availSave(ref,data);await reply(chatId,`Anotado: ${Avail.describeBlock(blk)}. Não te chamo para estudar nesse horário.`);
+}
+async function availSummary(data,chatId){
+  const s=Avail.summary(data,Date.now()),q=Avail.quietBounds(data);
+  const lines=['Sua disponibilidade no SLCampus:',`Silêncio: ${Avail.fmt(q.sleep)} até ${Avail.fmt(q.wake)}`];
+  lines.push(s.blocks.length?'Ocupado:\n'+s.blocks.slice(0,8).map(b=>'• '+b).join('\n'):'Nenhum compromisso informado ainda.');
+  lines.push(s.best.length?'Seus melhores horários (aprendidos): '+s.best.join(', '):'Ainda estou aprendendo seus melhores horários — responda quando eu perguntar.');
+  lines.push('Para informar algo: /ocupado trabalho até 18h');
+  await reply(chatId,lines.join('\n'));
 }
 
 module.exports=async function(req,res){
@@ -584,7 +640,9 @@ module.exports=async function(req,res){
   const rawLength=Number(req.headers['content-length']||0);
   if(rawLength>256*1024)return res.status(413).json({error:'Atualização muito grande.'});
   try{
-    const update=req.body||{},msg=update.message;if(!msg)return res.status(200).json({ok:true,ignored:true});
+    const update=req.body||{};
+    if(update.callback_query){await availCallback(init().firestore(),update.callback_query);return res.status(200).json({ok:true});}
+    const msg=update.message;if(!msg)return res.status(200).json({ok:true,ignored:true});
     const chatId=String(msg.chat?.id||'');if(!chatId)return res.status(200).json({ok:true,ignored:true});
     const db=init().firestore(),text=String(msg.text||msg.caption||'').trim();
     if(text.startsWith('/start')){const c=text.split(/\s+/)[1]?.trim().toUpperCase();if(c){const linkRef=db.collection('telegramLinks').doc(c),snap=await linkRef.get(),link=snap.exists?snap.data():null;if(link&&new Date(link.expiresAt).getTime()>Date.now()){await db.collection('users').doc(link.uid).set({telegram:{chatId,username:msg.from?.username||'',firstName:msg.from?.first_name||'',linkedAt:new Date().toISOString()}},{merge:true});await linkRef.delete();await reply(chatId,'Telegram vinculado ao SLCampus.\n\n'+help());return res.status(200).json({ok:true});}}await reply(chatId,'Código inválido ou expirado. Gere outro código em SLCampus → Configurações → Telegram.');return res.status(200).json({ok:true});}
@@ -594,6 +652,9 @@ module.exports=async function(req,res){
     if(lower==='/desvincular'){await ref.set({telegram:null},{merge:true});await reply(chatId,'Telegram desvinculado.');await mark();return res.status(200).json({ok:true});}
     if(lower==='/status'){const subjects=(data.subjects||[]).length,pending=scopedAcademicItems(data,'tasks').filter(x=>!x.concluida).length,exams=scopedAcademicItems(data,'exams').filter(x=>!x.concluida&&String(x.data||'')>=todayBR()).length,sessions=(data.sessions||[]).length;await reply(chatId,`SLCampus\nMatérias no semestre atual: ${subjects}\nTarefas pendentes: ${pending}\nPróximas avaliações: ${exams}\nSessões registradas: ${sessions}`);await mark();return res.status(200).json({ok:true});}
     if(lower==='/agenda'){await reply(chatId,agendaText(data,todayBR()));await mark();return res.status(200).json({ok:true});}
+    if(lower.startsWith('/ocupado')){await availCommand(ref,data,chatId,text);await mark();return res.status(200).json({ok:true});}
+    if(lower==='/disponibilidade'){await availSummary(data,chatId);await mark();return res.status(200).json({ok:true});}
+    if(text&&!text.startsWith('/')&&!msg.document&&!msg.photo&&await availReply(ref,data,chatId,text)){await mark();return res.status(200).json({ok:true,availability:true});}
     let inboxItem={id:id('tg'),receivedAt:new Date().toISOString(),chatId,type:'message',caption:msg.caption||'',text:msg.text||''};
     if(msg.document){inboxItem.type='document';inboxItem.fileId=msg.document.file_id;inboxItem.fileName=msg.document.file_name||'arquivo';inboxItem.mimeType=msg.document.mime_type||'';}
     else if(msg.photo?.length){const ph=msg.photo[msg.photo.length-1];inboxItem.type='photo';inboxItem.fileId=ph.file_id;inboxItem.fileName='foto.jpg';inboxItem.mimeType='image/jpeg';}

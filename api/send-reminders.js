@@ -41,6 +41,7 @@
 // como um fallback diário caso o cron externo falhe.
 
 const AcademicIntelligence = require('./_lib/academic-intelligence-server');
+const Avail = require('./_lib/study-availability');
 
 const DEDUPE_LIMIT = 500;
 const SCHEDULER_LEASE_MS = 110000; // ~1m50s: evita execuções sobrepostas de cron externo a cada 1 min.
@@ -103,6 +104,8 @@ function setupWebPush() {
 
 function telegramToken(){return process.env.TELEGRAM_BOT_TOKEN||'';}
 async function sendTelegram(chatId,text){const t=telegramToken();if(!t||!chatId)return false;const r=await fetch(`https://api.telegram.org/bot${t}/sendMessage`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({chat_id:chatId,text})});const j=await r.json().catch(()=>({}));if(!r.ok||!j.ok)throw new Error(j.description||`Telegram sendMessage falhou (${r.status})`);return true;}
+
+async function sendTelegramButtons(chatId,text,rows){const t=telegramToken();if(!t||!chatId)return false;const r=await fetch(`https://api.telegram.org/bot${t}/sendMessage`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({chat_id:chatId,text,reply_markup:{inline_keyboard:rows}})});const j=await r.json().catch(()=>({}));if(!r.ok||!j.ok)throw new Error(j.description||`Telegram sendMessage falhou (${r.status})`);return true;}
 
 // Datas e horários salvos pelo app (exams.data, tasks.dataLimite,
 // reviews.data, sessions.data) não guardam fuso horário — vêm de campos
@@ -221,9 +224,14 @@ function freeWindowNow(data,now,minMinutes=10){
     const duration=Number(s?.duracaoMin||s?.duracao||45);
     if(date===p.date&&start!=null&&duration>0)intervals.push({start,end:start+Math.min(180,duration)});
   });
+  // Compromissos que o próprio usuário informou (trabalho, academia…) também
+  // ocupam o dia — é isso que impede "você está livre" quando ele não está.
+  Avail.busyIntervals(data,p.date).forEach(b=>intervals.push({start:b.start,end:b.end}));
   intervals.sort((a,b)=>a.start-b.start);
   const merged=[]; for(const x of intervals){const last=merged.at(-1);if(last&&x.start<=last.end)last.end=Math.max(last.end,x.end);else merged.push({...x});}
-  const dayStart=5*60, dayEnd=23*60+30;
+  // Horário de silêncio (acordar/dormir) configurável; padrão 07:00–22:30.
+  const quiet=Avail.quietBounds(data);
+  const dayStart=quiet.wake, dayEnd=quiet.sleep;
   let cursor=dayStart;
   const gaps=[];
   for(const x of merged){if(x.start>cursor)gaps.push({start:cursor,end:Math.min(x.start,dayEnd)});cursor=Math.max(cursor,x.end);if(cursor>=dayEnd)break;}
@@ -256,12 +264,6 @@ function studyOpportunity(data,now){
   const p=localParts(now);
   const free=freeWindowNow(data,now,20);
   if(!free)return null;
-  const state=smartReminderState(data).studyOpportunity;
-  const lastAt=state.lastSentAt?Date.parse(state.lastSentAt):0;
-  if(lastAt&&now-lastAt<4*3600000)return null;
-  const sentDate=state.lastSentDate===p.date?Number(state.sentToday||0):0;
-  if(sentDate>=2)return null;
-
   const adaptive=data?.user?.adaptiveLearning&&typeof data.user.adaptiveLearning==='object'?data.user.adaptiveLearning:{};
   const target=Number(adaptive.dailyTargetMinutes)||0;
   const actual=todayStudyMinutes(data,p.date);
@@ -292,15 +294,23 @@ function studyOpportunity(data,now){
   const preferred=Math.max(25,Math.min(45,Number(free.learned?.sessionMinutes)||45));
   const minutes=Math.max(20,Math.min(preferred,free.remaining));
   if(minutes<20)return null;
+  // Decide se vale perguntar agora: respeita silêncio, histórico de respostas,
+  // limite diário e recua quando o usuário ignora — mas aperta quando está atrasado.
+  const nextDays=Number.isFinite(Number(pick.workload?.nextExam?.days))?Number(pick.workload.nextExam.days):null;
+  const decision=Avail.decideAsk(data,now,{free:{remaining:free.remaining,endsAt:free.endsAt},studyToday:actual,targetMin:target,nextExamDays:nextDays,studiedYesterday:todayStudyMinutes(data,Avail.dateOffset(p.date,-1))>0});
+  if(!decision)return null;
   let action='revisar os tópicos mais frágeis';
   if(pick.learning?.weakTopicNames?.length) action=`revisar ${pick.learning.weakTopicNames.slice(0,2).join(' e ')}`;
   else if(pick.learning?.pendingReviews>0) action='fazer as revisões pendentes';
   else if(pick.workload?.overdueTasks>0) action='resolver a tarefa atrasada';
-  else if(pick.workload?.nextExam?.title) action=`preparar a próxima avaliação (${pick.workload.nextExam.title})`;
+  else if(pick.workload?.nextExam?.title) action=`preparar ${pick.workload.nextExam.title}`;
   const exam=pick.workload?.nextExam;
-  const examText=exam?` A próxima avaliação é ${exam.title}${exam.days===0?' hoje':exam.days===1?' amanhã':` em ${exam.days} dias`}.`:'';
-  const body=`Você está em um intervalo livre de cerca de ${Math.floor(free.remaining)} min e este horário combina com seus horários de estudo registrados. ${pick.name} está entre as prioridades atuais (score ${pick.priorityScore}).${examText} Aproveite ${minutes} min agora para ${action}.`;
-  return {key:`smart-study:${p.date}:${Math.floor(p.hour*60+p.minute/30)}`,title:'🧠 Hora útil para estudar',body,quality:free.quality,studyOpportunity:{subject:pick.name,minutes,priorityScore:pick.priorityScore,freeMinutes:free.remaining,bucket:free.bucket,preferredBucket:free.learned.preferredBucket,reason:action,createdAt:new Date(now).toISOString()}};
+  const examText=exam?`${exam.title} ${exam.days===0?'é hoje':exam.days===1?'é amanhã':`é em ${exam.days} dias`}.`:'';
+  const qid=`q-${now.toString(36)}${Math.random().toString(36).slice(2,5)}`;
+  const msg=Avail.buildAskMessage({subject:pick.name,minutes,endsAt:free.endsAt,pressure:decision.pressure,action,examText,seed:Math.floor(now/3600000)});
+  return {key:`smart-study:${p.date}:${Math.floor(p.hour*60+p.minute/30)}`,title:msg.title,body:msg.body,quality:free.quality,
+    availabilityAsk:{id:qid,decision,remaining:free.remaining,subject:pick.name,minutes},
+    studyOpportunity:{subject:pick.name,minutes,priorityScore:pick.priorityScore,freeMinutes:free.remaining,bucket:free.bucket,preferredBucket:free.learned.preferredBucket,reason:action,createdAt:new Date(now).toISOString()}};
 }
 function classCaptureState(data){
   const state=data.smartReminderState&&typeof data.smartReminderState==='object'?data.smartReminderState:{};
@@ -520,7 +530,7 @@ module.exports = async function handler(req, res) {
           if (alreadyPush.has(item.key)) continue;
           try {
             await webpush.sendNotification(subscription, JSON.stringify({
-              title: item.title, body: item.body, url: './', tag: item.key, requireInteraction: true
+              title: item.title, body: item.body, url: item.availabilityAsk ? `./?av=${item.availabilityAsk.id}` : './', tag: item.key, requireInteraction: true
             }));
             summary.notificationsSent++;
             sentPush.add(item.key);
@@ -538,7 +548,13 @@ module.exports = async function handler(req, res) {
         for (const item of due) {
           if (alreadyTelegram.has(item.key)) continue;
           try {
-            await sendTelegram(telegram.chatId, `SLCampus\n${item.title}\n${item.body}`);
+            if (item.availabilityAsk) {
+              const qid = item.availabilityAsk.id;
+              await sendTelegramButtons(telegram.chatId, `SLCampus\n${item.title}\n${item.body}`, [
+                [{ text: '✅ Posso estudar agora', callback_data: `av:${qid}:yes` }],
+                [{ text: '⏰ Daqui a 30 min', callback_data: `av:${qid}:later` }, { text: '❌ Não posso', callback_data: `av:${qid}:no` }]
+              ]);
+            } else await sendTelegram(telegram.chatId, `SLCampus\n${item.title}\n${item.body}`);
             summary.telegramSent = (summary.telegramSent || 0) + 1;
             sentTelegram.add(item.key);
             if (item.focusPush) focusTelegramSent = true;
@@ -560,6 +576,7 @@ module.exports = async function handler(req, res) {
       };
       for (const item of due) {
         if (!fullyDelivered(item)) continue;
+        if (item.availabilityAsk) Avail.markAsked(data, now, item.availabilityAsk.decision, { id: item.availabilityAsk.id, remaining: item.availabilityAsk.remaining, subject: item.availabilityAsk.subject, minutes: item.availabilityAsk.minutes });
         if (item.studyOpportunity) {
           const prev=smartState.studyOpportunity||{};
           const sameDay=prev.lastSentDate===localParts(now).date;
@@ -590,6 +607,7 @@ module.exports = async function handler(req, res) {
       smartState.classCapture = Object.fromEntries(Object.entries(smartState.classCapture).slice(-160));
       smartState.review = Object.fromEntries(Object.entries(smartState.review).slice(-250));
       const update = { sentReminders: mergedSent, sentTelegramReminders: mergedTelegram, pushSubscriptions: stillValidSubs, smartReminderState: smartState };
+      if (data.studyAvailability) update.studyAvailability = data.studyAvailability;
       // O término do foco só é encerrado no servidor depois que todos os
       // canais habilitados entregarem. Assim, se o Push falhar mas Telegram
       // funcionar (ou vice-versa), o canal que falhou ainda terá outra chance.
