@@ -6,21 +6,28 @@
   'use strict';
   var SEL = [
     '.modal', '.slc-telegram-modal', '.slc-overlay', '.exam-popup-overlay',
-    '.semfin-modal', '.hist-modal', '.semarch-modal', '.slc-resource-modal',
-    '[role="dialog"][aria-modal="true"]'
+    '.semfin-overlay', '.hist-overlay', '.semarch-modal', '.catalog-modal-overlay', '.slc-resource-modal',
+    '.learning-evidence-card', '[role="dialog"][aria-modal="true"]'
   ].join(',');
   var SCROLLERS = [
     '.modal-content', '.slc-telegram-modal-card', '.slc-overlay-card', '.exam-popup-card',
-    '.slc-resource-modal .modal-content', '[role="dialog"][aria-modal="true"]'
+    '.slc-resource-modal .modal-content', '.semfin-modal', '.hist-modal', '.catalog-modal',
+    '.learning-evidence-card', '[role="dialog"][aria-modal="true"]'
   ].join(',');
 
   var css = '' +
-    // o conteúdo do modal rola sozinho e não "vaza" o gesto pra página de trás
+    // O elemento que contém os campos é o único que deve rolar. Isso evita que
+    // o gesto seja capturado pelo overlay/página de trás no Safari do iPhone.
     SCROLLERS + '{overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;}' +
-    '.slc-telegram-modal-card{max-height:min(88dvh,760px)!important;}' +
-    '.modal-content{max-height:90dvh;}' +
-    '.slc-overlay-card{max-height:calc(100dvh - 40px);}' +
+    '.modal{overflow:hidden;}' +
+    '.modal-content{max-height:min(90dvh,900px);overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;}' +
+    '.slc-overlay{overflow:hidden;}' +
+    '.slc-overlay-card{max-height:calc(100dvh - 40px);overflow-y:auto;}' +
+    '.exam-popup-overlay{overflow:hidden;}' +
     '.exam-popup-card{max-height:88dvh;overflow-y:auto;}' +
+    '.semfin-overlay,.hist-overlay,.catalog-modal-overlay{overflow:hidden;}' +
+    '.semfin-modal,.hist-modal,.catalog-modal{max-height:calc(100dvh - 28px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;}' +
+    '.learning-evidence-card{overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;}' +
     '@media (max-width:768px){' +
       '.slc-telegram-modal-card{max-height:calc(100dvh - 16px)!important;padding-bottom:env(safe-area-inset-bottom,0px);}' +
       '.slc-telegram-modal-body{padding-bottom:calc(24px + env(safe-area-inset-bottom,0px))!important;}' +
@@ -79,14 +86,26 @@
   document.addEventListener('visibilitychange', schedule);
   schedule();
 
-  // Rede de segurança: gesto de arrastar fora de qualquer área rolável do modal não move o fundo.
+  // Rede de segurança: procura o PRIMEIRO ancestral realmente rolável.
+  // Antes, closest('.modal') encontrava o overlay antes do .modal-content e
+  // acabava bloqueando o gesto no iPhone mesmo quando o conteúdo tinha rolagem.
+  function findScrollable(target) {
+    var el = target && target.nodeType === 1 ? target : target?.parentElement;
+    while (el && el !== document.body) {
+      var cs = getComputedStyle(el);
+      var canScroll = (el.scrollHeight > el.clientHeight + 1) &&
+        (/(auto|scroll|overlay)/.test(cs.overflowY) || el.matches('.modal-content,.slc-telegram-modal-card,.slc-overlay-card,.exam-popup-card,.semfin-modal,.hist-modal,.catalog-modal,.learning-evidence-card'));
+      if (canScroll) return el;
+      el = el.parentElement;
+    }
+    return null;
+  }
+
   document.addEventListener('touchmove', function (e) {
     if (!locked) return;
-    var t = e.target, scroller = t && t.closest ? t.closest(SCROLLERS + ',.modal') : null;
-    if (!scroller) { e.preventDefault(); return; }
-    var s = scroller;
-    while (s && s !== document.body) { if (s.scrollHeight > s.clientHeight + 1) return; s = s.parentElement; }
-    e.preventDefault();                                              // conteúdo curto demais para rolar
+    var scroller = findScrollable(e.target);
+    if (scroller) return;
+    e.preventDefault(); // fora do conteúdo rolável, o fundo nunca recebe o gesto.
   }, { passive: false });
 
   window.SLCModalScroll = { recheck: schedule };
