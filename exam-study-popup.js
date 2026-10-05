@@ -66,11 +66,40 @@
     return `em ${dias} dias`;
   }
 
+  // Sugere o melhor horário LIVRE: evita compromissos informados e aulas, respeita
+  // o horário de silêncio e prefere as horas em que a pessoa mais costuma poder estudar.
+  function melhorHorario(diaStr, ehHoje) {
+    const A = window.SLCAvailability, data = window.app?.data;
+    if (!A || !data) return 19 * 60;
+    const q = A.quietBounds(data), now = new Date();
+    const busy = A.busyIntervals(data, diaStr);
+    const dow = new Date(diaStr + 'T00:00:00').getDay();
+    (data.classSchedule || []).forEach(a => {
+      if (Number(a?.dia) !== dow) return;
+      const st = A.timeMin(a.inicio), en = A.timeMin(a.fim);
+      if (st != null && en != null && en > st) busy.push({ start: st, end: en });
+    });
+    const learned = {};
+    A.bestSlots(data, Date.now(), 24).forEach(b => { if (b.dow === dow) learned[b.hour] = b.score; });
+    let best = null;
+    for (let h = Math.ceil((q.wake + 30) / 60); h * 60 + 45 <= q.sleep - 30; h++) {
+      const st = h * 60, en = st + 45;
+      if (ehHoje && st < now.getHours() * 60 + now.getMinutes() + 20) continue;
+      if (busy.some(b => st < b.end && en > b.start)) continue;
+      const score = (learned[h] || 0) * 10 - Math.abs(h - 19) * 0.15;   // aprendizado manda; 19h desempata
+      if (!best || score > best.score) best = { h, score };
+    }
+    return best ? best.h * 60 : 19 * 60;
+  }
+
   function sugerirDataSessao(dataEvento) {
     const alvo = new Date(dataEvento);
     alvo.setDate(alvo.getDate() - 1);
-    if (alvo < new Date()) alvo.setTime(Date.now());
-    alvo.setHours(19, 0, 0, 0);
+    let ehHoje = false;
+    if (alvo < new Date()) { alvo.setTime(Date.now()); ehHoje = true; }
+    const dia = `${alvo.getFullYear()}-${String(alvo.getMonth() + 1).padStart(2, '0')}-${String(alvo.getDate()).padStart(2, '0')}`;
+    const min = melhorHorario(dia, ehHoje);
+    alvo.setHours(Math.floor(min / 60), min % 60, 0, 0);
     alvo.setMinutes(alvo.getMinutes() - alvo.getTimezoneOffset());
     return alvo.toISOString().slice(0, 16);
   }
