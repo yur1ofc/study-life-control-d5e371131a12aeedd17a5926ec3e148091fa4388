@@ -2,7 +2,6 @@
   "buildCommand": "node inject-env.js",
   "outputDirectory": ".",
   "cleanUrls": true,
-
   "functions": {
     "api/gemini.js": {
       "maxDuration": 300
@@ -10,29 +9,66 @@
     "api/mentor-chat.js": {
       "maxDuration": 30
     },
-    "api/admin-ai-usage.js": {
-      "maxDuration": 10
+    "api/send-reminders.js": {
+      "maxDuration": 60
     }
   },
-
   "rewrites": [
     {
       "source": "/admin",
       "destination": "/admin-ai.html"
     },
     {
+      "source": "/api/admin-ai-usage",
+      "destination": "/api/admin-users?mode=ai"
+    },
+    {
+      "source": "/api/presence-heartbeat",
+      "destination": "/api/admin-users?mode=presence"
+    },
+    {
+      "source": "/api/telegram-file",
+      "destination": "/api/telegram?mode=file"
+    },
+    {
+      "source": "/api/telegram-link",
+      "destination": "/api/telegram?mode=link"
+    },
+    {
+      "source": "/api/telegram-webhook",
+      "destination": "/api/telegram?mode=webhook"
+    },
+    {
+      "source": "/api/notification-health",
+      "destination": "/api/notifications?mode=health"
+    },
+    {
+      "source": "/api/push-test",
+      "destination": "/api/notifications?mode=test"
+    },
+    {
+      "source": "/api/delete-account",
+      "destination": "/api/account-actions?mode=delete"
+    },
+    {
+      "source": "/api/delete-account.js",
+      "destination": "/api/account-actions?mode=delete"
+    },
+    {
+      "source": "/api/focus-schedule",
+      "destination": "/api/account-actions?mode=focus"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
   ],
-
   "crons": [
     {
       "path": "/api/send-reminders",
       "schedule": "0 12 * * *"
     }
   ],
-
   "headers": [
     {
       "source": "/service-worker.js",
@@ -84,8 +120,16 @@
           "value": "no-store, no-cache, must-revalidate, private"
         }
       ]
+    },
+    {
+      "source": "/api/admin-ai-usage",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, no-cache, must-revalidate, private"
+        }
+      ]
     }
   ],
-
   "$schema": "https://openapi.vercel.sh/vercel.json"
 }

@@ -3,6 +3,7 @@
 // acontece no servidor; o navegador nunca recebe credenciais privilegiadas.
 const admin = require('firebase-admin');
 const { getFirebaseAdmin, authenticateAdmin, sendAuthError } = require('./_lib/admin-auth');
+const quota = require('./_lib/gemini-admin-quota');
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -77,6 +78,62 @@ function buildActivitySeries(presences, days = 14) {
 
 module.exports = async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+
+  const mode = String(req.query?.mode || '').toLowerCase();
+
+  // Presence heartbeat is deliberately served from this already-authorized
+  // function so it does not create another Vercel Serverless Function.
+  if (mode === 'presence') {
+    if (!['POST', 'DELETE'].includes(req.method)) {
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
+    try {
+      const authHeader = String(req.headers.authorization || '');
+      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+      if (!token) return res.status(401).json({ error: 'Login necessário.' });
+      let user;
+      try {
+        user = await getFirebaseAdmin().auth().verifyIdToken(token);
+      } catch (_) {
+        return res.status(401).json({ error: 'Sessão inválida.' });
+      }
+      const db = getFirebaseAdmin().firestore();
+      const ref = db.collection('user_presence').doc(user.uid);
+      if (req.method === 'DELETE') {
+        await ref.delete().catch(() => {});
+        return res.status(204).end();
+      }
+      const now = admin.firestore.Timestamp.now();
+      const expiresAt = admin.firestore.Timestamp.fromMillis(Date.now() + 90 * 1000);
+      await ref.set({
+        uid: user.uid,
+        email: String(user.email || '').toLowerCase(),
+        displayName: String(user.name || ''),
+        lastSeenAt: now,
+        expiresAt,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      return res.status(204).end();
+    } catch (err) {
+      console.error('[presence-heartbeat]', err);
+      return res.status(500).json({ error: 'Não foi possível atualizar presença.' });
+    }
+  }
+
+  // The former /api/admin-ai-usage endpoint now shares this function.
+  if (mode === 'ai') {
+    if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+    try {
+      await authenticateAdmin(req);
+      const data = await quota.readDashboard();
+      return res.status(200).json(data);
+    } catch (err) {
+      console.error('[admin-ai-usage]', err);
+      if (err.statusCode) return sendAuthError(res, err);
+      return res.status(503).json({ error: 'Não foi possível carregar o painel de IA.' });
+    }
+  }
+
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
