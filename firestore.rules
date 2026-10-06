@@ -56,6 +56,12 @@ service cloud.firestore {
           && (!('archivedSemesters' in d) || d.archivedSemesters.size() <= 20);
     }
 
+    // ─── Presença online — somente Vercel/Firebase Admin SDK ────────────────
+    // O navegador nunca pode ler, criar, alterar ou apagar presença diretamente.
+    match /user_presence/{userId} {
+      allow read, write: if false;
+    }
+
     // ─── Dados do usuário ────────────────────────────────────────────────────
 
     match /users/{userId} {

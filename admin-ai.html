@@ -1,25 +1,111 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SLCampus — Uso da IA</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>SLCampus — Administração</title>
 <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <script defer src="env-config.js"></script>
 <script defer src="firebase-config.js"></script>
 <style>
-body{margin:0;background:#0a0f1f;color:#e5e7eb;font:14px system-ui,sans-serif}.wrap{max-width:1100px;margin:40px auto;padding:0 20px}.card{background:#111827;border:1px solid #263247;border-radius:16px;padding:20px;margin:14px 0}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.kpi{font-size:28px;font-weight:800}.muted{color:#94a3b8}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:9px;border-bottom:1px solid #263247;vertical-align:top}button{background:#2563eb;color:white;border:0;padding:10px 14px;border-radius:9px;cursor:pointer}@media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr)}}
+:root{color-scheme:dark;--bg:#080b12;--panel:#101620;--panel2:#0d131c;--line:#202a38;--text:#edf2f7;--muted:#8e9aaa;--accent:#78a9ff;--good:#5ee0a0;--danger:#ff7d8a}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(900px 500px at 70% -10%,#162541 0%,transparent 65%),var(--bg);color:var(--text);font:14px Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.wrap{max-width:1320px;margin:0 auto;padding:34px 24px 60px}.top{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;margin-bottom:24px}.eyebrow{color:var(--accent);font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:11px}.title{font-size:32px;line-height:1.1;margin:6px 0}.sub{color:var(--muted);margin:0}.pill{display:inline-flex;align-items:center;gap:8px;padding:8px 11px;border:1px solid var(--line);background:#0c121b;border-radius:999px;color:var(--muted)}.dot{width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 14px #5ee0a066}
+.grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}.card{background:linear-gradient(180deg,#111823,#0e141d);border:1px solid var(--line);border-radius:18px;box-shadow:0 12px 40px #0000001c}.kpi{padding:18px}.label{font-size:12px;color:var(--muted)}.value{font-size:30px;font-weight:750;letter-spacing:-.03em;margin-top:7px}.hint{font-size:11px;color:#657183;margin-top:6px}
+.section{margin-top:14px;padding:18px}.sectionhead{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:15px}.section h2{font-size:16px;margin:0}.actions{display:flex;gap:8px}.btn{border:1px solid var(--line);background:#151e2b;color:var(--text);padding:9px 12px;border-radius:10px;cursor:pointer}.btn:hover{background:#1a2635}.btn:disabled{opacity:.5;cursor:wait}
+.chart{height:270px;position:relative}.chart svg{width:100%;height:100%;overflow:visible}.axis{fill:var(--muted);font-size:10px}.gridline{stroke:#1c2633;stroke-width:1}.line{fill:none;stroke:var(--accent);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}.area{fill:url(#fade);opacity:.35}.point{fill:var(--accent)}
+.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:13px}table{width:100%;border-collapse:collapse;min-width:620px}th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line)}th{color:#7f8b9c;font-size:11px;text-transform:uppercase;letter-spacing:.06em;background:#0c121a;position:sticky;top:0}td{font-size:13px}tr:last-child td{border-bottom:0}.online{color:var(--good);font-weight:650}.muted{color:var(--muted)}.error{color:var(--danger)}.empty{text-align:center;padding:30px;color:var(--muted)}
+#status{margin-top:18px;padding:14px;border-radius:13px;background:#0d131c;border:1px solid var(--line);color:var(--muted)}.hidden{display:none!important}
+@media(max-width:1050px){.grid{grid-template-columns:repeat(3,1fr)}}@media(max-width:700px){.wrap{padding:22px 14px}.top{align-items:flex-start;flex-direction:column}.grid{grid-template-columns:repeat(2,1fr)}.value{font-size:25px}}@media(max-width:450px){.grid{grid-template-columns:1fr}}
 </style>
-</head><body><div class="wrap">
-<h1>Uso da IA — SLCampus</h1><p class="muted">Painel administrativo. Os contadores são mantidos somente pelo servidor.</p>
-<div id="status" class="card">Autenticando…</div><div id="app" style="display:none">
-<div class="grid"><div class="card"><div class="muted">Chamadas hoje</div><div id="total" class="kpi">—</div></div><div class="card"><div class="muted">Importações</div><div id="imports" class="kpi">—</div></div><div class="card"><div class="muted">Mentor</div><div id="mentor" class="kpi">—</div></div><div class="card"><div class="muted">Restantes</div><div id="remaining" class="kpi">—</div></div></div>
-<div class="card"><h2>Orçamento interno</h2><div id="budget"></div><p class="muted">O orçamento configurado aqui é uma trava do SLCampus; não é a quota oficial do Google.</p></div>
-<div class="card"><h2>Últimas chamadas</h2><button onclick="loadData()">Atualizar</button><div style="overflow:auto;margin-top:12px"><table><thead><tr><th>Data</th><th>Usuário</th><th>Operação</th><th>Modelo</th><th>Status</th><th>HTTP</th><th>Tempo</th><th>Erro</th></tr></thead><tbody id="logs"></tbody></table></div></div>
-</div></div>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div><div class="eyebrow">SLCampus · privado</div><h1 class="title">Administração</h1><p class="sub">Usuários, cadastros e presença em tempo real.</p></div>
+    <div class="pill"><span class="dot"></span><span id="who">Verificando acesso…</span></div>
+  </header>
+
+  <div id="status">Autenticando com a conta Google…</div>
+
+  <main id="app" class="hidden">
+    <section class="grid">
+      <div class="card kpi"><div class="label">Usuários cadastrados</div><div id="total" class="value">—</div><div class="hint">contas no Firebase Auth</div></div>
+      <div class="card kpi"><div class="label">Ativos agora</div><div id="active" class="value">—</div><div class="hint">heartbeat nos últimos 90s</div></div>
+      <div class="card kpi"><div class="label">Ativos hoje</div><div id="activeToday" class="value">—</div><div class="hint">último login hoje</div></div>
+      <div class="card kpi"><div class="label">Cadastros hoje</div><div id="today" class="value">—</div><div class="hint">data do cadastro</div></div>
+      <div class="card kpi"><div class="label">Cadastros no mês</div><div id="month" class="value">—</div><div class="hint">mês atual</div></div>
+      <div class="card kpi"><div class="label">Cadastros no ano</div><div id="year" class="value">—</div><div class="hint">ano atual</div></div>
+    </section>
+
+    <section class="card section">
+      <div class="sectionhead"><div><h2>Novos cadastros</h2><div class="muted">Últimos 30 dias</div></div><div class="actions"><button class="btn" id="refresh">Atualizar</button></div></div>
+      <div class="chart"><svg id="chart" viewBox="0 0 900 270" preserveAspectRatio="none" aria-label="Gráfico de cadastros"></svg></div>
+    </section>
+
+    <section class="card section">
+      <div class="sectionhead"><div><h2>Usuários ativos agora</h2><div class="muted">Atualizado a cada 30 segundos</div></div></div>
+      <div class="tablewrap"><table><thead><tr><th>Usuário</th><th>E-mail</th><th>Última atividade</th><th>Status</th></tr></thead><tbody id="activeRows"></tbody></table></div>
+    </section>
+  </main>
+</div>
+
 <script>
-let authReady=false;
-function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-async function loadData(){const u=firebase.auth().currentUser;if(!u)return;const token=await u.getIdToken();const r=await fetch('/api/admin-ai-usage',{headers:{Authorization:'Bearer '+token}});const d=await r.json();if(!r.ok)throw new Error(d.error||'Falha');document.getElementById('status').textContent='Admin autenticado.';document.getElementById('app').style.display='block';document.getElementById('total').textContent=d.usage.total+'/'+d.budget.total;document.getElementById('imports').textContent=d.usage.import;document.getElementById('mentor').textContent=d.usage.mentor;document.getElementById('remaining').textContent=d.usage.remaining;document.getElementById('budget').innerHTML=`Total/dia: <b>${d.budget.total}</b> · reserva import: <b>${d.budget.importReserve}</b> · teto chat: <b>${d.budget.chatCeiling}</b> · import/usuário: <b>${d.budget.userImportLimit}/dia</b> · mentor/usuário: <b>${d.budget.mentorDailyLimit}/dia</b> · origem: <b>${esc(d.budget.source)}</b>`;document.getElementById('logs').innerHTML=d.logs.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.email||x.uid)}</td><td>${esc(x.operation)}</td><td>${esc(x.model)}</td><td>${esc(x.status)}</td><td>${esc(x.httpStatus)}</td><td>${x.latencyMs?esc(x.latencyMs+'ms'):'—'}</td><td>${esc(x.errorMessage||'')}</td></tr>`).join('');}
-window.addEventListener('load',()=>{const timer=setInterval(()=>{if(window.firebase?.auth&&window.firebaseConfig){clearInterval(timer);firebase.initializeApp(window.firebaseConfig);firebase.auth().onAuthStateChanged(async u=>{try{if(!u){document.getElementById('status').textContent='Faça login no SLCampus e abra esta página novamente.';return;}await loadData();}catch(e){document.getElementById('status').textContent=e.message;}});}},100);setTimeout(()=>clearInterval(timer),10000);});
-</script></body></html>
+let firebaseReady=false, currentUser=null;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function fmtDate(s){if(!s)return '—';const d=new Date(s);return d.toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'medium'});}
+function setStatus(msg, cls=''){ $('status').textContent=msg; $('status').className=cls; }
+
+function drawChart(points){
+  const svg=$('chart'), W=900,H=270,p={l:38,r:18,t:18,b:30};
+  svg.innerHTML='';
+  if(!points?.length){svg.innerHTML='<text x="450" y="135" text-anchor="middle" class="axis">Sem dados.</text>';return;}
+  const max=Math.max(1,...points.map(x=>Number(x.count)||0));
+  const x=i=>p.l+(i/(Math.max(1,points.length-1)))*(W-p.l-p.r);
+  const y=v=>H-p.b-(v/max)*(H-p.t-p.b);
+  const ns='http://www.w3.org/2000/svg';
+  const defs=document.createElementNS(ns,'defs'); defs.innerHTML='<linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-opacity=".35"/><stop offset="1" stop-opacity="0"/></linearGradient>';svg.appendChild(defs);
+  [0,.5,1].forEach(t=>{const yy=y(max*t), line=document.createElementNS(ns,'line');line.setAttribute('x1',p.l);line.setAttribute('x2',W-p.r);line.setAttribute('y1',yy);line.setAttribute('y2',yy);line.setAttribute('class','gridline');svg.appendChild(line);});
+  const pts=points.map((v,i)=>`${x(i)},${y(Number(v.count)||0)}`).join(' ');
+  const poly=document.createElementNS(ns,'polyline');poly.setAttribute('points',`${p.l},${H-p.b} ${pts} ${W-p.r},${H-p.b}`);poly.setAttribute('class','area');svg.appendChild(poly);
+  const path=document.createElementNS(ns,'polyline');path.setAttribute('points',pts);path.setAttribute('class','line');svg.appendChild(path);
+  points.forEach((v,i)=>{if(i%5===0||i===points.length-1){const tx=document.createElementNS(ns,'text');tx.setAttribute('x',x(i));tx.setAttribute('y',H-8);tx.setAttribute('text-anchor','middle');tx.setAttribute('class','axis');tx.textContent=new Date(v.date+'T00:00:00Z').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});svg.appendChild(tx);}});
+}
+
+async function loadData(){
+  const token=await currentUser.getIdToken(true);
+  const r=await fetch('/api/admin-users',{headers:{Authorization:'Bearer '+token}});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(d.error||'Acesso negado.');
+  $('total').textContent=d.stats.totalUsers;
+  $('active').textContent=d.stats.activeNow;
+  $('activeToday').textContent=d.stats.activeToday;
+  $('today').textContent=d.stats.registeredToday;
+  $('month').textContent=d.stats.registeredMonth;
+  $('year').textContent=d.stats.registeredYear;
+  $('who').textContent=currentUser.email;
+  drawChart(d.registrations);
+  $('activeRows').innerHTML=d.activeUsers.length?d.activeUsers.map(u=>`<tr><td>${esc(u.displayName||'Sem nome')}</td><td>${esc(u.email)}</td><td>${esc(fmtDate(u.lastSeenAt))}</td><td class="online">● online</td></tr>`).join(''):'<tr><td colspan="4" class="empty">Nenhum usuário ativo neste momento.</td></tr>';
+  $('status').classList.add('hidden'); $('app').classList.remove('hidden');
+}
+$('refresh').addEventListener('click',async()=>{const b=$('refresh');b.disabled=true;try{await loadData();}catch(e){setStatus(e.message,'error');}finally{b.disabled=false;}});
+window.addEventListener('load',()=>{
+  const timer=setInterval(()=>{
+    if(window.firebase?.auth&&window.firebaseConfig){
+      clearInterval(timer); firebaseReady=true; firebase.initializeApp(window.firebaseConfig);
+      firebase.auth().onAuthStateChanged(async u=>{
+        currentUser=u;
+        if(!u){$('who').textContent='Não autenticado';setStatus('Entre no SLCampus com a conta Google autorizada para abrir esta área.');return;}
+        try{await loadData();}catch(e){$('who').textContent=u.email||'Conta';setStatus(e.message||'Acesso negado.','error');}
+      });
+    }
+  },100);
+  setTimeout(()=>clearInterval(timer),10000);
+  setInterval(()=>{if(currentUser)loadData().catch(()=>{});},30000);
+});
+</script>
+</body>
+</html>

@@ -10,8 +10,53 @@ function setDisplay(id, value) {
   if (el) el.style.display = value;
 }
 
+
+// Presença administrativa: o navegador só envia um heartbeat autenticado.
+// Nenhum dado privilegiado é mantido no cliente.
+let presenceTimer = null;
+
+async function updatePresence() {
+  try {
+    const user = auth.currentUser;
+    if (!user) return;
+    const token = await user.getIdToken();
+    await fetch('/api/presence-heartbeat', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      keepalive: true
+    });
+  } catch (error) {
+    // Presença é telemetria administrativa; nunca deve impedir o uso do app.
+    console.debug('[SLC Presence] heartbeat indisponível:', error?.message || error);
+  }
+}
+
+function startPresenceHeartbeat() {
+  if (presenceTimer) clearInterval(presenceTimer);
+  updatePresence();
+  presenceTimer = setInterval(updatePresence, 30_000);
+}
+
+async function clearPresence() {
+  if (presenceTimer) {
+    clearInterval(presenceTimer);
+    presenceTimer = null;
+  }
+  try {
+    const user = auth.currentUser;
+    if (!user) return;
+    const token = await user.getIdToken();
+    await fetch('/api/presence-heartbeat', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+      keepalive: true
+    });
+  } catch (_) {}
+}
+
 async function handleSignedInUser(user) {
   currentUser = user;
+  startPresenceHeartbeat();
   setDisplay('login-screen', 'none');
 
   if (!window.app) {
@@ -51,6 +96,7 @@ async function handleSignedInUser(user) {
 }
 
 function handleSignedOutUser() {
+  if (presenceTimer) { clearInterval(presenceTimer); presenceTimer = null; }
   currentUser = null;
   setDisplay('login-screen', 'flex');
   setDisplay('setup-screen', 'none');
@@ -140,6 +186,7 @@ async function loginWithGoogle() {
 async function logout() {
   try {
     const uid = auth.currentUser?.uid;
+    await clearPresence();
     await auth.signOut();
     // O backup local é por UID e não é necessário após o logout.
     // Isso evita deixar dados acadêmicos no navegador de um dispositivo compartilhado.
