@@ -12,7 +12,6 @@
     "api/admin-ai-usage.js": {
       "maxDuration": 10
     },
-  },
   "rewrites": [
     {
       "source": "/admin",
