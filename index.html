@@ -30,6 +30,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="landing.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
@@ -110,6 +111,114 @@
             </div>
         </div>
 
+        <!-- Landing page pública: aparece antes do login e funciona como apresentação do SLCampus. -->
+        <section id="landing-screen" class="landing-screen" aria-label="Apresentação do SLCampus" style="display:none;">
+            <header class="landing-nav">
+                <a class="landing-brand" href="#landing-screen" aria-label="SLCampus início">
+                    <img src="logo.png" alt="SLCampus">
+                    <span>SLC<span>ampus</span></span>
+                </a>
+                <nav class="landing-nav-links" aria-label="Navegação">
+                    <a href="#landing-features">Recursos</a>
+                    <a href="#landing-how">Como funciona</a>
+                </nav>
+                <button type="button" class="landing-nav-login" id="landing-login-top">Entrar <i class="fas fa-arrow-right"></i></button>
+            </header>
+
+            <main>
+                <section class="landing-hero">
+                    <div class="landing-hero-copy">
+                        <div class="landing-eyebrow"><span class="landing-eyebrow-dot"></span> Seu semestre em um só lugar</div>
+                        <h1>Estude melhor.<br><span>Sem complicar.</span></h1>
+                        <p class="landing-hero-text">Organize aulas, provas, tarefas e tempo de estudo. O SLCampus transforma sua rotina em um plano claro para você saber <strong>o que fazer agora.</strong></p>
+                        <div class="landing-actions">
+                            <button type="button" class="landing-primary" id="landing-login">
+                                Começar agora <i class="fas fa-arrow-right"></i>
+                            </button>
+                            <a class="landing-secondary" href="#landing-how">Ver como funciona <i class="fas fa-play"></i></a>
+                        </div>
+                        <div class="landing-mini-proof">
+                            <span><i class="fas fa-check"></i> Agenda</span>
+                            <span><i class="fas fa-check"></i> Mentor IA</span>
+                            <span><i class="fas fa-check"></i> Notas</span>
+                            <span><i class="fas fa-check"></i> Foco</span>
+                        </div>
+                    </div>
+
+                    <div class="landing-visual" aria-label="Prévia animada do painel do SLCampus">
+                        <div class="landing-orb landing-orb-one"></div>
+                        <div class="landing-orb landing-orb-two"></div>
+                        <div class="landing-dashboard-card">
+                            <div class="landing-dashboard-top">
+                                <div>
+                                    <span class="landing-overline">VISÃO GERAL</span>
+                                    <h2>Seu dia, em ordem.</h2>
+                                </div>
+                                <div class="landing-avatar"><img src="logo.png" alt=""></div>
+                            </div>
+                            <div class="landing-progress-card">
+                                <div class="landing-progress-head"><span>Progresso da semana</span><strong>78%</strong></div>
+                                <div class="landing-progress-track"><span></span></div>
+                                <div class="landing-progress-days"><span>SEG</span><span>TER</span><span>QUA</span><span>QUI</span><span>SEX</span></div>
+                            </div>
+                            <div class="landing-task-grid">
+                                <div class="landing-task landing-task-blue"><i class="fas fa-calendar-check"></i><div><strong>4 tarefas</strong><small>para hoje</small></div></div>
+                                <div class="landing-task landing-task-purple"><i class="fas fa-graduation-cap"></i><div><strong>1 prova</strong><small>nesta semana</small></div></div>
+                            </div>
+                            <div class="landing-mentor-card">
+                                <div class="landing-mentor-icon"><i class="fas fa-sparkles"></i></div>
+                                <div><span>MENTOR IA</span><strong>Comece por Física I</strong><small>25 min agora já fazem diferença.</small></div>
+                                <i class="fas fa-chevron-right"></i>
+                            </div>
+                        </div>
+                        <div class="landing-float landing-float-top"><i class="fas fa-bolt"></i><div><strong>Modo Foco</strong><small>25 min ativos</small></div><span class="landing-live-dot"></span></div>
+                        <div class="landing-float landing-float-bottom"><i class="fas fa-bell"></i><div><strong>Próxima prova</strong><small>Química · em 2 dias</small></div></div>
+                    </div>
+                </section>
+
+                <section id="landing-features" class="landing-section landing-features-section">
+                    <div class="landing-section-head">
+                        <span class="landing-kicker">FEITO PARA A VIDA REAL</span>
+                        <h2>Menos abas abertas.<br><span>Mais clareza para estudar.</span></h2>
+                    </div>
+                    <div class="landing-feature-grid">
+                        <article class="landing-feature-card feature-blue"><div class="landing-feature-icon"><i class="fas fa-calendar-days"></i></div><span>01</span><h3>Rotina organizada</h3><p>Aulas, provas e tarefas aparecem no lugar certo para você não perder o fio da semana.</p><div class="landing-feature-line"></div></article>
+                        <article class="landing-feature-card feature-purple"><div class="landing-feature-icon"><i class="fas fa-wand-magic-sparkles"></i></div><span>02</span><h3>Mentor IA</h3><p>Seu painel cruza sua rotina e mostra uma sugestão prática do que vale estudar agora.</p><div class="landing-feature-line"></div></article>
+                        <article class="landing-feature-card feature-cyan"><div class="landing-feature-icon"><i class="fas fa-chart-line"></i></div><span>03</span><h3>Veja sua evolução</h3><p>Notas, frequência, horas e progresso ficam visíveis sem transformar sua rotina em uma planilha.</p><div class="landing-feature-line"></div></article>
+                        <article class="landing-feature-card feature-orange"><div class="landing-feature-icon"><i class="fas fa-bullseye"></i></div><span>04</span><h3>Foco no momento certo</h3><p>Abra uma sessão de foco, estude por blocos e volte para sua rotina sem perder o progresso.</p><div class="landing-feature-line"></div></article>
+                    </div>
+                </section>
+
+                <section id="landing-how" class="landing-section landing-how-section">
+                    <div class="landing-how-intro">
+                        <span class="landing-kicker">COMO FUNCIONA</span>
+                        <h2>Do caos da semana<br><span>para um próximo passo claro.</span></h2>
+                        <p>Você entra, organiza seu semestre e deixa o SLCampus transformar essas informações em uma rotina mais fácil de acompanhar.</p>
+                    </div>
+                    <div class="landing-steps">
+                        <div class="landing-step"><div class="landing-step-number">01</div><div><h3>Monte seu espaço</h3><p>Cadastre seu curso, matérias e horários uma vez.</p></div></div>
+                        <div class="landing-step"><div class="landing-step-number">02</div><div><h3>Veja o que importa</h3><p>Seu dashboard reúne tarefas, provas e progresso.</p></div></div>
+                        <div class="landing-step"><div class="landing-step-number">03</div><div><h3>Estude e evolua</h3><p>Use o foco e o Mentor IA para transformar plano em ação.</p></div></div>
+                    </div>
+                </section>
+
+                <section class="landing-final-cta">
+                    <div class="landing-final-glow"></div>
+                    <div class="landing-final-content">
+                        <span class="landing-kicker">PRONTO PARA COMEÇAR?</span>
+                        <h2>Seu próximo estudo<br><span>começa aqui.</span></h2>
+                        <p>Entre com sua conta Google e monte seu espaço em poucos passos.</p>
+                        <button type="button" class="landing-primary landing-primary-large" id="landing-login-bottom">Criar meu espaço <i class="fas fa-arrow-right"></i></button>
+                    </div>
+                </section>
+            </main>
+
+            <footer class="landing-footer">
+                <div class="landing-brand landing-brand-footer"><img src="logo.png" alt="SLCampus"><span>SLCampus</span></div>
+                <span>Organize. Estude. Evolua.</span>
+            </footer>
+        </section>
+
         <div id="login-screen" class="login-container" style="display: none;">
             <!-- Painel esquerdo: features -->
             <div class="login-features-panel">
@@ -130,6 +239,7 @@
             <!-- Painel direito: login -->
             <div class="login-right-panel">
                 <div class="login-card">
+                    <button type="button" class="login-back-landing" id="back-to-landing"><i class="fas fa-arrow-left"></i> Voltar</button>
                     <div class="login-header">
                         <img src="logo.png" alt="SLCampus" class="brand-logo-img">
                         <h1>Bem-vindo de volta</h1>
@@ -1147,6 +1257,7 @@
 <script defer src="security.js"></script>
 <script defer src="utils.js"></script>
 <script defer src="auth.js"></script>
+<script defer src="landing.js"></script>
 <script defer src="database.js"></script>
 <script defer src="daily-log.js"></script>
 <script defer src="class-diary.js"></script>

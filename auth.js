@@ -10,6 +10,15 @@ function setDisplay(id, value) {
   if (el) el.style.display = value;
 }
 
+function showLandingPage() {
+  setDisplay('landing-screen', 'block');
+  setDisplay('login-screen', 'none');
+}
+
+function hideLandingPage() {
+  setDisplay('landing-screen', 'none');
+}
+
 
 // Presença administrativa: o navegador só envia um heartbeat autenticado.
 // Nenhum dado privilegiado é mantido no cliente.
@@ -57,6 +66,7 @@ async function clearPresence() {
 async function handleSignedInUser(user) {
   currentUser = user;
   startPresenceHeartbeat();
+  hideLandingPage();
   setDisplay('login-screen', 'none');
 
   if (!window.app) {
@@ -98,7 +108,7 @@ async function handleSignedInUser(user) {
 function handleSignedOutUser() {
   if (presenceTimer) { clearInterval(presenceTimer); presenceTimer = null; }
   currentUser = null;
-  setDisplay('login-screen', 'flex');
+  showLandingPage();
   setDisplay('setup-screen', 'none');
   setDisplay('main-dashboard', 'none');
 }
@@ -211,5 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
 window.authService = {
   getCurrentUser: () => currentUser,
   loginWithGoogle,
-  logout
+  logout,
+  showLandingPage,
+  hideLandingPage
 };
