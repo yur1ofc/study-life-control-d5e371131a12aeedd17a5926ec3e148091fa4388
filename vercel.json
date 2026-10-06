@@ -2,6 +2,7 @@
   "buildCommand": "node inject-env.js",
   "outputDirectory": ".",
   "cleanUrls": true,
+
   "functions": {
     "api/gemini.js": {
       "maxDuration": 300
@@ -11,7 +12,9 @@
     },
     "api/admin-ai-usage.js": {
       "maxDuration": 10
-    },
+    }
+  },
+
   "rewrites": [
     {
       "source": "/admin",
@@ -22,12 +25,14 @@
       "destination": "/index.html"
     }
   ],
+
   "crons": [
     {
       "path": "/api/send-reminders",
       "schedule": "0 12 * * *"
     }
   ],
+
   "headers": [
     {
       "source": "/service-worker.js",
@@ -81,5 +86,6 @@
       ]
     }
   ],
+
   "$schema": "https://openapi.vercel.sh/vercel.json"
 }
