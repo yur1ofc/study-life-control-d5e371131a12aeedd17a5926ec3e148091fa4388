@@ -1,0 +1,122 @@
+/* SLCampus — motion system: reveal on scroll + chart/progress entrance */
+:root {
+  --slc-motion-ease: cubic-bezier(.22, 1, .36, 1);
+  --slc-motion-fast: 320ms;
+  --slc-motion-normal: 520ms;
+}
+
+/* Elements are only hidden when JS is active, so there is no accessibility/JS-failure blank page. */
+html.slc-motion-ready .slc-reveal {
+  opacity: 0;
+  transform: translate3d(0, 22px, 0) scale(.985);
+  filter: blur(4px);
+  transition:
+    opacity var(--slc-motion-normal) var(--slc-motion-ease),
+    transform var(--slc-motion-normal) var(--slc-motion-ease),
+    filter var(--slc-motion-normal) var(--slc-motion-ease);
+  will-change: opacity, transform, filter;
+}
+
+html.slc-motion-ready .slc-reveal.slc-visible {
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+
+html.slc-motion-ready .slc-reveal[data-motion-direction="left"] {
+  transform: translate3d(-28px, 0, 0) scale(.985);
+}
+html.slc-motion-ready .slc-reveal[data-motion-direction="right"] {
+  transform: translate3d(28px, 0, 0) scale(.985);
+}
+html.slc-motion-ready .slc-reveal[data-motion-direction="up"] {
+  transform: translate3d(0, 28px, 0) scale(.985);
+}
+
+.slc-stagger > .slc-reveal:nth-child(1) { transition-delay: 0ms; }
+.slc-stagger > .slc-reveal:nth-child(2) { transition-delay: 55ms; }
+.slc-stagger > .slc-reveal:nth-child(3) { transition-delay: 110ms; }
+.slc-stagger > .slc-reveal:nth-child(4) { transition-delay: 165ms; }
+.slc-stagger > .slc-reveal:nth-child(5) { transition-delay: 220ms; }
+.slc-stagger > .slc-reveal:nth-child(6) { transition-delay: 275ms; }
+.slc-stagger > .slc-reveal:nth-child(n+7) { transition-delay: 320ms; }
+
+/* Progress bars: freeze at 0 until the bar itself enters the viewport. */
+html.slc-motion-ready .progress-fill.slc-progress-motion,
+html.slc-motion-ready .setup-progress-fill.slc-progress-motion {
+  width: 0 !important;
+  transition: width 700ms var(--slc-motion-ease) !important;
+}
+
+html.slc-motion-ready .progress-fill.slc-progress-motion.slc-chart-visible,
+html.slc-motion-ready .setup-progress-fill.slc-progress-motion.slc-chart-visible {
+  width: var(--slc-progress-target) !important;
+}
+
+/* Vertical charts grow upward from the baseline. */
+html.slc-motion-ready .chart-bar.slc-bar-motion,
+html.slc-motion-ready .mini-chart-bar.slc-bar-motion {
+  height: 0 !important;
+  transform-origin: bottom center;
+  transition:
+    height 620ms var(--slc-motion-ease),
+    transform 180ms ease,
+    filter 180ms ease !important;
+}
+
+html.slc-motion-ready .chart-bar.slc-bar-motion.slc-chart-visible,
+html.slc-motion-ready .mini-chart-bar.slc-bar-motion.slc-chart-visible {
+  height: var(--slc-bar-target) !important;
+}
+
+.chart-bar.slc-bar-motion.slc-chart-visible,
+.mini-chart-bar.slc-bar-motion.slc-chart-visible {
+  animation: slcBarGlow 700ms ease both;
+}
+
+@keyframes slcBarGlow {
+  0% { filter: brightness(1.15); }
+  65% { filter: brightness(1.06); }
+  100% { filter: brightness(1); }
+}
+
+/* Small interaction polish for cards/buttons without changing their click behavior. */
+.slc-motion-card {
+  transition:
+    transform 220ms var(--slc-motion-ease),
+    box-shadow 220ms ease,
+    border-color 220ms ease;
+}
+.slc-motion-card:hover {
+  transform: translateY(-3px);
+}
+
+/* Keep motion comfortable on touch devices. */
+@media (max-width: 700px) {
+  html.slc-motion-ready .slc-reveal {
+    transform: translate3d(0, 16px, 0) scale(.99);
+    filter: blur(2px);
+  }
+
+  html.slc-motion-ready .slc-reveal[data-motion-direction="left"],
+  html.slc-motion-ready .slc-reveal[data-motion-direction="right"] {
+    transform: translate3d(0, 16px, 0) scale(.99);
+  }
+}
+
+/* Users who disable animation get the content immediately. */
+@media (prefers-reduced-motion: reduce) {
+  html.slc-motion-ready .slc-reveal,
+  html.slc-motion-ready .progress-fill.slc-progress-motion,
+  html.slc-motion-ready .setup-progress-fill.slc-progress-motion,
+  html.slc-motion-ready .chart-bar.slc-bar-motion,
+  html.slc-motion-ready .mini-chart-bar.slc-bar-motion {
+    transition: none !important;
+    animation: none !important;
+    filter: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+    width: var(--slc-progress-target, auto) !important;
+    height: var(--slc-bar-target, auto) !important;
+  }
+}
