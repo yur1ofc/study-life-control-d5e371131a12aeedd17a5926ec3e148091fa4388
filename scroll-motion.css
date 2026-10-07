@@ -41,32 +41,34 @@ html.slc-motion-ready .slc-reveal[data-motion-direction="up"] {
 .slc-stagger > .slc-reveal:nth-child(6) { transition-delay: 275ms; }
 .slc-stagger > .slc-reveal:nth-child(n+7) { transition-delay: 320ms; }
 
-/* Progress bars: freeze at 0 until the bar itself enters the viewport. */
+/*
+ * Animate the rendered fill with transforms, never by replacing its width.
+ * Width is owned by the app and may be assigned after the element is created;
+ * forcing a captured/computed width here made many bars appear at 100%.
+ */
 html.slc-motion-ready .progress-fill.slc-progress-motion,
 html.slc-motion-ready .setup-progress-fill.slc-progress-motion {
-  width: 0 !important;
-  transition: width 700ms var(--slc-motion-ease) !important;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 700ms var(--slc-motion-ease) !important;
 }
 
 html.slc-motion-ready .progress-fill.slc-progress-motion.slc-chart-visible,
 html.slc-motion-ready .setup-progress-fill.slc-progress-motion.slc-chart-visible {
-  width: var(--slc-progress-target) !important;
+  transform: scaleX(1);
 }
 
-/* Vertical charts grow upward from the baseline. */
+/* Vertical chart bars keep their real data-driven height throughout. */
 html.slc-motion-ready .chart-bar.slc-bar-motion,
 html.slc-motion-ready .mini-chart-bar.slc-bar-motion {
-  height: 0 !important;
+  transform: scaleY(0);
   transform-origin: bottom center;
-  transition:
-    height 620ms var(--slc-motion-ease),
-    transform 180ms ease,
-    filter 180ms ease !important;
+  transition: transform 620ms var(--slc-motion-ease), filter 180ms ease !important;
 }
 
 html.slc-motion-ready .chart-bar.slc-bar-motion.slc-chart-visible,
 html.slc-motion-ready .mini-chart-bar.slc-bar-motion.slc-chart-visible {
-  height: var(--slc-bar-target) !important;
+  transform: scaleY(1);
 }
 
 .chart-bar.slc-bar-motion.slc-chart-visible,
@@ -116,7 +118,5 @@ html.slc-motion-ready .mini-chart-bar.slc-bar-motion.slc-chart-visible {
     filter: none !important;
     transform: none !important;
     opacity: 1 !important;
-    width: var(--slc-progress-target, auto) !important;
-    height: var(--slc-bar-target, auto) !important;
   }
 }

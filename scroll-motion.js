@@ -50,7 +50,7 @@
       '.item-list > li', '.task-card', '.habit-card', '.subject-card',
       '.calendar-card', '.schedule-card', '.feature-card', '.panel',
       '.modal-content', '.empty-state', '.info-card', '.quick-action',
-      '.dashboard-grid > *', '.view-container > section', '.view-container > div'
+      '.dashboard-grid > *'
     ];
     var nodes = [];
     var seen = new Set();
@@ -90,36 +90,21 @@
       } else if (revealObserver) {
         revealObserver.observe(el);
         observed.add(el);
+      } else {
+        // Graceful fallback: never leave content hidden if observers are unavailable.
+        reveal(el);
       }
     });
   }
 
   function captureProgress(el) {
-    if (el.dataset.slcProgressReady === '1') return;
-    var inline = el.style.width || '';
-    var computed = window.getComputedStyle(el).width;
-    var target = inline || computed;
-    // If CSS returned pixels, keep the original percentage when available.
-    if (inline) target = inline;
-    else if (el.getAttribute('aria-valuenow') && el.getAttribute('aria-valuemax')) {
-      var now = Number(el.getAttribute('aria-valuenow'));
-      var max = Number(el.getAttribute('aria-valuemax')) || 100;
-      target = Math.max(0, Math.min(100, now / max * 100)) + '%';
-    } else {
-      // Width is already rendered by the application; use it as a pixel target.
-      target = computed;
-    }
-    el.style.setProperty('--slc-progress-target', target);
+    if (!el || el.dataset.slcProgressReady === '1') return;
     el.dataset.slcProgressReady = '1';
     el.classList.add('slc-progress-motion');
   }
 
   function captureBar(el) {
-    if (el.dataset.slcBarReady === '1') return;
-    var inline = el.style.height || '';
-    var computed = window.getComputedStyle(el).height;
-    var target = inline || computed;
-    el.style.setProperty('--slc-bar-target', target);
+    if (!el || el.dataset.slcBarReady === '1') return;
     el.dataset.slcBarReady = '1';
     el.classList.add('slc-bar-motion');
   }
@@ -135,6 +120,8 @@
         requestAnimationFrame(function () { el.classList.add('slc-chart-visible'); });
       } else if (chartObserver) {
         chartObserver.observe(el);
+      } else {
+        el.classList.add('slc-chart-visible');
       }
     });
 
@@ -147,6 +134,8 @@
         requestAnimationFrame(function () { el.classList.add('slc-chart-visible'); });
       } else if (chartObserver) {
         chartObserver.observe(el);
+      } else {
+        el.classList.add('slc-chart-visible');
       }
     });
   }
