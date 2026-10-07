@@ -1,0 +1,11 @@
+SLCampus — correção do desalinhamento causado pelas animações
+
+Causa corrigida:
+Os seletores de direção da animação tinham a mesma especificidade dos seletores que removem a transformação depois que o elemento fica visível. Como vinham depois no CSS, continuavam deslocando cards e outros componentes horizontalmente (até 28px), deixando grids e páginas desalinhados.
+
+Como aplicar:
+1. No projeto que está conectado à Vercel, substitua o arquivo scroll-motion.css pelo arquivo deste pacote.
+2. Faça commit/push para o GitHub e aguarde a Vercel publicar.
+3. Faça uma atualização forçada no navegador (Ctrl+F5). Se o site estiver instalado como app/PWA, feche e abra novamente.
+
+Não substitua style.css nem arquivos de lógica: esta correção é apenas no CSS das animações e não altera dados, Firebase ou funcionalidades.
