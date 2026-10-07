@@ -23,13 +23,13 @@ html.slc-motion-ready .slc-reveal.slc-visible {
   filter: none;
 }
 
-html.slc-motion-ready .slc-reveal:not(.slc-visible)[data-motion-direction="left"] {
+html.slc-motion-ready .slc-reveal[data-motion-direction="left"] {
   transform: translate3d(-28px, 0, 0) scale(.985);
 }
-html.slc-motion-ready .slc-reveal:not(.slc-visible)[data-motion-direction="right"] {
+html.slc-motion-ready .slc-reveal[data-motion-direction="right"] {
   transform: translate3d(28px, 0, 0) scale(.985);
 }
-html.slc-motion-ready .slc-reveal:not(.slc-visible)[data-motion-direction="up"] {
+html.slc-motion-ready .slc-reveal[data-motion-direction="up"] {
   transform: translate3d(0, 28px, 0) scale(.985);
 }
 
@@ -41,34 +41,20 @@ html.slc-motion-ready .slc-reveal:not(.slc-visible)[data-motion-direction="up"] 
 .slc-stagger > .slc-reveal:nth-child(6) { transition-delay: 275ms; }
 .slc-stagger > .slc-reveal:nth-child(n+7) { transition-delay: 320ms; }
 
-/*
- * Animate the rendered fill with transforms, never by replacing its width.
- * Width is owned by the app and may be assigned after the element is created;
- * forcing a captured/computed width here made many bars appear at 100%.
- */
-html.slc-motion-ready .progress-fill.slc-progress-motion,
-html.slc-motion-ready .setup-progress-fill.slc-progress-motion {
-  transform: scaleX(0);
-  transform-origin: left center;
-  transition: transform 700ms var(--slc-motion-ease) !important;
-}
-
-html.slc-motion-ready .progress-fill.slc-progress-motion.slc-chart-visible,
-html.slc-motion-ready .setup-progress-fill.slc-progress-motion.slc-chart-visible {
-  transform: scaleX(1);
-}
-
-/* Vertical chart bars keep their real data-driven height throughout. */
+/* Vertical charts grow upward from the baseline. */
 html.slc-motion-ready .chart-bar.slc-bar-motion,
 html.slc-motion-ready .mini-chart-bar.slc-bar-motion {
-  transform: scaleY(0);
+  height: 0 !important;
   transform-origin: bottom center;
-  transition: transform 620ms var(--slc-motion-ease), filter 180ms ease !important;
+  transition:
+    height 620ms var(--slc-motion-ease),
+    transform 180ms ease,
+    filter 180ms ease !important;
 }
 
 html.slc-motion-ready .chart-bar.slc-bar-motion.slc-chart-visible,
 html.slc-motion-ready .mini-chart-bar.slc-bar-motion.slc-chart-visible {
-  transform: scaleY(1);
+  height: var(--slc-bar-target) !important;
 }
 
 .chart-bar.slc-bar-motion.slc-chart-visible,
@@ -100,8 +86,8 @@ html.slc-motion-ready .mini-chart-bar.slc-bar-motion.slc-chart-visible {
     filter: blur(2px);
   }
 
-  html.slc-motion-ready .slc-reveal:not(.slc-visible)[data-motion-direction="left"],
-  html.slc-motion-ready .slc-reveal:not(.slc-visible)[data-motion-direction="right"] {
+  html.slc-motion-ready .slc-reveal[data-motion-direction="left"],
+  html.slc-motion-ready .slc-reveal[data-motion-direction="right"] {
     transform: translate3d(0, 16px, 0) scale(.99);
   }
 }
@@ -109,8 +95,6 @@ html.slc-motion-ready .mini-chart-bar.slc-bar-motion.slc-chart-visible {
 /* Users who disable animation get the content immediately. */
 @media (prefers-reduced-motion: reduce) {
   html.slc-motion-ready .slc-reveal,
-  html.slc-motion-ready .progress-fill.slc-progress-motion,
-  html.slc-motion-ready .setup-progress-fill.slc-progress-motion,
   html.slc-motion-ready .chart-bar.slc-bar-motion,
   html.slc-motion-ready .mini-chart-bar.slc-bar-motion {
     transition: none !important;
@@ -118,5 +102,6 @@ html.slc-motion-ready .mini-chart-bar.slc-bar-motion.slc-chart-visible {
     filter: none !important;
     transform: none !important;
     opacity: 1 !important;
+    height: var(--slc-bar-target, auto) !important;
   }
 }

@@ -324,7 +324,7 @@ class ViewRenderer {
         return `
             <div class="view-header">
                 <h2><i class="fas fa-robot"></i> Mentor IA</h2>
-                <div class="header-actions">
+                <div class="header-actions mentor-header-actions">
                     <button class="btn-secondary" id="ia-plano-hoje"><i class="fas fa-calendar-day"></i> Plano Hoje</button>
                     <button class="btn-secondary" id="ia-plano-semana"><i class="fas fa-calendar-week"></i> Plano Semana</button>
                     <button class="btn-secondary" id="ia-analisar-risco"><i class="fas fa-exclamation-triangle"></i> Analisar Risco</button>

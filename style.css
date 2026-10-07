@@ -6922,3 +6922,21 @@ body.slc-tutorial-open { overscroll-behavior:none !important; }
 
 /* Foco v18: alerta de pausas frequentes / pausa esquecida */
 .focus-insight-warn{padding:10px 12px;border-radius:12px;background:rgba(245,158,11,.14);border:1px solid rgba(245,158,11,.35);color:#fbbf24;font-size:.9rem;line-height:1.4;text-align:left}
+
+
+/* Correções mobile V38: menu Mais, Mentor IA e grade curricular */
+@media (max-width: 768px) {
+  /* No celular as sugestões abaixo do chat já cobrem as ações rápidas. */
+  .mentor-header-actions { display: none !important; }
+  .grade-shell { display: grid; gap: 12px; }
+  .grade-shell > * { margin-block: 0 !important; min-width: 0; }
+  .grade-focus-card-upgraded { margin-bottom: 0 !important; }
+  .grade-semester-section, .grade-semester-card, .grade-semester-group { margin-top: 12px !important; }
+}
+#slc-mobile-more:not(.open) { pointer-events: none !important; }
+#slc-mobile-more.open { pointer-events: auto !important; }
+@media (max-width: 768px) {
+  .semester-grid-upgraded { display: grid !important; grid-template-columns: minmax(0, 1fr) !important; gap: 12px !important; margin: 0 !important; padding: 0 !important; align-content: start !important; }
+  .semester-card-upgraded { width: 100%; min-width: 0; margin: 0 !important; }
+  .grade-focus-card-upgraded + .semester-grid-upgraded { margin-top: 0 !important; }
+}

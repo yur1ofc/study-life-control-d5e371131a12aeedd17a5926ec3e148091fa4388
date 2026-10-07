@@ -222,14 +222,9 @@
           if(e){ e.preventDefault(); e.stopPropagation(); }
           if(x.dataset.v==='__more'){ openMobileMore(); } else { navigate(x.dataset.v); }
         };
+        // Um único caminho de ativação evita navegação duplicada em Android/iOS.
+        // Combinar click + pointerup + touchend disparava a mesma ação 2–3 vezes.
         x.onclick=(e)=>go(e);
-        x.addEventListener('pointerdown',e=>{
-          if(e.pointerType==='touch'){ e.preventDefault(); e.stopPropagation(); }
-        }, {passive:false});
-        x.addEventListener('pointerup',e=>{
-          if(e.pointerType==='touch') go(e);
-        }, {passive:false});
-        x.addEventListener('touchend',e=>go(e), {passive:false});
       });
     }
     b.style.display='grid';
@@ -270,11 +265,12 @@
         const target=e.target && e.target.closest ? e.target.closest('#slc-product-bottom-nav button[data-v="__more"]') : null;
         if(!target) return;
         e.preventDefault(); e.stopPropagation();
+        if (document.getElementById('slc-mobile-more')?.classList.contains('open')) return;
         openMobileMore();
       };
+      // O click nativo já funciona em navegadores móveis modernos. Não duplicar
+      // com pointerup/touchend: isso abria o drawer repetidamente e podia congelar a UI.
       document.addEventListener('click',handleMore,true);
-      document.addEventListener('pointerup',e=>{ if(e.pointerType==='touch') handleMore(e); },{capture:true,passive:false});
-      document.addEventListener('touchend',handleMore,{capture:true,passive:false});
     }
     window.addEventListener('resize',()=>mobileNav());
     document.addEventListener('visibilitychange',()=>mobileNav());
