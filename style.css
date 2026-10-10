@@ -6940,3 +6940,50 @@ body.slc-tutorial-open { overscroll-behavior:none !important; }
   .semester-card-upgraded { width: 100%; min-width: 0; margin: 0 !important; }
   .grade-focus-card-upgraded + .semester-grid-upgraded { margin-top: 0 !important; }
 }
+
+
+/* Correção de layout da lista de tarefas: texto e ações não se sobrepõem. */
+.item-list .task-list-item {
+    align-items: center;
+    min-width: 0;
+    gap: 16px;
+}
+
+.item-list .task-list-content {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.item-list .task-list-content strong {
+    display: block;
+    line-height: 1.4;
+}
+
+.item-list .task-list-content small {
+    display: block;
+    line-height: 1.45;
+    color: var(--text-secondary);
+}
+
+.item-list .task-list-actions {
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px !important;
+}
+
+@media (max-width: 768px) {
+    .item-list .task-list-item {
+        align-items: stretch;
+    }
+
+    .item-list .task-list-actions {
+        align-self: flex-end;
+        max-width: 100%;
+    }
+}

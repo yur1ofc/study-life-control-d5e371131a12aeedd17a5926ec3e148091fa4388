@@ -722,7 +722,9 @@ class ViewRenderer {
     }
 
     renderTarefas() {
-        const { atuais: tasksAtuais, arquivadas } = this.app.filterSemestreAtual(this.app.data.tasks, 'materia');
+        // Tarefas são registros independentes: não ocultá-las pelo status atual
+        // da matéria, pois isso fazia tarefas recém-cadastradas parecerem perdidas.
+        const tasksAtuais = Array.isArray(this.app.data.tasks) ? this.app.data.tasks : [];
 
         const pendentes = tasksAtuais
             .filter(t => !t.concluida)
@@ -737,20 +739,18 @@ class ViewRenderer {
                 <h2><i class="fas fa-tasks"></i> Tarefas</h2>
                 <button class="btn-primary" id="btn-nova-tarefa"><i class="fas fa-plus"></i> Nova Tarefa</button>
             </div>
-            ${arquivadas ? `<p class="text-secondary archived-note"><i class="fas fa-box-archive"></i> ${arquivadas} matéria${arquivadas > 1 ? 's' : ''} arquivada${arquivadas > 1 ? 's' : ''} (fora do semestre atual) — as tarefas continuam salvas em Grade Curricular › Semestres anteriores.</p>` : ''}
-
             <div class="dashboard-grid">
                 <div class="card">
                     <div class="card-header"><h3>📋 Pendentes (${pendentes.length})</h3></div>
                     <div class="card-body">
                         <ul class="item-list">
                             ${pendentes.map(t => `
-                                <li>
-                                    <div>
+                                <li class="task-list-item">
+                                    <div class="task-list-content">
                                         <strong>${this.esc(t.titulo)}</strong>
                                         <small>${this.esc(t.materia)} • até ${formatarData(t.dataLimite)}</small>
                                     </div>
-                                    <div style="display:flex; gap:8px;">
+                                    <div class="task-list-actions" style="display:flex; gap:8px;">
                                         <span class="tag ${this.esc(t.prioridade)}">${this.esc(t.prioridade)}</span>
                                         <button class="btn-icon btn-editar-tarefa" data-id="${this.esc(t.id)}" title="Editar tarefa">
                                             <i class="fas fa-edit"></i>
@@ -774,12 +774,12 @@ class ViewRenderer {
                     <div class="card-body">
                         <ul class="item-list">
                             ${concluidas.slice(0, 10).map(t => `
-                                <li>
-                                    <div>
+                                <li class="task-list-item">
+                                    <div class="task-list-content">
                                         <strong>${this.esc(t.titulo)}</strong>
                                         <small>${this.esc(t.materia)}</small>
                                     </div>
-                                    <div style="display:flex; gap:8px;">
+                                    <div class="task-list-actions" style="display:flex; gap:8px;">
                                         <i class="fas fa-check" style="color: var(--accent-success);"></i>
                                         <button class="btn-icon btn-editar-tarefa" data-id="${this.esc(t.id)}" title="Editar tarefa">
                                             <i class="fas fa-edit"></i>
