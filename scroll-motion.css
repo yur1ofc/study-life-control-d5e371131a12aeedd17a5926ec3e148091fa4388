@@ -17,11 +17,6 @@ html.slc-motion-ready .slc-reveal {
   will-change: opacity, transform, filter;
 }
 
-html.slc-motion-ready .slc-reveal.slc-visible {
-  opacity: 1;
-  transform: none;
-  filter: none;
-}
 
 html.slc-motion-ready .slc-reveal[data-motion-direction="left"] {
   transform: translate3d(-28px, 0, 0) scale(.985);
@@ -31,6 +26,17 @@ html.slc-motion-ready .slc-reveal[data-motion-direction="right"] {
 }
 html.slc-motion-ready .slc-reveal[data-motion-direction="up"] {
   transform: translate3d(0, 28px, 0) scale(.985);
+}
+
+/* O estado "visível" vem DEPOIS das variantes de direção e com especificidade maior.
+   Antes, [data-motion-direction] empatava em especificidade e vencia por ordem,
+   deixando cards/linhas deslocados (±28px) e escalados para sempre. */
+html.slc-motion-ready .slc-reveal.slc-visible,
+html.slc-motion-ready .slc-reveal.slc-visible[data-motion-direction] {
+  opacity: 1;
+  transform: none;
+  filter: none;
+  will-change: auto;
 }
 
 .slc-stagger > .slc-reveal:nth-child(1) { transition-delay: 0ms; }

@@ -1435,8 +1435,13 @@ button:active,
 
 .mapa-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(350px, 100%), 1fr));
     gap: 24px;
+    align-items: start;
+}
+
+.mapa-grid > * {
+    min-width: 0;
 }
 
 .materia-map {
@@ -1454,7 +1459,7 @@ button:active,
     text-align: left;
     font: inherit;
     color: inherit;
-    padding: inherit;
+    padding: 20px 24px;
 }
 
 .materia-map-toggle h3 {
@@ -6986,4 +6991,34 @@ body.slc-tutorial-open { overscroll-behavior:none !important; }
         align-self: flex-end;
         max-width: 100%;
     }
+}
+
+
+/* Provas e Trabalhos: cabeçalho dos cards de matéria e linhas de evento.
+   Título quebra naturalmente; selo, ações e chevron nunca são esmagados. */
+.materia-map-toggle h3 {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+.materia-map-toggle .badge,
+.materia-map-toggle .materia-map-chevron {
+    flex: 0 0 auto;
+}
+.prova-item > div:first-child {
+    flex: 1 1 0;
+    overflow-wrap: anywhere;
+}
+.prova-item > div:first-child strong,
+.prova-item > div:first-child small {
+    display: block;
+}
+.prova-item > div:last-child {
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+@media (max-width: 768px) {
+    .materia-map-toggle { padding: 16px; }
+    .prova-item > div:first-child { flex: 0 0 auto; width: 100%; }
+    .prova-item > div:last-child { width: 100%; justify-content: flex-end; }
 }
