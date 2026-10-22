@@ -5,7 +5,7 @@
 // adicione ele aqui também — senão ele só entra no cache dinâmico depois
 // do primeiro acesso online, e falha se o usuário abrir o app offline
 // (ou logo após instalar como PWA) antes disso acontecer.
-const CACHE_VERSION = 'slc-v63-layout-fix';
+const CACHE_VERSION = 'slc-v64-audit-fixes';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 
@@ -44,7 +44,7 @@ const STATIC_ASSETS = [
   './app.js',
   './semester-finish.js',
   './semester-archive-viewer.js',
-  './semester-context.js', './shared/academic-context.js',
+  './semester-context.js',
   './semester-history-manager.js',
   './universidades-brasil.js',
   './setup-wizard.js',
@@ -200,6 +200,14 @@ self.addEventListener('fetch', event => {
         return cached || fetchPromise;
       })
     );
+    return;
+  }
+
+  // Nunca cachear APIs: respostas podem conter dados autenticados e o Cache API
+  // não separa as entradas pelo cabeçalho Authorization.
+  const requestUrl = new URL(request.url);
+  if (request.method !== 'GET' || requestUrl.pathname.startsWith('/api/')) {
+    event.respondWith(fetch(request));
     return;
   }
 

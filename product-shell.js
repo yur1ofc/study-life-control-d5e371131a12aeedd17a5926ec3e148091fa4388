@@ -98,6 +98,12 @@
       const totalMin=sessions.reduce((n,s)=>n+(Number(s.duracaoReal||s.duracao)||0),0);
       return `<section class="slc-profile-page"><div class="slc-profile-hero"><div class="slc-avatar-xl">${esc(initials)}</div><div><span class="slc-eyebrow">MINHA CONTA</span><h2>${esc(u.nome||a?.displayName||'Usuário')}</h2><p>${esc(a?.email||'')} · ${esc(perfil)}</p></div><button class="btn-secondary" data-slcnavigate="configuracoes"><i class="fas fa-cog"></i> Configurações</button></div><div class="slc-profile-stats"><div><strong>${level}</strong><span>Nível</span></div><div><strong>${xp}</strong><span>XP</span></div><div><strong>${streak}</strong><span>Dias seguidos</span></div><div><strong>${(totalMin/60).toFixed(1)}h</strong><span>Estudadas</span></div></div><div class="slc-profile-grid"><div class="card"><div class="card-header"><h3><i class="fas fa-user-graduate"></i> Perfil acadêmico</h3></div><div class="card-body"><div class="slc-profile-row"><span>Perfil</span><strong>${esc(perfil)}</strong></div><div class="slc-profile-row"><span>Objetivo</span><strong>${esc(u.objetivo||u.curso||u.concurso||'Não definido')}</strong></div><div class="slc-profile-row"><span>Universidade</span><strong>${esc(u.universidade||'Não definida')}</strong></div><div class="slc-profile-row"><span>Semestre atual</span><strong>${esc(u.semestre||'Não definido')}</strong></div><div class="slc-profile-row"><span>Matérias ativas</span><strong>${this.app?.data?.subjects?.length||0}</strong></div><div class="slc-profile-row"><span>Meta diária</span><strong>${goal.toFixed(1)}h</strong></div></div></div><div class="card"><div class="card-header"><h3><i class="fas fa-bolt"></i> Ações rápidas</h3></div><div class="card-body slc-profile-actions"><button data-slcnavigate="configuracoes"><i class="fas fa-user-edit"></i> Editar perfil</button><button data-slcnavigate="estatisticas"><i class="fas fa-chart-line"></i> Meu desempenho</button><button data-slcnavigate="mapa-aprendizado"><i class="fas fa-map"></i> Meu mapa de aprendizado</button><button data-slcnavigate="sessoes"><i class="fas fa-clock"></i> Histórico de estudos</button><button data-slcnavigate="biblioteca"><i class="fas fa-layer-group"></i> Minha biblioteca</button></div></div></div></section>`;
     };
+    window.__slcRenderPerfil = () => {
+      const app = window.app;
+      if (!app) return '';
+      if (!app.viewRenderer && window.ViewRenderer) app.viewRenderer = new ViewRenderer(app);
+      return app.viewRenderer?.renderPerfil?.() || '';
+    };
   }
 
   function patchLoadView(){

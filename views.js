@@ -588,8 +588,9 @@ class ViewRenderer {
                             <div class="week-agenda-day-list">
                                 ${d.aulas.map(aula => {
                                     const cor = aula.cor || '#3b82f6';
+                                    const corOk = /^#[0-9a-fA-F]{3,8}$/.test(cor) ? cor : '#3b82f6';
                                     return `
-                                        <div class="week-agenda-item" data-aula-id="${this.esc(aula.id)}" style="border-left-color:${cor};">
+                                        <div class="week-agenda-item" data-aula-id="${this.esc(aula.id)}" style="border-left-color:${corOk};">
                                             <div class="week-agenda-time">
                                                 <strong>${this.esc(aula.inicio)}</strong>
                                                 <span>${this.esc(aula.fim)}</span>

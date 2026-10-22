@@ -183,13 +183,10 @@ service cloud.firestore {
     // Cada usuário publica uma "foto" pública (mas sem nome nem e-mail) das
     // provas/tarefas/sessões/aulas nesse documento, identificado por um token
     // aleatório e longo (gerado em calendar-feed.js). Leitura é pública de
-    // propósito: é assim que app de calendário (Google/Apple/Outlook) consegue
-    // buscar o .ics periodicamente sem o usuário precisar logar de novo — a
-    // segurança vem do token ser longo o bastante pra não dar pra adivinhar,
-    // igual um link "de compartilhamento" de qualquer outro serviço. Só quem
-    // tem a URL consegue ler; ninguém consegue *listar* os tokens existentes.
+    // A leitura individual é pública para permitir assinaturas .ics sem login.
+    // `list` não é permitido: cai na regra catch-all negada ao final.
     match /calendar_feeds/{token} {
-      allow read: if true;
+      allow get: if true;
 
       // reviews (revisão espaçada) foi adicionado depois dos demais campos
       // e ficou de fora dessa validação por um tempo — limite de 1000 casa

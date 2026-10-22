@@ -1,4 +1,5 @@
 :root {
+    --z-header: 100; --z-nav: 200; --z-modal: 1000; --z-toast: 1100; --z-loading: 1200;
     --bg-primary: #0a0f1f;
     --bg-secondary: #151f2f;
     --bg-tertiary: #1e2b3a;
@@ -87,6 +88,8 @@ html {
 [hidden] {
   display: none !important;
 }
+
+[data-theme="light"] { color-scheme: light; }
 
 body {
     color-scheme: dark;
@@ -928,7 +931,7 @@ button:active,
 
 .dashboard-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(320px,100%), 1fr));
     gap: 24px;
     margin-bottom: 32px;
 }
@@ -1506,7 +1509,7 @@ button:active,
 
 .materiais-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(300px,100%), 1fr));
     gap: 24px;
 }
 
@@ -2029,7 +2032,7 @@ body[data-view="mentor-ia"] .sugestoes-container {
 .modal {
     display: none;
     position: fixed;
-    z-index: 1000;
+    z-index: var(--z-modal);
     inset: 0;
     width: 100%;
     height: 100%;
@@ -3484,7 +3487,7 @@ input:checked + .toggle-slider:before {
 .grade-focus-list { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; }
 .grade-focus-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border-radius: 16px; border:1px solid rgba(148,163,184,.14); background: rgba(15,23,42,.28); }
 .grade-focus-item small { display:block; color: var(--text-secondary); margin-top:4px; }
-.semester-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; }
+.semester-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(min(340px,100%), 1fr)); gap: 20px; }
 .semester-card { border:1px solid rgba(148,163,184,.12); }
 .semester-card-active { box-shadow: 0 0 0 1px rgba(59,130,246,.28), 0 18px 50px rgba(37,99,235,.12); }
 .semester-card-header p { margin: 4px 0 0; color: var(--text-secondary); font-size:.95rem; }
@@ -4906,7 +4909,7 @@ body.sidebar-open #slc-bottom-nav {
         font-size: .92rem;
         font-weight: 700;
         line-height: 1.35;
-        color: #f8fafc;
+        color: var(--text-primary);
     }
     .login-mobile-bullets {
         list-style: none;
@@ -4922,7 +4925,7 @@ body.sidebar-open #slc-bottom-nav {
         gap: 8px;
         font-size: .78rem;
         line-height: 1.4;
-        color: rgba(248,250,252,.75);
+        color: var(--text-secondary);
     }
     .login-mobile-bullets li::before {
         content: '✓';
@@ -6276,7 +6279,7 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif}
 .telegram-empty{padding:24px;text-align:center;color:var(--text-secondary)}
 
 @media(max-width:768px){
-  #slc-product-bottom-nav{z-index:2147483000!important;height:72px!important;min-height:72px!important;padding:6px 5px calc(6px + env(safe-area-inset-bottom))!important;touch-action:manipulation;pointer-events:auto!important;-webkit-user-select:none!important;user-select:none!important}
+  #slc-product-bottom-nav{z-index:var(--z-nav)!important;height:72px!important;min-height:72px!important;padding:6px 5px calc(6px + env(safe-area-inset-bottom))!important;touch-action:manipulation;pointer-events:auto!important;-webkit-user-select:none!important;user-select:none!important}
   #slc-product-bottom-nav button{min-width:0!important;min-height:56px!important;padding:5px 3px!important;position:relative!important;z-index:2!important;pointer-events:auto!important;touch-action:manipulation!important;-webkit-tap-highlight-color:transparent!important;-webkit-touch-callout:none!important}
   #slc-product-bottom-nav button.primary{margin:-8px 3px 4px!important}
   #slc-mobile-more{z-index:2147483646!important}
@@ -7022,3 +7025,12 @@ body.slc-tutorial-open { overscroll-behavior:none !important; }
     .prova-item > div:first-child { flex: 0 0 auto; width: 100%; }
     .prova-item > div:last-child { width: 100%; justify-content: flex-end; }
 }
+
+
+/* Foco visível global para navegação por teclado. */
+:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+
+.close-modal { border: 0; background: transparent; font: inherit; cursor: pointer; padding: 4px 8px; color: inherit; }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
+@media (max-width: 768px) { button, .btn, .btn-primary, .btn-secondary { min-height: 44px; } }

@@ -1,7 +1,7 @@
 // SLCampus — webhook Telegram. Além dos comandos clássicos, entende frases
 // naturais em português sem precisar chamar uma IA paga.
 const admin=require('firebase-admin');
-const AcademicCore=require('../../../shared/academic-context.js');
+const AcademicCore=require('../../../Shared/academic-context.js');
 const AI=require('../ai-core');
 const quota=require('../gemini-admin-quota');
 const AcademicIntelligence=require('../academic-intelligence-server');
@@ -645,7 +645,7 @@ module.exports=async function(req,res){
     const msg=update.message;if(!msg)return res.status(200).json({ok:true,ignored:true});
     const chatId=String(msg.chat?.id||'');if(!chatId)return res.status(200).json({ok:true,ignored:true});
     const db=init().firestore(),text=String(msg.text||msg.caption||'').trim();
-    if(text.startsWith('/start')){const c=text.split(/\s+/)[1]?.trim().toUpperCase();if(c){const linkRef=db.collection('telegramLinks').doc(c),snap=await linkRef.get(),link=snap.exists?snap.data():null;if(link&&new Date(link.expiresAt).getTime()>Date.now()){await db.collection('users').doc(link.uid).set({telegram:{chatId,username:msg.from?.username||'',firstName:msg.from?.first_name||'',linkedAt:new Date().toISOString()}},{merge:true});await linkRef.delete();await reply(chatId,'Telegram vinculado ao SLCampus.\n\n'+help());return res.status(200).json({ok:true});}}await reply(chatId,'Código inválido ou expirado. Gere outro código em SLCampus → Configurações → Telegram.');return res.status(200).json({ok:true});}
+    if(text.startsWith('/start')){const c=text.split(/\s+/)[1]?.trim().toUpperCase();if(c){const linkRef=db.collection('telegramLinks').doc(c),snap=await linkRef.get(),link=snap.exists?snap.data():null;if(link && Number(link.attempts||0)<5 && new Date(link.expiresAt).getTime()>Date.now()){await db.collection('users').doc(link.uid).set({telegram:{chatId,username:msg.from?.username||'',firstName:msg.from?.first_name||'',linkedAt:new Date().toISOString()}},{merge:true});await linkRef.delete();await reply(chatId,'Telegram vinculado ao SLCampus.\n\n'+help());return res.status(200).json({ok:true});} if(link){const attempts=Number(link.attempts||0)+1;if(attempts>=5) await linkRef.delete(); else await linkRef.set({attempts},{merge:true});}}await reply(chatId,'Código inválido ou expirado. Gere outro código em SLCampus → Configurações → Telegram.');return res.status(200).json({ok:true});}
     const q=await db.collection('users').where('telegram.chatId','==',chatId).limit(1).get();if(q.empty){await reply(chatId,'Este Telegram ainda não está vinculado. Gere um código no SLCampus → Configurações → Telegram e envie /start CODIGO.');return res.status(200).json({ok:true});}
     const ref=q.docs[0].ref,data=q.docs[0].data()||{};if(alreadyProcessed(data,update.update_id))return res.status(200).json({ok:true,duplicate:true});const mark=()=>markProcessed(ref,data,update.update_id).catch(()=>null);const lower=normalize(text);
     if(lower==='/ajuda'||lower==='/help'){await reply(chatId,help());await mark();return res.status(200).json({ok:true});}

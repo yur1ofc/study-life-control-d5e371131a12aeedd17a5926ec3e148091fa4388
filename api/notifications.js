@@ -6,7 +6,7 @@ const handlers = {
 
 module.exports = async function handler(req, res) {
   const mode = String(req.query?.mode || '').toLowerCase();
-  const target = handlers[mode];
-  if (!target) return res.status(404).json({ error: 'Notification route not found.' });
+  const target = Object.prototype.hasOwnProperty.call(handlers, mode) ? handlers[mode] : null;
+  if (typeof target !== 'function') return res.status(404).json({ error: 'Notification route not found.' });
   return target(req, res);
 };

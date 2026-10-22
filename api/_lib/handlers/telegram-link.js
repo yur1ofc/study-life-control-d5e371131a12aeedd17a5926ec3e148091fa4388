@@ -4,7 +4,7 @@ const crypto=require('crypto');
 let app;
 function init(){if(app)return app;const raw=process.env.FIREBASE_SERVICE_ACCOUNT_KEY;if(!raw)throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY não configurada.');const service=JSON.parse(Buffer.from(raw,'base64').toString('utf8'));app=admin.apps.length?admin.app():admin.initializeApp({credential:admin.credential.cert(service)});return app;}
 function bearer(req){const h=req.headers.authorization||'';return h.startsWith('Bearer ')?h.slice(7):'';}
-function code(){return crypto.randomBytes(4).toString('hex').slice(0,6).toUpperCase();}
+function code(){return crypto.randomBytes(6).toString('base64url').slice(0,10);}
 module.exports=async function(req,res){
   if(req.method!=='POST')return res.status(405).json({error:'Método não permitido.'});
   try{

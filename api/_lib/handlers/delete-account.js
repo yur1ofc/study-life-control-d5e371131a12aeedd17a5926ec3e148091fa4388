@@ -46,6 +46,8 @@ module.exports = async function handler(req,res) {
     await deleteQuery(db.collection('calendar_feeds').where('uid','==',uid));
     await deleteQuery(db.collection('telegramLinks').where('uid','==',uid));
 
+    await db.collection('user_presence').doc(uid).delete().catch(() => null);
+
     // Firestore Admin recursive delete remove o documento e subcoleções.
     await db.recursiveDelete(db.collection('users').doc(uid));
 

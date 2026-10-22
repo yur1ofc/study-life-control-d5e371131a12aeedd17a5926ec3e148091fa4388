@@ -19,7 +19,7 @@
     return normalizeText(value);
   }
   function signatureForItem(collection, item) {
-    const ignored = new Set(['id','createdAt','updatedAt','timestamp','uid','_tempId','__localId','ultimaAtualizacao','ultimaInteracao','streak','lastStudyDate']);
+    const ignored = new Set(['createdAt','updatedAt','timestamp','uid','_tempId','__localId','ultimaAtualizacao','ultimaInteracao','streak','lastStudyDate']);
     const clone = {};
     Object.keys(item || {}).sort().forEach(key => {
       if (ignored.has(key)) return;
@@ -1508,7 +1508,6 @@
       // recurso que já existe como item fixo na sidebar (desktop) e como aba
       // "IA" na barra inferior (mobile) — dois botões pra abrir a mesma
       // coisa. Ficou só o item de navegação.
-      window.app.syncGamificationAchievements?.().catch?.(()=>{});
       window.app.syncGamificationAchievements?.().catch?.(()=>{});
       setupNotificationCenter(window.app);
       updateSidebarLevelRing(window.app);

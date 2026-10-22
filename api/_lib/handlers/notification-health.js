@@ -27,6 +27,6 @@ module.exports=async function(req,res){
     const userSnap=await db.collection('users').doc(decoded.uid).get();
     const data=userSnap.data()||{};
     const subs=Array.isArray(data.pushSubscriptions)?data.pushSubscriptions:[];
-    return res.status(200).json({ok:true,mode:'user',permission:!!data.settings?.studyReminders?.enabled,focusPush:!!data.settings?.focusPushEnabled,subscriptions:subs.length,lastRunAt:h?.lastRunAt||null,minutesSinceRun:recent,lastRunSummary:h?.summary||null,lastRunError:h?.error||null,schedulerStatus:h?.status||'never_run',schedulerHealthy});
+    return res.status(200).json({ok:true,mode:'user',permission:!!data.settings?.studyReminders?.enabled,focusPush:!!data.settings?.focusPushEnabled,subscriptions:subs.length,lastRunAt:h?.lastRunAt||null,minutesSinceRun:recent,schedulerStatus:h?.status||'never_run',schedulerHealthy});
   }catch(e){console.error('[notification-health]',e);return res.status(500).json({error:'Não foi possível consultar a saúde das notificações.'});}
 };

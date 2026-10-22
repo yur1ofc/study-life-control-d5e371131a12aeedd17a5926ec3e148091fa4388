@@ -596,7 +596,7 @@ REGRAS CRÍTICAS:
     }
 
     async function saveDraft(app, draft, index) {
-        draft.fim = draft.fim || draft.finalizadoEm || new Date().toISOString().slice(0,10);
+        draft.fim = draft.fim || draft.finalizadoEm || (window.toDateString ? window.toDateString(new Date()) : `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}`);
         draft.finalizadoEm = draft.fim;
         draft.tipo = draft.tipo || 'manual'; draft.origem = draft.origem || 'cadastro-manual';
         draft.subjects = draft.subjects.map(s => normalizeSubject({...s, semestre: draft.numero ? String(draft.numero) : s.semestre})); draft.curriculum=draft.subjects.map(s=>CLONE(s)); draft.materias=draft.subjects.map(s=>s.nome);

@@ -265,7 +265,7 @@
         const color = value >= 7 ? '#10b981' : value >= 5 ? '#f59e0b' : '#ef4444';
         return `
           <div class="slc-grade-row">
-            <span class="slc-grade-label" title="${label}">${label}</span>
+            <span class="slc-grade-label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
             <div class="slc-grade-track"><div class="slc-grade-fill" style="width:${pct}%;background:${color};"></div></div>
             <span class="slc-grade-value" style="color:${color};">${value.toFixed(1)}</span>
           </div>`;
@@ -362,18 +362,18 @@
         .baixa { background:#dcfce7;color:#16a34a; }
       </style></head><body>
       <h1>📚 SLCampus</h1>
-      <p style="color:#64748b;font-size:13px;">Relatório gerado em ${new Date().toLocaleDateString('pt-BR')} • ${user.nome || 'Usuário'}</p>
+      <p style="color:#64748b;font-size:13px;">Relatório gerado em ${new Date().toLocaleDateString('pt-BR')} • ${escapeHtml(user.nome || 'Usuário')}</p>
       <h2>Tarefas Pendentes</h2>
       <table><tr><th>Tarefa</th><th>Matéria</th><th>Prazo</th><th>Prioridade</th></tr>
-      ${tasks.map(t => `<tr><td>${t.titulo||''}</td><td>${t.materia||''}</td><td>${t.dataLimite||''}</td><td><span class="badge ${t.prioridade||''}">${t.prioridade||''}</span></td></tr>`).join('')}
+      ${tasks.map(t => `<tr><td>${escapeHtml(t.titulo||'')}</td><td>${escapeHtml(t.materia||'')}</td><td>${escapeHtml(t.dataLimite||'')}</td><td><span class="badge ${escapeHtml(t.prioridade||'')}">${t.prioridade||''}</span></td></tr>`).join('')}
       </table>
       <h2>Provas e Trabalhos</h2>
       <table><tr><th>Título</th><th>Matéria</th><th>Data</th><th>Tipo</th></tr>
-      ${exams.map(e => `<tr><td>${e.titulo||''}</td><td>${e.materia||''}</td><td>${e.data||''}</td><td>${e.tipo||''}</td></tr>`).join('')}
+      ${exams.map(e => `<tr><td>${escapeHtml(e.titulo||'')}</td><td>${escapeHtml(e.materia||'')}</td><td>${escapeHtml(e.data||'')}</td><td>${escapeHtml(e.tipo||'')}</td></tr>`).join('')}
       </table>
       <h2>Notas Registradas</h2>
       <table><tr><th>Matéria</th><th>Avaliação</th><th>Nota</th><th>Peso</th></tr>
-      ${grades.map(g => `<tr><td>${g.materia||''}</td><td>${g.avaliacao||''}</td><td>${g.nota||''}</td><td>${g.peso||''}%</td></tr>`).join('')}
+      ${grades.map(g => `<tr><td>${escapeHtml(g.materia||'')}</td><td>${escapeHtml(g.avaliacao||'')}</td><td>${g.nota||''}</td><td>${g.peso||''}%</td></tr>`).join('')}
       </table>
       </body></html>`;
 

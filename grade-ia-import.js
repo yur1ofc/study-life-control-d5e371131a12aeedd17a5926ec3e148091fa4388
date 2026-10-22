@@ -287,18 +287,18 @@ Regras:
       const updatedRows = diff.updated.map(u => {
         const bits = Object.entries(u.changes).map(([campo, v]) => {
           const label = { semestre: 'semestre', tipo: 'tipo', cargaHoraria: 'carga horária', creditos: 'créditos' }[campo] || campo;
-          return `${label}: <s style="opacity:.55">${v.de || '—'}</s> → <strong>${v.para}</strong>`;
+          return `${label}: <s style="opacity:.55">${escapeHtml(v.de || '—')}</s> → <strong>${escapeHtml(v.para)}</strong>`;
         }).join(' · ');
-        return `<li style="padding:.4rem 0;border-bottom:1px solid #eef2f7;font-size:.82rem;"><strong>${u.item.nome}</strong><br><span style="color:#64748b">${bits}</span></li>`;
+        return `<li style="padding:.4rem 0;border-bottom:1px solid #eef2f7;font-size:.82rem;"><strong>${escapeHtml(u.item.nome)}</strong><br><span style="color:#64748b">${bits}</span></li>`;
       }).join('');
 
-      const addedRows = diff.added.map(d => `<li style="padding:.3rem 0;font-size:.82rem;">${d.nome} <span style="color:#94a3b8">· ${d.semestre ? d.semestre + 'º sem.' : 'sem semestre'} · ${d.tipo === 'optativa' ? 'optativa' : 'obrigatória'}</span></li>`).join('');
+      const addedRows = diff.added.map(d => `<li style="padding:.3rem 0;font-size:.82rem;">${escapeHtml(d.nome)} <span style="color:#94a3b8">· ${d.semestre ? d.semestre + 'º sem.' : 'sem semestre'} · ${d.tipo === 'optativa' ? 'optativa' : 'obrigatória'}</span></li>`).join('');
 
       const removedRows = diff.removedCandidates.map(item => `
         <li style="padding:.35rem 0;font-size:.82rem;display:flex;align-items:center;gap:.5rem;">
           <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;flex:1;">
-            <input type="checkbox" class="slc-gim-remove-check" value="${item.id}">
-            <span>${item.nome} <span style="color:#94a3b8">· status: ${item.status || 'não cursada'}</span></span>
+            <input type="checkbox" class="slc-gim-remove-check" value="${escapeHtml(item.id)}">
+            <span>${escapeHtml(item.nome)} <span style="color:#94a3b8">· status: ${item.status || 'não cursada'}</span></span>
           </label>
         </li>`).join('');
 

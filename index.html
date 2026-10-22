@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SLCampus — Seu sistema de estudos</title>
     <meta name="description" content="Organize estudos, materiais, provas, tarefas e rotina em um único espaço inteligente para estudar melhor.">
-    <meta name="theme-color" content="#2563eb">
+    <meta name="theme-color" content="#0a0f1f">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta property="og:title" content="SLCampus">
@@ -20,7 +20,7 @@
     <meta name="twitter:description" content="Seu espaço inteligente para estudar, organizar e evoluir.">
     <meta name="twitter:image" content="https://slcampus.vercel.app/og-image.svg">
     <link rel="manifest" href="manifest.json">
-    <link rel="icon" href="icon-192.png" type="image/png">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <!-- iOS não lê SVG nem o manifest para o ícone de tela inicial — precisa deste PNG -->
     <link rel="apple-touch-icon" href="icon-180.png">
     <!-- Preconnect: acelera o popup do Google e o carregamento de fontes/ícones -->
@@ -40,15 +40,14 @@
     <script defer src="scroll-motion.js"></script>
     <!-- Credenciais injetadas no build pelo inject-env.js -->
     <script src="env-config.js"></script>
-    <!-- Firebase SDK hospedado localmente (não mais na CDN gstatic.com) —
-         assim o service worker consegue cachear e o app funciona offline
-         mesmo em navegadores/dispositivos que não tinham a CDN em cache. -->
+    <!-- Firebase SDK carregado da CDN oficial gstatic.com. -->
     <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
     <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics-compat.js"></script>
     <script defer src="curriculum-catalog.js"></script>
+    <link rel="stylesheet" href="launch-polish.css">
 </head>
 <body>
     <div id="app">
@@ -266,10 +265,10 @@
                         </button>
                         <p class="login-cta-hint">Leva 10 segundos — sem formulário pra preencher.</p>
                         <div id="login-error-msg" style="display:none;margin-top:14px;padding:10px 14px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);border-radius:10px;color:#ef4444;font-size:.88rem;text-align:center;"></div>
-                        <p style="margin-top:14px;font-size:.76rem;color:#64748b;text-align:center;display:flex;align-items:center;justify-content:center;gap:6px;"><i class="fas fa-lock" style="font-size:.7rem;"></i> Seus dados ficam só na sua conta — ninguém mais tem acesso a eles.</p>
-                        <p style="margin-top:8px;font-size:.72rem;color:#475569;text-align:center;">Ao entrar, você concorda com o uso dos dados para fins acadêmicos pessoais.</p>
+                        <p style="margin-top:14px;font-size:.76rem;color:var(--text-secondary);text-align:center;display:flex;align-items:center;justify-content:center;gap:6px;"><i class="fas fa-lock" style="font-size:.7rem;"></i> Seus dados ficam só na sua conta — ninguém mais tem acesso a eles.</p>
+                        <p style="margin-top:8px;font-size:.72rem;color:var(--text-secondary);text-align:center;">Ao entrar, você concorda com o uso dos dados para fins acadêmicos pessoais.</p>
                         <p style="margin-top:16px;font-size:.78rem;text-align:center;">
-                            <a href="https://www.instagram.com/slcampus/" target="_blank" rel="noopener" style="color:#94a3b8;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+                            <a href="https://www.instagram.com/slcampus/" target="_blank" rel="noopener" style="color:var(--text-secondary);text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
                                 <i class="fab fa-instagram"></i> @slcampus
                             </a>
                         </p>
@@ -538,7 +537,7 @@
                             <button class="btn-icon" id="daily-log-btn" onclick="window.diaryView?.openModal()" title="Registrar Dia">
                                 <i class="fas fa-clipboard-list"></i>
                             </button>
-                            <div class="notification-badge" id="notification-badge">
+                            <div class="notification-badge" id="notification-badge" role="button" tabindex="0" aria-label="Notificações" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click()}">
                                 <i class="fas fa-bell"></i>
                                 <span class="badge-count" id="notification-count">0</span>
                             </div>
@@ -557,7 +556,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2><i class="fas fa-clock"></i> Nova Sessão de Estudo</h2>
-                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+                <button type="button" class="close-modal" aria-label="Fechar" onclick="this.closest('.modal').style.display='none'">&times;</button>
             </div>
             <form id="form-sessao" class="modal-form" onsubmit="app.handleSessaoSubmit(event)">
                 <div class="form-group">
@@ -601,7 +600,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2><i class="fas fa-tasks"></i> Nova Tarefa</h2>
-                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+                <button type="button" class="close-modal" aria-label="Fechar" onclick="this.closest('.modal').style.display='none'">&times;</button>
             </div>
             <form id="form-tarefa" class="modal-form" onsubmit="app.handleTarefaSubmit(event)">
                 <div class="form-group">
@@ -645,7 +644,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2><i class="fas fa-graduation-cap"></i> Nova Prova/Trabalho</h2>
-                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+                <button type="button" class="close-modal" aria-label="Fechar" onclick="this.closest('.modal').style.display='none'">&times;</button>
             </div>
             <form id="form-prova" class="modal-form" onsubmit="app.handleProvaSubmit(event)">
                 <div class="form-group">
@@ -712,7 +711,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2><i class="fas fa-calendar-week"></i> Nova Aula</h2>
-                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+                <button type="button" class="close-modal" aria-label="Fechar" onclick="this.closest('.modal').style.display='none'">&times;</button>
             </div>
             <form id="form-aula" class="modal-form" onsubmit="app.handleAulaSubmit(event)">
                 <div class="form-group">
@@ -774,7 +773,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2><i class="fas fa-map-marker-alt"></i> Novo Tópico</h2>
-                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+                <button type="button" class="close-modal" aria-label="Fechar" onclick="this.closest('.modal').style.display='none'">&times;</button>
             </div>
             <form id="form-topico" class="modal-form" onsubmit="app.handleTopicoSubmit(event)">
                 <div class="form-group">
@@ -817,7 +816,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2><i class="fas fa-star"></i> Registrar Nota</h2>
-                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+                <button type="button" class="close-modal" aria-label="Fechar" onclick="this.closest('.modal').style.display='none'">&times;</button>
             </div>
             <form id="form-nota" class="modal-form" onsubmit="app.handleNotaSubmit(event)">
                 <div class="form-group">
@@ -851,7 +850,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2><i class="fas fa-folder"></i> Novo Material</h2>
-                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+                <button type="button" class="close-modal" aria-label="Fechar" onclick="this.closest('.modal').style.display='none'">&times;</button>
             </div>
             <form id="form-material" class="modal-form" onsubmit="app.handleMaterialSubmit(event)">
                 <div class="form-group">
@@ -891,7 +890,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2><i class="fas fa-book"></i> Matéria</h2>
-                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+                <button type="button" class="close-modal" aria-label="Fechar" onclick="this.closest('.modal').style.display='none'">&times;</button>
             </div>
             <form id="form-materia" class="modal-form">
                 <div class="form-group">
@@ -934,7 +933,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2><i class="fas fa-sitemap"></i> Componente Curricular</h2>
-                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+                <button type="button" class="close-modal" aria-label="Fechar" onclick="this.closest('.modal').style.display='none'">&times;</button>
             </div>
             <form id="form-curriculum" class="modal-form">
                 <div class="form-row">
@@ -1023,7 +1022,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2><i class="fas fa-language"></i> Curso Extra</h2>
-                <span class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</span>
+                <button type="button" class="close-modal" aria-label="Fechar" onclick="this.closest('.modal').style.display='none'">&times;</button>
             </div>
             <form id="form-extra-course" class="modal-form">
                 <div class="form-group">
@@ -1125,7 +1124,7 @@
         <div class="modal-content modal-lg">
             <div class="modal-header">
                 <h2><i class="fas fa-book-open"></i> <span id="modal-diario-titulo">Registro do dia</span></h2>
-                <span class="close-modal" onclick="document.getElementById('modal-diario').style.display='none'">&times;</span>
+                <button type="button" class="close-modal" aria-label="Fechar" onclick="document.getElementById('modal-diario').style.display='none'">&times;</button>
             </div>
             <form id="form-diario" class="modal-form" onsubmit="window.diaryView?.handleSubmit(event)">
                 <div class="form-group">
@@ -1199,7 +1198,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2><i class="fas fa-calendar-week"></i> Detalhes da Aula</h2>
-                <span class="close-modal" onclick="document.getElementById('modal-aula-detail').style.display='none'">&times;</span>
+                <button type="button" class="close-modal" aria-label="Fechar" onclick="document.getElementById('modal-aula-detail').style.display='none'">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="aula-detail-info">
@@ -1225,7 +1224,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2><i class="fas fa-lightbulb"></i> O que estudar agora?</h2>
-                <span class="close-modal" onclick="document.getElementById('modal-whats-now').style.display='none'">&times;</span>
+                <button type="button" class="close-modal" aria-label="Fechar" onclick="document.getElementById('modal-whats-now').style.display='none'">&times;</button>
             </div>
             <div class="modal-body">
                 <div id="whats-now-content" class="whats-now-content"></div>
@@ -1238,7 +1237,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2><i class="fas fa-chart-pie"></i> Configurar Estrutura de Notas</h2>
-                <span class="close-modal" onclick="document.getElementById('modal-grade-structure').style.display='none'">&times;</span>
+                <button type="button" class="close-modal" aria-label="Fechar" onclick="document.getElementById('modal-grade-structure').style.display='none'">&times;</button>
             </div>
             <div class="modal-body">
                 <div id="grade-structure-materia" class="grade-structure-materia"></div>
@@ -1253,7 +1252,7 @@
         </div>
     </div>
 
-    <div id="toast-container"></div>
+    <div id="toast-container" role="status" aria-live="polite"></div>
 
     <script defer src="firebase-config.js"></script>
 <script defer src="security.js"></script>
@@ -1303,12 +1302,13 @@
     <script defer src="exam-study-popup.js"></script>
     <script defer src="quick-search.js"></script>
     <script defer src="export-data.js"></script>
-    <link rel="stylesheet" href="launch-polish.css">
+
     <script defer src="launch-polish.js"></script>
     <script defer src="improvements.js"></script>
+    <script defer src="feedback-widget.js"></script>
     <script defer src="ux-improvements.js"></script>
     <script defer src="reprovado-ecosystem.js"></script>
-    <script defer src="shared/academic-context.js"></script>
+
     <script defer src="semester-context.js"></script>
     <script defer src="semester-history-manager.js"></script>
     <script defer src="academic-intelligence.js"></script>

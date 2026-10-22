@@ -42,7 +42,7 @@
     return out.sort(function (x, y) { return y.score - x.score; }).slice(0, 3);
   }
   function mountCard() {
-    var content = document.getElementById('content-area');
+    var content = document.getElementById('view-container');
     if (!content || document.getElementById('slc-best-hours') || !content.querySelector('.dashboard-header')) return;
     var w = bestWindows(); if (!w.length) return;
     var now = A().localParts(Date.now()), today = w.filter(function (x) { return x.dow === now.weekday && x.end > now.hour; })[0];

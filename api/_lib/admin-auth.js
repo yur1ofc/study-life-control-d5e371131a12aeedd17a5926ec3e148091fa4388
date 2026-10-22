@@ -47,7 +47,7 @@ async function authenticateAdmin(req) {
   const app = getFirebaseAdmin();
   let decoded;
   try {
-    decoded = await app.auth().verifyIdToken(token);
+    decoded = await app.auth().verifyIdToken(token, true);
   } catch (_) {
     const err = new Error('Sessão inválida.');
     err.statusCode = 401;

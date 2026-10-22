@@ -1449,7 +1449,7 @@ Regras:
     }
 
     // Navegação
-    q('#wiz-btn-next')?.addEventListener('click', () => goNext());
+    q('#wiz-btn-next')?.addEventListener('click', async () => { const btn = q('#wiz-btn-next'); if (!btn || btn.disabled) return; btn.disabled = true; try { await goNext(); } finally { btn.disabled = false; } });
     q('#wiz-btn-finish')?.addEventListener('click', () => finishSetup());
     q('#wiz-btn-back')?.addEventListener('click', () => goBack());
     q('#wiz-skip-step')?.addEventListener('click', async () => {
@@ -1745,21 +1745,35 @@ Regras:
     window.scrollTo(0, 0);
   }
 
+  function showWizardFieldError(selector, message) {
+    const input = q(selector);
+    if (!input) return;
+    const field = input.closest('.form-group, .form-field, .field, label') || input.parentElement;
+    field?.querySelector('.field-error')?.remove();
+    const error = document.createElement('div');
+    error.className = 'field-error';
+    error.textContent = message;
+    error.style.cssText = 'color:var(--accent-danger);font-size:.85rem;margin-top:5px;';
+    field?.appendChild(error);
+    input.setAttribute('aria-invalid', 'true');
+    input.focus();
+  }
+
   function validateStepQuem() {
     const nome = q('#wiz-nome')?.value?.trim();
-    if (!nome) { alert('Por favor, informe seu nome.'); q('#wiz-nome')?.focus(); return false; }
+    if (!nome) { showWizardFieldError('#wiz-nome', 'Por favor, informe seu nome.'); return false; }
 
     if (wizardState.perfil === 'faculdade') {
       const curso = q('#wiz-curso')?.value?.trim();
       const semestre = q('#wiz-semestre')?.value;
-      if (!curso) { alert('Por favor, informe seu curso.'); q('#wiz-curso')?.focus(); return false; }
-      if (!semestre) { alert('Selecione o semestre atual.'); return false; }
+      if (!curso) { showWizardFieldError('#wiz-curso', 'Por favor, informe seu curso.'); return false; }
+      if (!semestre) { showWizardFieldError('#wiz-semestre', 'Selecione o semestre atual.'); return false; }
     } else if (wizardState.perfil === 'concurso') {
       const concurso = q('#wiz-concurso')?.value?.trim();
-      if (!concurso) { alert('Por favor, informe qual concurso você está estudando.'); q('#wiz-concurso')?.focus(); return false; }
+      if (!concurso) { showWizardFieldError('#wiz-concurso', 'Por favor, informe qual concurso você está estudando.'); return false; }
     } else if (wizardState.perfil === 'ensino_medio') {
       const serie = q('#wiz-serie')?.value;
-      if (!serie) { alert('Selecione sua série.'); return false; }
+      if (!serie) { showWizardFieldError('#wiz-serie', 'Selecione sua série.'); return false; }
     }
     // perfil 'geral': só o nome é obrigatório
     return true;

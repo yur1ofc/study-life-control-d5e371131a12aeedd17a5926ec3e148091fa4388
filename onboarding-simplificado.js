@@ -146,7 +146,7 @@
   // ─── Injeção no dashboard ──────────────────────────────────────────────────
 
   function injectChecklistIntoDashboard() {
-    const content = document.getElementById('content-area');
+    const content = document.getElementById('view-container');
     if (!content) return;
 
     const header = content.querySelector('.dashboard-header');
