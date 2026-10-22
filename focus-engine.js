@@ -295,7 +295,7 @@
     modal.innerHTML = `
       <div class="modal-content learning-evidence-card">
         <div class="modal-header">
-          <div><h2><i class="fas fa-brain"></i> O que você realmente aprendeu?</h2><p>${session.materia || 'Sessão de estudo'}${topic ? ` • ${topic}` : ''}</p></div>
+          <div><h2><i class="fas fa-brain"></i> O que você realmente aprendeu?</h2><p>${escHtml(session.materia || 'Sessão de estudo')}${topic ? ` • ${escHtml(topic)}` : ''}</p></div>
           <button type="button" class="modal-close" id="learning-evidence-close" aria-label="Fechar">&times;</button>
         </div>
         <div class="modal-body">

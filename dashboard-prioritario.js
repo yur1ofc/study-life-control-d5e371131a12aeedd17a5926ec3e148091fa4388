@@ -245,16 +245,16 @@
     card.innerHTML = `
       <button class="slc-prio-dismiss" title="Dispensar por hoje">✕</button>
       <div class="slc-prio-label"><i class="${icon}"></i> ${label}</div>
-      <div class="slc-prio-title">${action.title}</div>
-      <div class="slc-prio-sub">${action.sub}</div>
+      <div class="slc-prio-title">${escapeHtml(action.title)}</div>
+      <div class="slc-prio-sub">${escapeHtml(action.sub)}</div>
       <div class="slc-prio-actions">
-        <button class="slc-prio-btn primary" data-view="${action.primaryBtn.view}" data-materia="${action.primaryBtn.materia || ''}">${action.primaryBtn.label}</button>
-        ${action.secondaryBtn ? `<button class="slc-prio-btn secondary" data-view="${action.secondaryBtn.view}">${action.secondaryBtn.label}</button>` : ''}
+        <button class="slc-prio-btn primary" data-view="${action.primaryBtn.view}" data-materia="${escapeHtml(action.primaryBtn.materia || '')}">${escapeHtml(action.primaryBtn.label)}</button>
+        ${action.secondaryBtn ? `<button class="slc-prio-btn secondary" data-view="${action.secondaryBtn.view}">${escapeHtml(action.secondaryBtn.label)}</button>` : ''}
       </div>
     `;
 
     // Inserir após o header do dashboard
-    const content = document.getElementById('content-area');
+    const content = document.getElementById('view-container');
     const header = content?.querySelector('.dashboard-header');
     if (header) {
       header.insertAdjacentElement('afterend', card);

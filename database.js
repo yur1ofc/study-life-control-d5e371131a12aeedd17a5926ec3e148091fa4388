@@ -190,6 +190,15 @@ const dbService = {
             // transaction snapshot.
             await db.runTransaction(async tx => {
                 const ref = db.collection('users').doc(user.uid);
+                const snap = await tx.get(ref);
+                const serverData = snap.exists ? snap.data()?.[field] : undefined;
+                // Para arrays, evita sobrescrever silenciosamente uma versão do servidor
+                // claramente mais recente/maior; a migração para subcoleções continua pendente.
+                if (Array.isArray(data) && Array.isArray(serverData) &&
+                    (serverData.length > data.length || (snap.data()?.updatedAt && window.app?.data?.updatedAt &&
+                     new Date(snap.data().updatedAt).getTime() > new Date(window.app.data.updatedAt).getTime()))) {
+                    throw Object.assign(new Error('Conflito de sincronização; versão do servidor preservada.'), { code: 'slc/sync-conflict' });
+                }
                 tx.set(ref, { [field]: data }, { merge: true });
             });
 

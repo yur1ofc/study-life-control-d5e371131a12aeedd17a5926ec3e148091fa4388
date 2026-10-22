@@ -123,7 +123,7 @@
             <button class="repro-btn" id="repro-eco-btn">Ver comparação de notas</button>
         `;
 
-        const content = document.getElementById('content-area');
+        const content = document.getElementById('view-container');
         const header = content?.querySelector('.dashboard-header');
         const priorityCard = document.getElementById('slc-priority-card');
         if (priorityCard) priorityCard.insertAdjacentElement('afterend', card);
@@ -143,7 +143,7 @@
         if (!repescagem.length) return;
         const byName = new Map(repescagem.map(item => [slug(item.nome), item]));
 
-        document.querySelectorAll('#content-area .subject-grade-card').forEach(card => {
+        document.querySelectorAll('#view-container .subject-grade-card').forEach(card => {
             const h3 = card.querySelector('.card-header h3');
             if (!h3) return;
             const item = byName.get(slug(h3.textContent));

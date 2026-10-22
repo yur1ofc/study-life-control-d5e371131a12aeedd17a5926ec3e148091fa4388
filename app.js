@@ -1,4 +1,10 @@
 // app.js - Classe principal do aplicativo COMPLETA, CORRIGIDA E MELHORADA
+function fireAppReady() {
+    if (window.__slcAppReadyFired) return;
+    window.__slcAppReadyFired = true;
+    document.dispatchEvent(new Event('app-ready'));
+}
+window.__slcFireAppReady = fireAppReady;
 
 class StudyLifeControl {
     constructor() {
@@ -59,24 +65,30 @@ class StudyLifeControl {
         this.updateSidebarInfo();
         this.applyHeavyMode();
 
-        document.dispatchEvent(new Event('app-ready'));
+        fireAppReady();
 
-        // Recupera sozinho a assinatura de notificações push se ela tiver
-        // sido invalidada/renovada pelo navegador (ver push-notifications.js
-        // → syncSubscription). Silencioso e não bloqueia o resto do init.
+        this.bootstrapServices();
+
+        this.loadView('dashboard');
+        this.initialized = true;
+        this.checkDailyReviews();
+    }
+
+    bootstrapServices() {
+        // Serviços compartilhados pelo boot normal e pelo fim do wizard.
         window.pushNotifications?.syncSubscription?.().catch(() => null);
-
         window.scheduleManager?.loadAulas();
         window.reviewSystem?.loadReviews();
         window.dailyLogService?.loadLogs();
         window.classDiaryService?.loadDiaries();
         window.gradeCalculator?.loadData();
         window.aiAssistant?.updateContext(this.data);
-
-        this.loadView('dashboard');
-        this.initialized = true;
-        this.checkDailyReviews();
     }
+
+    /* Recupera sozinho a assinatura de notificações push se ela tiver
+        // sido invalidada/renovada pelo navegador (ver push-notifications.js
+        // → syncSubscription). Silencioso e não bloqueia o resto do init.
+    */
 
     async loadData() {
         const user = auth.currentUser;
@@ -434,6 +446,7 @@ class StudyLifeControl {
             case 'estatisticas': html = this.viewRenderer.renderEstatisticas(); break;
             case 'foco': html = this.viewRenderer.renderModoFoco(); break;
             case 'configuracoes': html = this.viewRenderer.renderConfiguracoes(); break;
+            case 'perfil': html = this.viewRenderer.renderPerfil ? this.viewRenderer.renderPerfil() : (window.__slcRenderPerfil?.() || this.viewRenderer.renderDashboard()); break;
             case 'materias': html = this.viewRenderer.renderMaterias(); break;
             case 'grade-curricular': html = this.viewRenderer.renderGradeCurricular(); break;
             case 'cursos-extras': html = this.viewRenderer.renderCursosExtras(); break;
@@ -785,9 +798,6 @@ class StudyLifeControl {
             // Aba Dados
             document.getElementById('exportar-dados')?.addEventListener('click', () => this.exportarDados());
             document.getElementById('limpar-dados')?.addEventListener('click', () => this.limparDados());
-            document.getElementById('btn-relatar-problema')?.addEventListener('click', () => {
-                window.open('https://github.com/yur1ofc/study-life-control/issues/new', '_blank');
-            });
             document.getElementById('btn-abrir-ajuda')?.addEventListener('click', () => {
                 this.loadView('ajuda');
                 document.querySelectorAll('.nav-item').forEach(nav => nav.classList.toggle('active', nav.dataset.view === 'ajuda'));
@@ -1818,7 +1828,7 @@ class StudyLifeControl {
             this.updateStreak();
             this.loadView(this.currentView);
             showToast('Sessão concluída!');
-        }
+        } else { window.showToast?.('Não foi possível salvar — verifique sua conexão.', 'error'); }
     }
 
     async concluirTarefa(id) {
@@ -1830,7 +1840,7 @@ class StudyLifeControl {
             tarefa.concluida = true;
             this.loadView(this.currentView);
             showToast('Tarefa concluída!');
-        }
+        } else { window.showToast?.('Não foi possível salvar — verifique sua conexão.', 'error'); }
     }
 
     async toggleHabito(id) {
@@ -2020,8 +2030,8 @@ class StudyLifeControl {
         }
     }
 
-    async excluirSessao(id) {
-        if (!confirm('Tem certeza que deseja excluir esta sessão?')) return;
+    async excluirSessao(id, jaConfirmado = false) {
+        if (!jaConfirmado && !confirm('Tem certeza que deseja excluir esta sessão?')) return;
 
         const success = await dbService.removeItem('sessions', id);
         if (success) {
@@ -2030,8 +2040,8 @@ class StudyLifeControl {
         }
     }
 
-    async excluirTarefa(id) {
-        if (!confirm('Tem certeza que deseja excluir esta tarefa?')) return;
+    async excluirTarefa(id, jaConfirmado = false) {
+        if (!jaConfirmado && !confirm('Tem certeza que deseja excluir esta tarefa?')) return;
 
         const success = await dbService.removeItem('tasks', id);
         if (success) {
@@ -2040,8 +2050,8 @@ class StudyLifeControl {
         }
     }
 
-    async excluirProva(id) {
-        if (!confirm('Tem certeza que deseja excluir esta prova?')) return;
+    async excluirProva(id, jaConfirmado = false) {
+        if (!jaConfirmado && !confirm('Tem certeza que deseja excluir esta prova?')) return;
 
         const success = await dbService.removeItem('exams', id);
         if (success) {
@@ -2050,8 +2060,8 @@ class StudyLifeControl {
         }
     }
 
-    async excluirTopico(id) {
-        if (!confirm('Tem certeza que deseja excluir este tópico?')) return;
+    async excluirTopico(id, jaConfirmado = false) {
+        if (!jaConfirmado && !confirm('Tem certeza que deseja excluir este tópico?')) return;
 
         const success = await dbService.removeItem('learningMap', id);
         if (success) {
@@ -2060,8 +2070,8 @@ class StudyLifeControl {
         }
     }
 
-    async excluirMaterial(id) {
-        if (!confirm('Tem certeza que deseja excluir este material?')) return;
+    async excluirMaterial(id, jaConfirmado = false) {
+        if (!jaConfirmado && !confirm('Tem certeza que deseja excluir este material?')) return;
 
         const success = await dbService.removeItem('materials', id);
         if (success) {
@@ -2070,8 +2080,8 @@ class StudyLifeControl {
         }
     }
 
-    async excluirNota(id) {
-        if (!confirm('Tem certeza que deseja excluir esta nota?')) return;
+    async excluirNota(id, jaConfirmado = false) {
+        if (!jaConfirmado && !confirm('Tem certeza que deseja excluir esta nota?')) return;
 
         const success = await dbService.removeItem('grades', id);
         if (success) {
@@ -2080,8 +2090,8 @@ class StudyLifeControl {
         }
     }
 
-    async excluirMateria(id) {
-        if (!confirm('ATENÇÃO: Excluir esta matéria também excluirá todas as sessões, tarefas, provas, tópicos, notas, materiais e aulas relacionados. Continuar?')) return;
+    async excluirMateria(id, jaConfirmado = false) {
+        if (!jaConfirmado && !confirm('ATENÇÃO: Excluir esta matéria também excluirá todas as sessões, tarefas, provas, tópicos, notas, materiais e aulas relacionados. Continuar?')) return;
 
         const materia = this.data.subjects.find(s => s.id === id);
         if (!materia) return;
@@ -4080,9 +4090,10 @@ StudyLifeControl.prototype.ensurePostSetupReady = async function() {
         this.initialized = true;
     }
 
+    this.bootstrapServices?.();
     this.updateSidebarInfo();
     this.loadView('dashboard');
-    document.dispatchEvent(new Event('app-ready'));
+    fireAppReady();
 };
 StudyLifeControl.prototype.registerSetupDynamicCatalogOption = function(meta = {}) {
     const faculdade = String(meta.faculdade || '').trim();

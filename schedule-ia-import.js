@@ -268,29 +268,29 @@ Quando encontrar esse formato:
 
             const fmtAula = a => `${DIAS_LABEL[a.dia]} · ${a.inicio}–${a.fim}${a.sala ? ' · ' + a.sala : ''}${a.professor ? ' · ' + a.professor : ''}`;
 
-            const addedRows = diff.added.map(a => `<li style="padding:.3rem 0;font-size:.82rem;"><strong>${a.materia}</strong><br><span style="color:#94a3b8">${fmtAula(a)}</span>${!a.materiaEncontrada ? ' <span style="color:#d97706;font-size:.72rem;">· matéria não cadastrada ainda</span>' : ''}</li>`).join('');
+            const addedRows = diff.added.map(a => `<li style="padding:.3rem 0;font-size:.82rem;"><strong>${escapeHtml(a.materia)}</strong><br><span style="color:#94a3b8">${fmtAula(a)}</span>${!a.materiaEncontrada ? ' <span style="color:#d97706;font-size:.72rem;">· matéria não cadastrada ainda</span>' : ''}</li>`).join('');
 
             const updatedRows = diff.updated.map(u => {
                 const bits = Object.entries(u.changes).map(([campo, v]) => {
                     const label = { inicio: 'início', fim: 'fim', sala: 'sala', professor: 'professor' }[campo] || campo;
-                    return `${label}: <s style="opacity:.55">${v.de}</s> → <strong>${v.para}</strong>`;
+                    return `${label}: <s style="opacity:.55">${escapeHtml(v.de)}</s> → <strong>${escapeHtml(v.para)}</strong>`;
                 }).join(' · ');
-                return `<li style="padding:.4rem 0;border-bottom:1px solid #eef2f7;font-size:.82rem;"><strong>${u.item.materia}</strong> <span style="color:#94a3b8">(${DIAS_LABEL[parseInt(u.item.dia, 10)]})</span><br><span style="color:#64748b">${bits}</span></li>`;
+                return `<li style="padding:.4rem 0;border-bottom:1px solid #eef2f7;font-size:.82rem;"><strong>${escapeHtml(u.item.materia)}</strong> <span style="color:#94a3b8">(${DIAS_LABEL[parseInt(u.item.dia, 10)]})</span><br><span style="color:#64748b">${bits}</span></li>`;
             }).join('');
 
             const removedRows = diff.removedCandidates.map(item => `
                 <li style="padding:.35rem 0;font-size:.82rem;display:flex;align-items:center;gap:.5rem;">
                     <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;flex:1;">
-                        <input type="checkbox" class="slc-sim-remove-check" value="${item.id}">
-                        <span>${item.materia} <span style="color:#94a3b8">· ${DIAS_LABEL[parseInt(item.dia, 10)]} ${item.inicio}–${item.fim}</span></span>
+                        <input type="checkbox" class="slc-sim-remove-check" value="${escapeHtml(item.id)}">
+                        <span>${escapeHtml(item.materia)} <span style="color:#94a3b8">· ${DIAS_LABEL[parseInt(item.dia, 10)]} ${item.inicio}–${item.fim}</span></span>
                     </label>
                 </li>`).join('');
 
             const unmatchedRows = diff.unmatchedSubjects.map(nome => `
                 <li style="padding:.3rem 0;font-size:.82rem;display:flex;align-items:center;gap:.5rem;">
                     <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;flex:1;">
-                        <input type="checkbox" class="slc-sim-create-check" value="${nome}" checked>
-                        <span>Cadastrar "<strong>${nome}</strong>" na aba Matérias</span>
+                        <input type="checkbox" class="slc-sim-create-check" value="${escapeHtml(nome)}" checked>
+                        <span>Cadastrar "<strong>${escapeHtml(nome)}</strong>" na aba Matérias</span>
                     </label>
                 </li>`).join('');
 

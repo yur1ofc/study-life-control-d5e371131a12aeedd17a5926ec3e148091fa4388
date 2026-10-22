@@ -96,7 +96,7 @@ async function handleSignedInUser(user) {
     if (!setupJaVisivel && typeof window.app.renderSetupForm === 'function') {
       window.app.renderSetupForm();
     }
-    document.dispatchEvent(new Event('app-ready'));
+    (window.__slcFireAppReady || (() => document.dispatchEvent(new Event('app-ready'))) )();
     return;
   }
 
@@ -124,6 +124,7 @@ auth.onAuthStateChanged(async (user) => {
     }
   } catch (error) {
     console.error('Erro na autenticação/inicialização:', error);
+    handleSignedOutUser(); // restaura a landing e oculta telas internas após falha de carga
     window.showToast?.('Erro ao inicializar aplicação. Recarregue a página.', 'error');
   } finally {
     window.hideLoading?.();
@@ -202,6 +203,10 @@ async function logout() {
     // Isso evita deixar dados acadêmicos no navegador de um dispositivo compartilhado.
     if (uid) {
       try { localStorage.removeItem(`slc-backup:${uid}`); } catch (_) {}
+      // Históricos antigos não são escopados por UID; limpe-os ao sair para
+      // evitar que dados de uma conta apareçam na próxima sessão neste dispositivo.
+      try { localStorage.removeItem('slc-ia-history'); } catch (_) {}
+      try { localStorage.removeItem('slc-briefing'); } catch (_) {}
     }
     window.showToast?.('Desconectado com sucesso', 'success');
   } catch (error) {

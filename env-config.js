@@ -1,3 +1,4 @@
+// GERADO AUTOMATICAMENTE por inject-env.js no build; mantenha local, não versione.
 // Gerado automaticamente no build — NÃO EDITE e NÃO COMMITE este arquivo
 window.__ENV = {
   "FIREBASE_API_KEY": "AIzaSyA5-6zU5IbQPpegknAXefAjorFHc3A4zko",

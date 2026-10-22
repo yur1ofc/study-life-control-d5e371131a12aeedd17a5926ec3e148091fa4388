@@ -394,8 +394,8 @@ class ScheduleManager {
                     concluida: false,
                     automatica: true
                 };
-                await dbService.addItem('tasks', tarefa);
-                showToast('Tarefa de recuperação criada automaticamente!');
+                const ok = await dbService.addItem('tasks', tarefa);
+                showToast(ok ? 'Tarefa de recuperação criada!' : 'Não foi possível salvar a tarefa.', ok ? 'success' : 'error');
             }
         }
 

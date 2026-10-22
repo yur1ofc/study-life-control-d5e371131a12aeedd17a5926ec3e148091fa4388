@@ -81,7 +81,7 @@ body{background:var(--bg-primary)}
 .quick-onboarding-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
 .setup-advanced-hidden{display:none !important}
 .setup-fast-pill{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:800;font-size:.82rem}
-.setup-card .form-actions{position:sticky;bottom:-4px;background:linear-gradient(180deg,rgba(248,250,252,.7),#fff 28%);padding-top:12px}
+.setup-card .form-actions{position:sticky;bottom:-4px;background:linear-gradient(180deg,transparent, var(--bg-secondary) 28%);padding-top:12px}
 @media (max-width: 1180px){.dashboard-top-grid{grid-template-columns:1fr}.quick-actions{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media (max-width: 980px){
   .main-content{padding-bottom:92px}

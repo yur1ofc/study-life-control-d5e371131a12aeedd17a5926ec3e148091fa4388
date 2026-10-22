@@ -1,6 +1,8 @@
 // ai-assistant.js - Mentor IA mais útil, contextual e menos genérico
 
 (function () {
+  const toDateStringLocal = (value = new Date()) => { const d = value instanceof Date ? value : new Date(value); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+
   const safeToDate = (value) => {
     if (!value) return null;
     const date = value instanceof Date ? value : new Date(value);
@@ -30,7 +32,7 @@
       } catch (_) {}
     }
     const date = safeToDate(value) || new Date();
-    return date.toISOString().slice(0, 10);
+    return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
   };
 
   const diffDays = (value) => {
@@ -2065,12 +2067,12 @@ ${report.monthly}`;
     return Number.isNaN(d.getTime()) ? null : d;
   };
 
-  const todayISO = () => new Date().toISOString().slice(0, 10);
+  const todayISO = () => (window.toDateString ? window.toDateString(new Date()) : `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}`);
 
   const isSameDate = (value, isoDay) => {
     const d = safeToDate(value);
     if (!d) return false;
-    return d.toISOString().slice(0, 10) === isoDay;
+    return (window.toDateString ? window.toDateString(d) : `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`) === isoDay;
   };
 
   const daysSince = (value) => {
@@ -2545,11 +2547,11 @@ ${report.monthly}`;
     const d = value?.toDate ? value.toDate() : new Date(value);
     return Number.isNaN(d.getTime()) ? null : d;
   };
-  const todayISO = () => new Date().toISOString().slice(0, 10);
+  const todayISO = () => (window.toDateString ? window.toDateString(new Date()) : `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}`);
   const isSameDate = (value, isoDay) => {
     const d = safeToDate(value);
     if (!d) return false;
-    return d.toISOString().slice(0, 10) === isoDay;
+    return (window.toDateString ? window.toDateString(d) : `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`) === isoDay;
   };
 
   proto.getProactiveGreeting = function () {

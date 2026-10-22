@@ -130,7 +130,7 @@
         const mat = this.data?.subjects?.find(s => s.id === id);
         const nome = mat?.nome || 'esta matéria';
         showDeleteConfirm(
-          `Excluir <strong>${nome}</strong>? Isso também remove todas as sessões, tarefas, provas, notas e materiais relacionados.`,
+          `Excluir <strong>${escapeHtml(nome)}</strong>? Isso também remove todas as sessões, tarefas, provas, notas e materiais relacionados.`,
           () => origMateria.call(self, id, true)
         );
       };
@@ -139,17 +139,8 @@
     proto.__deletePatched = true;
   }
 
-  // Patch no window.confirm para interceptar os que ainda usam confirm() nativo
-  const _origConfirm = window.confirm.bind(window);
-  window.confirm = function (msg) {
-    // Só intercepta confirmações de exclusão (contêm palavras-chave)
-    if (msg && (msg.includes('excluir') || msg.includes('Excluir') || msg.includes('deletar') || msg.includes('remover'))) {
-      // Retorna true para que o código continue — o modal bonito já foi mostrado
-      // pelo patch acima. Para os que ainda usam confirm() direto, deixa passar.
-      return _origConfirm(msg);
-    }
-    return _origConfirm(msg);
-  };
+  // As exclusões com modal customizado passam `jaConfirmado=true` ao método original;
+  // as demais confirmações nativas continuam usando window.confirm normalmente.
 
   // ═══════════════════════════════════════════════════════════════
   // 2. HISTÓRICO PERSISTENTE DO MENTOR IA
@@ -205,7 +196,10 @@
           const contentEl = document.createElement('div');
           contentEl.className = 'message-content';
           const ts = new Date(item.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-          contentEl.innerHTML = `<small style="display:block;font-size:10px;color:var(--text-tertiary);margin-bottom:3px;">${ts}</small>${item.role === 'assistant' ? item.content : item.content}`;
+          const timeEl = document.createElement('small');
+          timeEl.style.cssText = 'display:block;font-size:10px;color:var(--text-tertiary);margin-bottom:3px;';
+          timeEl.textContent = ts;
+          contentEl.append(timeEl, document.createTextNode(String(item.content ?? '')));
           wrapper.appendChild(contentEl);
           messages.insertBefore(wrapper, sep.nextSibling);
         });
@@ -248,7 +242,7 @@
     if (!app) return '<p style="color:var(--text-secondary)">Carregando...</p>';
 
     const today = new Date();
-    const todayStr = today.toISOString().slice(0, 10);
+    const todayStr = window.toDateString ? window.toDateString(today) : `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
     const diaSemana = today.getDay();
     const diasNomes = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
 
@@ -379,13 +373,13 @@
   function shouldRegenerateBriefing() {
     try {
       const saved = JSON.parse(localStorage.getItem(BRIEFING_KEY) || '{}');
-      const today = new Date().toISOString().slice(0, 10);
+      const today = (window.toDateString ? window.toDateString(new Date()) : `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}`);
       return saved.date !== today;
     } catch { return true; }
   }
 
   function saveBriefing(text) {
-    localStorage.setItem(BRIEFING_KEY, JSON.stringify({ date: new Date().toISOString().slice(0, 10), text }));
+    localStorage.setItem(BRIEFING_KEY, JSON.stringify({ date: (window.toDateString ? window.toDateString(new Date()) : `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}`), text }));
   }
 
   function loadBriefing() {
@@ -408,9 +402,11 @@
     const line = document.createElement('div');
     line.id = 'slc-briefing-card';
     line.className = 'slc-briefing-line';
-    line.innerHTML = `
-      <i class="fas fa-robot"></i>
-      <span id="slc-briefing-text">${saved ? saved : '<span style="opacity:.6">Gerando briefing...</span>'}</span>`;
+    const robot = document.createElement('i'); robot.className = 'fas fa-robot';
+    const briefingText = document.createElement('span'); briefingText.id = 'slc-briefing-text';
+    briefingText.textContent = saved || 'Gerando briefing...';
+    if (!saved) briefingText.style.opacity = '.6';
+    line.append(robot, briefingText);
 
     header.insertAdjacentElement('afterend', line);
 
@@ -426,7 +422,7 @@
     if (!app || !window.aiAssistant) return;
 
     const textEl = document.getElementById('slc-briefing-text');
-    if (textEl) textEl.innerHTML = '<span style="opacity:.6"><i class="fas fa-spinner fa-spin"></i> Gerando briefing...</span>';
+    if (textEl) { textEl.textContent = 'Gerando briefing...'; textEl.style.opacity = '.6'; }
 
     try {
       window.aiAssistant.updateContext?.(app.data);
@@ -438,7 +434,7 @@
       );
       if (resp) {
         saveBriefing(resp);
-        if (textEl) textEl.innerHTML = resp.replace(/\n/g, ' ');
+        if (textEl) textEl.textContent = resp.replace(/\n/g, ' ');
       }
     } catch (e) {
       if (textEl) textEl.innerHTML = '<span style="opacity:.6">Não foi possível gerar o briefing agora.</span>';
@@ -676,10 +672,11 @@
 
   // Reexecuta quando app emite eventos
   document.addEventListener('app-ready', () => { tryInit(); onDashboardReady(); syncQuickAddVisibility(); syncFeedbackVisibility(); syncBottomNavVisibility(); });
-  document.addEventListener('view-loaded', () => {
+  // O banner offline já é gerenciado por app-enhancements.js.
+  /* document.addEventListener('view-loaded', () => {
     if (window.app?.currentView === 'dashboard') setTimeout(injectBriefingCard, 200);
     if (window.innerWidth <= 768 && !document.getElementById('slc-bottom-nav')) injectBottomNav();
-  });
+  }); */
 
   // Resize: injeta/remove bottom nav conforme largura
   window.addEventListener('resize', () => {
