@@ -547,37 +547,11 @@
   function enableOfflinePersistence() {
     // A tentativa de habilitar o enablePersistence do Firestore agora acontece
     // cedo, em firebase-config.js (precisa rodar antes de qualquer outra
-    // consulta ao Firestore). Aqui só cuidamos do banner de status de conexão.
+    // consulta ao Firestore). O banner de status de conexão é gerenciado
+    // exclusivamente por app-enhancements.js (updateNetworkBanner) — este
+    // módulo não deve criar um segundo banner.
     if (window.__slcOfflineBannerSetup) return;
     window.__slcOfflineBannerSetup = true;
-
-    // Banner de status de conexão
-    let offlineBanner = null;
-
-    function showOfflineBanner() {
-      if (offlineBanner) return;
-      offlineBanner = document.createElement('div');
-      offlineBanner.style.cssText = `
-        position:fixed;top:0;left:0;right:0;z-index:9990;
-        background:#f59e0b;color:#0f172a;
-        padding:8px 16px;text-align:center;font-size:13px;font-weight:500;
-        display:flex;align-items:center;justify-content:center;gap:8px;
-      `;
-      offlineBanner.innerHTML = '<i class="fas fa-wifi" style="opacity:.6"></i> Você está offline — os dados estão salvos localmente';
-      document.body.appendChild(offlineBanner);
-    }
-
-    function hideOfflineBanner() {
-      if (offlineBanner) { offlineBanner.remove(); offlineBanner = null; }
-    }
-
-    window.addEventListener('offline', showOfflineBanner);
-    window.addEventListener('online', () => {
-      hideOfflineBanner();
-      if (window.showToast) window.showToast('Conexão restaurada! Sincronizando...', 'success');
-    });
-
-    if (!navigator.onLine) showOfflineBanner();
   }
 
   // ═══════════════════════════════════════════════════════════════

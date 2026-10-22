@@ -5,7 +5,7 @@
 // It does not call an LLM. It separates urgency, attention, evidence of current risk,
 // historical signals and data gaps so the conversational model explains rather than invents.
 
-const Core = require('../../Shared/academic-context.js');
+const Core = require('../../shared/academic-context.js');
 
 const norm = v => String(v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 const num = (v, fallback = null) => {
