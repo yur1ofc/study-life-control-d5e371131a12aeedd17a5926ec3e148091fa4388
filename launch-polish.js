@@ -6,6 +6,13 @@
   const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const esc=v=>window.escapeHtml?window.escapeHtml(String(v??'')):String(v??'');
   const generateIdSafe=()=>window.generateId?window.generateId():'id-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);
+  // Rótulos em pt-BR para os valores internos — os crus ("danger", "warning",
+  // "sessao", nível de risco) apareciam literalmente nos badges das telas.
+  const LEVEL_LABELS={danger:'Atrasada',warning:'Atenção',success:'Em dia'};
+  const ALERTA_LABELS={danger:'Urgente',warning:'Atenção',crítico:'Crítico'};
+  const NIVEL_LABELS={alto:'Alto',medio:'Médio',baixo:'Baixo',critico:'Crítico'};
+  const EVENTO_LABELS={sessao:'Sessão',tarefa:'Tarefa',prova:'Prova',revisao:'Revisão',aula:'Aula'};
+  const pluralDia=n=>`${n} dia${Number(n)===1?'':'s'}`;
 
   function hoursToday(){
     const sessions=window.app?.data?.sessions||[];
@@ -109,7 +116,7 @@
               <div class="dashboard-kpi"><span>Horas semana</span><strong>${horas.semana.toFixed(1)}h</strong></div>
               <div class="dashboard-kpi"><span>Tarefas abertas</span><strong>${(app.data?.tasks||[]).filter(t=>!t.concluida).length}</strong></div>
               <div class="dashboard-kpi"><span>Provas chegando</span><strong>${exams.length}</strong></div>
-              <div class="dashboard-kpi"><span>Streak</span><strong>${esc(user.streak||0)} dias</strong></div>
+              <div class="dashboard-kpi"><span>Streak</span><strong>${pluralDia(user.streak||0)}</strong></div>
               <div class="dashboard-kpi"><span>Produtividade</span><strong>${esc(app.calcularProdutividade?.()||'0%')}</strong></div>
             </div>
             <div class="quick-actions">
@@ -131,7 +138,7 @@
                     <strong>${esc(item.titulo||item.materia||'Prioridade')}</strong>
                     <small>${esc(item.materia||item.tipo||'Plano do dia')}</small>
                   </div>
-                  <span class="tag ${item.prioridade==='alta'?'high':'medium'}">${esc(item.tipo||'hoje')}</span>
+                  <span class="tag ${item.prioridade==='alta'?'high':'medium'}">${esc(EVENTO_LABELS[item.tipo]||item.tipo||'hoje')}</span>
                 </div>`).join('') || '<p class="text-secondary">Sem itens para hoje</p>'}
             </div>
           </section>
@@ -157,9 +164,9 @@
         <section class="dashboard-list-card dashboard-attention-card">
           <div class="dashboard-section-head"><h3><i class="fas fa-bell"></i> Atenção</h3></div>
           <div class="mini-list">
-            ${alerts.map(a=>`<div class="mini-item"><div class="mini-item-main"><strong>${esc(a.titulo||'Alerta')}</strong><small>${esc(a.descricao||a.mensagem||'')}</small></div><span class="tag ${(a.tipo||'warning')==='danger'?'high':'warning'}">${esc(a.tipo||'alerta')}</span></div>`).join('')}
-            ${risk.map(r=>`<div class="mini-item"><div class="mini-item-main"><strong>${esc(r.materia)}</strong><small>${esc(r.motivo||'Risco acadêmico')}</small></div><span class="tag ${String(r.nivel).toLowerCase().includes('alto')?'high':'warning'}">${esc(r.nivel||'risco')}</span></div>`).join('')}
-            ${materiasAtrasadas.map(m=>`<div class="mini-item"><div class="mini-item-main"><strong>${esc(m.materia)}</strong><small>${m.nuncaEstudou?'Sem registro de estudo ainda':`${m.dias} dias sem estudar`}</small></div><span class="tag warning">${m.nuncaEstudou?'novo':`${m.dias}d`}</span></div>`).join('')}
+            ${alerts.map(a=>`<div class="mini-item"><div class="mini-item-main"><strong>${esc(a.titulo||'Alerta')}</strong><small>${esc(a.descricao||a.mensagem||'')}</small></div><span class="tag ${(a.tipo||'warning')==='danger'?'high':'warning'}">${esc(ALERTA_LABELS[a.tipo]||'Atenção')}</span></div>`).join('')}
+            ${risk.map(r=>`<div class="mini-item"><div class="mini-item-main"><strong>${esc(r.materia)}</strong><small>${esc(r.motivo||'Risco acadêmico')}</small></div><span class="tag ${String(r.nivel).toLowerCase().includes('alto')?'high':'warning'}">${esc(NIVEL_LABELS[String(r.nivel).toLowerCase()]||r.nivel||'risco')}</span></div>`).join('')}
+            ${materiasAtrasadas.map(m=>`<div class="mini-item"><div class="mini-item-main"><strong>${esc(m.materia)}</strong><small>${m.nuncaEstudou?'Sem registro de estudo ainda':`${pluralDia(m.dias)} sem estudar`}</small></div><span class="tag warning">${m.nuncaEstudou?'novo':`${m.dias}d`}</span></div>`).join('')}
             ${(semAlertas && !materiasAtrasadas.length) ? '<p class="text-secondary">Tudo sob controle por enquanto.</p>' : ''}
             </div>
           </section>
@@ -225,7 +232,7 @@
     const list = ensureNotificationPanel();
     if (!list) return;
     const notes=buildNotifications();
-    list.innerHTML=notes.length ? notes.map(n=>`<div class="notification-item" data-level="${esc(n.level)}"><div class="notification-item-main"><strong>${esc(n.title)}</strong><small>${esc(n.text)}</small></div><span class="tag ${n.level==='danger'?'high':n.level==='warning'?'warning':'success'}">${esc(n.level)}</span></div>`).join('') : '<div class="notification-empty">Sem lembretes agora.</div>';
+    list.innerHTML=notes.length ? notes.map(n=>`<div class="notification-item" data-level="${esc(n.level)}"><div class="notification-item-main"><strong>${esc(n.title)}</strong><small>${esc(n.text)}</small></div><span class="tag ${n.level==='danger'?'high':n.level==='warning'?'warning':'success'}">${esc(LEVEL_LABELS[n.level]||n.level)}</span></div>`).join('') : '<div class="notification-empty">Sem lembretes agora.</div>';
     updateNotificationBadge();
   }
 
@@ -253,7 +260,7 @@
             <button type="button" class="btn-secondary" id="btn-aula-batch-exemplo"><i class="fas fa-copy"></i> Exemplo</button>
             <button type="button" class="btn-secondary" id="btn-aula-clear-batch"><i class="fas fa-eraser"></i> Limpar lote</button>
           </div>
-          <div class="batch-help-card" style="margin-top:10px"><div class="notification-item-main"><strong>Dica</strong><small>Separadores aceitos: ponto e vírgula ou barra vertical. Dias aceitos: seg, ter, qua, qui, sex, sab, dom.</small></div></div>
+          <div class="batch-help-card" style="margin-top:10px"><div class="batch-help-body" style="display:flex;flex-direction:column;gap:3px"><strong>Dica</strong><small>Separadores aceitos: ponto e vírgula ou barra vertical. Dias aceitos: seg, ter, qua, qui, sex, sab, dom.</small></div></div>
         </div>`;
       colorGroup.insertAdjacentElement('beforebegin', block);
     }

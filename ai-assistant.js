@@ -46,6 +46,9 @@
     return Math.round((date - getTodayDateOnly()) / 86400000);
   };
 
+  // "1 dia(s)" → "1 dia" / "2 dias" (nos textos e prompts do Mentor).
+  const diaPlural = (n) => `${n} dia${Number(n) === 1 ? '' : 's'}`;
+
   const daysSince = (value) => {
     if (!value) return Infinity;
     const date = safeToDate(value);
@@ -123,7 +126,7 @@
           const data = dateOnly(item?.data);
           return data && data >= hoje && diffDays(data) <= dias && !item?.concluida;
         })
-        .sort((a, b) => new Date(a.data) - new Date(b.data));
+        .sort((a, b) => parseDateSafe(a.data) - parseDateSafe(b.data));
     }
 
     getRevisoesPendentes() {
@@ -152,7 +155,7 @@
     getUltimaAulaRegistrada(materiaNome) {
       return (this.context.classDiaries || [])
         .filter(item => item?.materia === materiaNome)
-        .sort((a, b) => new Date(b.data) - new Date(a.data))[0] || null;
+        .sort((a, b) => parseDateSafe(b.data) - parseDateSafe(a.data))[0] || null;
     }
 
     getFaltasMateria(materiaNome) {
@@ -228,7 +231,7 @@
       if (!provas.length) return 'Você não tem provas ou trabalhos próximos cadastrados nos próximos 30 dias.';
       return [
         'Próximas provas e trabalhos:',
-        ...provas.slice(0, 6).map(item => `- ${item.titulo} (${item.materia}) em ${formatDate(item.data)}${item.tipo ? ` • ${item.tipo}` : ''} • faltam ${diffDays(item.data)} dia(s)`)
+        ...provas.slice(0, 6).map(item => `- ${item.titulo} (${item.materia}) em ${formatDate(item.data)}${item.tipo ? ` • ${item.tipo}` : ''} • faltam ${diaPlural(diffDays(item.data))}`)
       ].join('\n');
     }
 
@@ -280,7 +283,7 @@
       this.getProximasProvas(14).forEach(prova => {
         const horas = this.getHorasEstudadasMateria(prova.materia);
         if (horas < 3) {
-          urgencias.push(`${prova.materia}: prova/trabalho em ${diffDays(prova.data)} dia(s) e só ${horas.toFixed(1)}h estudadas.`);
+          urgencias.push(`${prova.materia}: prova/trabalho em ${diaPlural(diffDays(prova.data))} e só ${horas.toFixed(1)}h estudadas.`);
         } else if (horas < 6) {
           urgencias.push(`${prova.materia}: avaliação próxima e preparação ainda média.`);
         }
@@ -528,7 +531,7 @@
       ];
 
       if (notas.length) partes.push(`- média atual: ${media.toFixed(1)}`);
-      if (prova) partes.push(`- próxima avaliação: ${formatDate(prova.data)} (${diffDays(prova.data)} dia(s))`);
+      if (prova) partes.push(`- próxima avaliação: ${formatDate(prova.data)} (${diaPlural(diffDays(prova.data))})`);
       if (faltas) partes.push(`- faltas registradas: ${faltas}`);
       if (ultimaAula?.conteudo) partes.push(`- último conteúdo anotado: ${ultimaAula.conteudo}`);
 
@@ -572,7 +575,7 @@
           const dias = Math.max(0, diffDays(provaProxima.data));
           const pesoUrgencia = Math.max(0, 24 - dias);
           score += pesoUrgencia * 4;
-          motivos.push(`tem avaliação em ${dias} dia(s)`);
+          motivos.push(`tem avaliação em ${diaPlural(dias)}`);
         }
 
         if (tarefasPendentes.length) {
@@ -757,7 +760,7 @@
         tipo: item.tipoSugestao,
         duracao,
         prioridade: item.score >= 80 ? 'danger' : item.score >= 55 ? 'warning' : 'success',
-        motivo: `${item.justificativaCurta}${item.provaProxima ? ` • avaliação em ${diffDays(item.provaProxima.data)} dia(s)` : ''}`
+        motivo: `${item.justificativaCurta}${item.provaProxima ? ` • avaliação em ${diaPlural(diffDays(item.provaProxima.data))}` : ''}`
       };
     }).filter(item => item.duracao > 0);
   };
@@ -793,7 +796,7 @@
       if (provaProxima) {
         const dias = Math.max(0, diffDays(provaProxima.data));
         score += Math.max(0, 26 - dias) * 4;
-        motivos.push(`tem avaliação em ${dias} dia(s)`);
+        motivos.push(`tem avaliação em ${diaPlural(dias)}`);
       }
       if (tarefasPendentes.length) {
         score += tarefasPendentes.length * 8;
@@ -1008,8 +1011,8 @@ ${report.monthly}`;
     return (this.context.tasks || [])
       .filter(item => !item?.concluida)
       .sort((a, b) => {
-        const da = new Date(a?.dataLimite || a?.data || 0).getTime();
-        const db = new Date(b?.dataLimite || b?.data || 0).getTime();
+        const da = parseDateSafe(a?.dataLimite || a?.data || 0).getTime();
+        const db = parseDateSafe(b?.dataLimite || b?.data || 0).getTime();
         return da - db;
       });
   };
@@ -1022,7 +1025,7 @@ ${report.monthly}`;
     return (this.context.exams || [])
       .filter(item => !item?.concluida)
       .filter(item => daysTo(item?.data) <= days)
-      .sort((a, b) => new Date(a?.data || 0) - new Date(b?.data || 0));
+      .sort((a, b) => parseDateSafe(a?.data || 0) - parseDateSafe(b?.data || 0));
   };
 
   proto._getMaterialsSummary = function (materiaNome = null) {
@@ -1100,7 +1103,7 @@ ${report.monthly}`;
     const rate = Math.round((present / diaries.length) * 100);
     const latest = diaries
       .slice()
-      .sort((a, b) => new Date(b?.data || 0) - new Date(a?.data || 0))[0];
+      .sort((a, b) => parseDateSafe(b?.data || 0) - parseDateSafe(a?.data || 0))[0];
     return [
       materiaNome ? `Presença em ${materiaNome}: ${rate}% (${present}/${diaries.length}).` : `Presença média registrada: ${rate}% (${present}/${diaries.length}).`,
       latest?.conteudoExplicado ? `Último conteúdo anotado: ${latest.conteudoExplicado}.` : '',
@@ -1111,7 +1114,7 @@ ${report.monthly}`;
   proto._getDailyLogSummary = function () {
     const logs = this.context.dailyLogs || [];
     if (!logs.length) return 'Você ainda não registrou diário de rotina/energia.';
-    const latest = logs.slice().sort((a, b) => new Date(b?.data || 0) - new Date(a?.data || 0))[0];
+    const latest = logs.slice().sort((a, b) => parseDateSafe(b?.data || 0) - parseDateSafe(a?.data || 0))[0];
     const worked = logs.filter(i => i?.trabalho?.trabalhou || i?.trabalhou).length;
     const lowEnergy = logs.filter(i => (i?.energia || '').toLowerCase() === 'baixa').length;
     return [
@@ -1128,7 +1131,7 @@ ${report.monthly}`;
     const xp = Number(g.xp || 0);
     const streak = Number(g.streak || this.context.user?.streak || 0);
     const unlocked = Array.isArray(g.achievements) ? g.achievements.filter(a => a?.unlocked).length : 0;
-    return `Gamificação: nível ${level}, ${xp} XP total, streak de ${streak} dia(s) e ${unlocked} conquista(s) desbloqueada(s).`;
+    return `Gamificação: nível ${level}, ${xp} XP total, streak de ${diaPlural(streak)} e ${unlocked} conquista${Number(unlocked) === 1 ? '' : 's'} desbloqueada${Number(unlocked) === 1 ? '' : 's'}.`;
   };
 
   proto._getRotinaSummary = function () {
@@ -1565,15 +1568,15 @@ ${report.monthly}`;
     const hoje = new Date();
     return (ctx.tasks || []).filter(t =>
       !t.concluida && norm(t.materia) === norm(nomeMat) &&
-      t.dataLimite && new Date(t.dataLimite + 'T23:59') < hoje
+      t.dataLimite && parseDateSafe(t.dataLimite + 'T23:59') < hoje
     ).length;
   }
 
   function proximaProva(ctx, nomeMat) {
     const hoje = new Date();
     const provas = (ctx.exams || [])
-      .filter(e => !e.concluida && norm(e.materia) === norm(nomeMat) && new Date(e.data) >= hoje)
-      .sort((a, b) => new Date(a.data) - new Date(b.data));
+      .filter(e => !e.concluida && norm(e.materia) === norm(nomeMat) && parseDateSafe(e.data) >= hoje)
+      .sort((a, b) => parseDateSafe(a.data) - parseDateSafe(b.data));
     return provas[0] || null;
   }
 
@@ -1917,7 +1920,7 @@ ${report.monthly}`;
     return (ctx.sessions || [])
       .filter(s => s?.concluida && norm(s.materia) === norm(nomeMateria))
       .filter(s => {
-        const d = s?.data ? new Date(s.data) : null;
+        const d = s?.data ? parseDateSafe(s.data) : null;
         return d && !Number.isNaN(d.getTime()) && d >= inicio && d < fim;
       })
       .reduce((acc, s) => acc + (parseInt(s.duracao) || 0), 0);
@@ -2063,7 +2066,7 @@ ${report.monthly}`;
 
   const safeToDate = (value) => {
     if (!value) return null;
-    const d = value?.toDate ? value.toDate() : new Date(value);
+    const d = value?.toDate ? value.toDate() : parseDateSafe(value);
     return Number.isNaN(d.getTime()) ? null : d;
   };
 
@@ -2204,7 +2207,7 @@ ${report.monthly}`;
 
     const diarioMateria = (ctx.classDiaries || [])
       .filter(d => d?.materia === topico.materia)
-      .sort((a, b) => new Date(b.data) - new Date(a.data))[0];
+      .sort((a, b) => parseDateSafe(b.data) - parseDateSafe(a.data))[0];
     const temDuvidaNoDiario = !!(diarioMateria && (diarioMateria.naoEntendi || diarioMateria.duvidaPendente) && daysSince(diarioMateria.data) <= 14);
     if (temDuvidaNoDiario) score += 18;
 
@@ -2227,8 +2230,8 @@ ${report.monthly}`;
       const motivos = [STATUS_LABEL[t.status] || 'status desconhecido'];
       if (item.confianca <= 2) motivos.push('sua confiança nesse tópico está baixa');
       if (item.dificuldadeTopico >= 4) motivos.push('tópico marcado como difícil');
-      if (item.dias >= 10) motivos.push(`sem revisar há ${item.dias} dia(s)`);
-      if (item.prova) motivos.push(`prova de ${t.materia} em ${this._diasAteProva(item.prova)} dia(s)`);
+      if (item.dias >= 10) motivos.push(`sem revisar há ${diaPlural(item.dias)}`);
+      if (item.prova) motivos.push(`prova de ${t.materia} em ${diaPlural(this._diasAteProva(item.prova))}`);
       if (item.temDuvidaNoDiario) motivos.push('você marcou dúvida sobre isso no diário recentemente');
 
       return `${index + 1}. **${t.nome}** (${t.materia}) — ${motivos.join(', ')}.`;
@@ -2327,7 +2330,7 @@ ${report.monthly}`;
 
     const evidenceSessions = (ctx.sessions || [])
       .filter(s => s?.learningEvidence?.level)
-      .sort((a,b) => new Date(b?.learningEvidence?.answeredAt || b?.data || 0) - new Date(a?.learningEvidence?.answeredAt || a?.data || 0))
+      .sort((a,b) => parseDateSafe(b?.learningEvidence?.answeredAt || b?.data || 0) - parseDateSafe(a?.learningEvidence?.answeredAt || a?.data || 0))
       .slice(0, 12);
     if (evidenceSessions.length) {
       const labels = { explain: 'explica sem olhar', exercise: 'resolve exercícios', doubt: 'ainda tem dúvidas', review: 'precisa revisar' };
@@ -2358,7 +2361,7 @@ ${report.monthly}`;
     const diarioRecente = (ctx.classDiaries || [])
       .filter(e => !idsHoje.has(e.id))
       .slice()
-      .sort((a, b) => new Date(b.data) - new Date(a.data))
+      .sort((a, b) => parseDateSafe(b.data) - parseDateSafe(a.data))
       .slice(0, 6);
     if (diarioRecente.length) {
       linhas.push('\nÚltimos registros do Diário (antes de hoje):');
@@ -2544,7 +2547,7 @@ ${report.monthly}`;
 
   const safeToDate = (value) => {
     if (!value) return null;
-    const d = value?.toDate ? value.toDate() : new Date(value);
+    const d = value?.toDate ? value.toDate() : parseDateSafe(value);
     return Number.isNaN(d.getTime()) ? null : d;
   };
   const todayISO = () => (window.toDateString ? window.toDateString(new Date()) : `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}`);
@@ -2571,7 +2574,7 @@ ${report.monthly}`;
 
     const provasProximas = this.getProximasProvas ? this.getProximasProvas(3) : [];
     if (provasProximas.length) {
-      const detalhes = provasProximas.map(p => `${p.titulo} (${p.materia}) em ${this._diasAteProva ? this._diasAteProva(p) : '?'} dia(s)`).join('; ');
+      const detalhes = provasProximas.map(p => `${p.titulo} (${p.materia}) em ${diaPlural(this._diasAteProva ? this._diasAteProva(p) : '?')}`).join('; ');
       avisos.push(`⚠️ Prova bem próxima: ${detalhes}. Se quiser, eu monto um plano focado nisso agora.`);
     }
 

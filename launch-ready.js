@@ -194,11 +194,11 @@
       if (s.materia in horasPorMateria) horasPorMateria[s.materia] += (parseInt(s.duracao)||0)/60;
     });
     const atrPorMateria = {};
-    tasks.filter(t => !t.concluida && t.dataLimite && new Date(t.dataLimite+'T23:59') < now).forEach(t => {
+    tasks.filter(t => !t.concluida && t.dataLimite && parseDateSafe(t.dataLimite+'T23:59') < now).forEach(t => {
       atrPorMateria[t.materia] = (atrPorMateria[t.materia]||0)+1;
     });
     const provasPorMateria = {};
-    exams.filter(e => !e.concluida && new Date(e.data) >= now).forEach(e => {
+    exams.filter(e => !e.concluida && parseDateSafe(e.data) >= now).forEach(e => {
       provasPorMateria[e.materia] = (provasPorMateria[e.materia]||0)+1;
     });
 
@@ -208,8 +208,8 @@
     }
     const rLabel = r => r==='bad'?'⚠️ Risco':r==='warn'?'👀 Atenção':'✅ OK';
     const totalH = Object.values(horasPorMateria).reduce((a,b)=>a+b,0);
-    const atrasadas = tasks.filter(t=>!t.concluida && t.dataLimite && new Date(t.dataLimite+'T23:59')<now).length;
-    const proxProvas = exams.filter(e=>!e.concluida && new Date(e.data)>=now).slice(0,3);
+    const atrasadas = tasks.filter(t=>!t.concluida && t.dataLimite && parseDateSafe(t.dataLimite+'T23:59')<now).length;
+    const proxProvas = exams.filter(e=>!e.concluida && parseDateSafe(e.data)>=now).slice(0,3);
 
     return `
 <div class="view-header"><h2><i class="fas fa-heartbeat"></i> Situação Acadêmica</h2></div>
@@ -226,14 +226,14 @@
     <div class="lr-sa-stat"><span class="lr-sa-stat-label">Total de horas</span><span class="lr-sa-stat-val">${totalH.toFixed(1)}h</span></div>
     <div class="lr-sa-stat"><span class="lr-sa-stat-label">Sessões concluídas</span><span class="lr-sa-stat-val">${sessions.filter(s=>s.concluida).length}</span></div>
     <div class="lr-sa-stat"><span class="lr-sa-stat-label">Média por matéria</span><span class="lr-sa-stat-val">${(totalH/subjects.length).toFixed(1)}h</span></div>
-    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Streak</span><span class="lr-sa-stat-val">${app.data?.user?.streak||0} dias 🔥</span></div>
+    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Streak</span><span class="lr-sa-stat-val">${app.data?.user?.streak||0} ${(app.data?.user?.streak||0)===1?'dia':'dias'} 🔥</span></div>
   </div>
   <div class="lr-sa-card">
     <div class="lr-sa-card-header"><span class="lr-sa-card-icon">✅</span><span class="lr-sa-card-title">Tarefas & Provas</span></div>
     <div class="lr-sa-stat"><span class="lr-sa-stat-label">Tarefas pendentes</span><span class="lr-sa-stat-val">${tasks.filter(t=>!t.concluida).length}</span></div>
     <div class="lr-sa-stat"><span class="lr-sa-stat-label">Atrasadas</span><span class="lr-sa-stat-val" style="color:var(--accent-danger)">${atrasadas}</span></div>
     <div class="lr-sa-stat"><span class="lr-sa-stat-label">Tarefas concluídas</span><span class="lr-sa-stat-val" style="color:var(--accent-success)">${tasks.filter(t=>t.concluida).length}</span></div>
-    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Próximas provas</span><span class="lr-sa-stat-val">${exams.filter(e=>!e.concluida&&new Date(e.data)>=now).length}</span></div>
+    <div class="lr-sa-stat"><span class="lr-sa-stat-label">Próximas provas</span><span class="lr-sa-stat-val">${exams.filter(e=>!e.concluida&&parseDateSafe(e.data)>=now).length}</span></div>
   </div>
 </div>
 
@@ -261,7 +261,7 @@ ${proxProvas.length?`
 <div class="lr-section-title">📅 Próximas provas</div>
 <div style="display:flex;flex-direction:column;gap:8px;">
 ${proxProvas.map(e=>{
-  const dias=Math.ceil((new Date(e.data)-now)/86400000);
+  const dias=Math.ceil((parseDateSafe(e.data)-now)/86400000);
   return `<div class="lr-sa-card" style="padding:12px 16px;display:flex;align-items:center;justify-content:space-between;">
     <div><strong style="color:var(--text-primary);font-size:.9rem">${esc(e.materia)}</strong>${e.titulo?`<span style="color:var(--text-secondary);font-size:.8rem;display:block">${esc(e.titulo)}</span>`:''}</div>
     <span class="lr-badge ${dias<=3?'bad':dias<=7?'warn':'good'}">${dias===0?'Hoje':dias===1?'Amanhã':dias+' dias'}</span>

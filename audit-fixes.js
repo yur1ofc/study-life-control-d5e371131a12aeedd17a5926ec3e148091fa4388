@@ -49,11 +49,11 @@
     const lines = ['⏰ **O que está mais atrasado**'];
     overdueTasks.slice(0, 8).forEach(t => {
       const days = Math.max(1, Math.ceil((now - new Date(`${t.dataLimite}T23:59:59`).getTime()) / 86400000));
-      lines.push(`- **${String(t.titulo || 'Tarefa')}**${t.materia ? ` — ${String(t.materia)}` : ''}: ${days} dia(s) atrasada.`);
+      lines.push(`- **${String(t.titulo || 'Tarefa')}**${t.materia ? ` — ${String(t.materia)}` : ''}: ${days} dia${days===1?'':'s'} atrasad${days===1?'a':'as'}.`);
     });
     overdueReviews.slice(0, 5).forEach(r => {
       const days = Math.max(1, Math.ceil((now - new Date(`${r.data}T23:59:59`).getTime()) / 86400000));
-      lines.push(`- **Revisão:** ${String(r.materia || '')}${r.topico ? ` — ${String(r.topico)}` : ''}: ${days} dia(s) atrasada.`);
+      lines.push(`- **Revisão:** ${String(r.materia || '')}${r.topico ? ` — ${String(r.topico)}` : ''}: ${days} dia${days===1?'':'s'} atrasad${days===1?'a':'as'}.`);
     });
     lines.push('');
     lines.push('Prioridade prática: feche primeiro o que está mais antigo e depois o que tem prazo mais próximo.');
@@ -78,7 +78,7 @@
       `Comece por **${s.name}**.`,
       `Dificuldade percebida: **${diff}**${s.difficulty?.confidence ? ` (${s.difficulty.confidence}% de confiança)` : ''}.`
     ];
-    if (exam) lines.push(`Próxima avaliação: **${exam.title || 'avaliação'}** em ${Math.max(0, exam.days)} dia(s).`);
+    if (exam) lines.push(`Próxima avaliação: **${exam.title || 'avaliação'}** em ${Math.max(0, exam.days)} dia${Math.max(0, exam.days)===1?'':'s'}.`);
     if (s.grade?.hasGrades) {
       lines.push(`Média atual: **${s.grade.currentAverage.toFixed(1)}**${s.grade.required !== null ? `; média necessária nas avaliações restantes: **${s.grade.required > 10 ? '>10' : s.grade.required.toFixed(1)}**.` : '.'}`);
     } else {

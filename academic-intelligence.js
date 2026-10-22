@@ -225,7 +225,7 @@
       if (grades.hasGrades && grades.required !== null && grades.required > 10) reasons.push('meta configurada não é mais atingível apenas com o peso restante');
       if (attendance.percentage !== null && attendance.percentage < 75) reasons.push(`frequência registrada de ${attendance.percentage}%`);
       if (workload.overdueTasks) reasons.push(`${workload.overdueTasks} tarefa(s) atrasada(s)`);
-      if (workload.nextExam && workload.nextExam.days <= 7) reasons.push(`avaliação em ${workload.nextExam.days} dia(s)`);
+      if (workload.nextExam && workload.nextExam.days <= 7) reasons.push(`avaliação em ${workload.nextExam.days} dia${workload.nextExam.days===1?'':'s'}`);
       if (learning.weakTopics) reasons.push(`${learning.weakTopics} tópico(s) com baixa confiança`);
       if (learning.weakEvidence) reasons.push(`${learning.weakEvidence} sessão(ões) com dúvida ou necessidade de revisão`);
       if (learning.errorEvidence) reasons.push(`${learning.errorEvidence} sessão(ões) com erro/dificuldade relatado`);
@@ -257,7 +257,7 @@
       const recommendation = failed.length
         ? `Você já teve ${failed.length} reprovação(ões) nesta matéria. Compare os pontos de dificuldade das tentativas anteriores e aumente o estudo ativo antes das próximas avaliações.`
         : workload.nextExam?.days <= 7
-          ? `Avaliação próxima: priorize revisão dos tópicos fracos e exercícios até ${workload.nextExam.days} dia(s).`
+          ? `Avaliação próxima: priorize revisão dos tópicos fracos e exercícios até ${workload.nextExam.days} dia${workload.nextExam.days===1?'':'s'}.`
           : learning.weakEvidence
             ? `Comece pelos conteúdos marcados como dúvida/revisão nas últimas sessões e faça recuperação ativa antes de reler o material.`
             : learning.weakTopics
@@ -460,15 +460,15 @@
       if(a.overall.currentAverage!==null) lines.push(`- Média atual das matérias com notas: ${a.overall.currentAverage.toFixed(1)}.`);
       lines.push(`- Histórico: ${a.overall.passedHistory} aprovação(ões) e ${a.overall.failedHistory} reprovação(ões) registrada(s).`);
       lines.push(`- Matérias com tentativa anterior: ${a.overall.repeatedSubjects}.`);
-      ordered.forEach(r=>{ const d=r.difficulty?.label||'média'; const grade=r.grade.hasGrades?`média ${r.grade.currentAverage.toFixed(1)}`:'sem notas'; const exam=r.workload.nextExam?`, avaliação em ${r.workload.nextExam.days} dia(s)`:''; lines.push(`\n**${r.name}** — atenção ${r.riskLevel.toUpperCase()} | dificuldade ${d} | ${grade}${exam}.`); if(r.history.length) lines.push(`  Histórico: ${r.history.map(h=>`${h.period||'?'} ${h.grade==null?'—':h.grade.toFixed(1)}`).join(' → ')}.`); if(r.riskReasons.length) lines.push(`  Fatores: ${r.riskReasons.slice(0,3).join('; ')}.`); });
+      ordered.forEach(r=>{ const d=r.difficulty?.label||'média'; const grade=r.grade.hasGrades?`média ${r.grade.currentAverage.toFixed(1)}`:'sem notas'; const exam=r.workload.nextExam?`, avaliação em ${r.workload.nextExam.days} dia${r.workload.nextExam.days===1?'':'s'}`:''; lines.push(`\n**${r.name}** — atenção ${r.riskLevel.toUpperCase()} | dificuldade ${d} | ${grade}${exam}.`); if(r.history.length) lines.push(`  Histórico: ${r.history.map(h=>`${h.period||'?'} ${h.grade==null?'—':h.grade.toFixed(1)}`).join(' → ')}.`); if(r.riskReasons.length) lines.push(`  Fatores: ${r.riskReasons.slice(0,3).join('; ')}.`); });
       if(a.priorities.length) lines.push(`\nPrioridades de ação: ${a.priorities.slice(0,3).map(r=>r.name).join(' → ')}.`);
       return lines.join('\n');
     }
 
     function delayedAnswer() {
       const o=overdue(); const lines=['O que está mais atrasado:'];
-      if(o.tasks.length) o.tasks.slice(0,8).forEach(x=>lines.push(`- Tarefa: ${x.title} — ${x.materia} — ${x.days} dia(s) atrasada.`));
-      if(o.reviews.length) o.reviews.slice(0,6).forEach(x=>lines.push(`- Revisão: ${x.title} — ${x.materia} — ${x.days} dia(s) sem revisão.`));
+      if(o.tasks.length) o.tasks.slice(0,8).forEach(x=>lines.push(`- Tarefa: ${x.title} — ${x.materia} — ${x.days} dia${x.days===1?'':'s'} atrasad${x.days===1?'a':'as'}.`));
+      if(o.reviews.length) o.reviews.slice(0,6).forEach(x=>lines.push(`- Revisão: ${x.title} — ${x.materia} — ${x.days} dia${x.days===1?'':'s'} sem revisão.`));
       if(!o.tasks.length&&!o.reviews.length) return 'Não encontrei tarefas vencidas nem tópicos de revisão atrasados nos dados cadastrados.';
       return lines.join('\n');
     }
@@ -478,7 +478,7 @@
       if(!list.length) return 'Cadastre suas matérias para eu calcular por onde começar.';
       const r=list[0], diff=r.difficulty?.label || 'média';
       const plan=r.workload?.nextExam ? `20 min de revisão + 30 min de exercícios + 10 min corrigindo erros` : r.learning?.weakTopics ? `25 min nos tópicos fracos + 20 min de exercícios` : `25 min de teoria ativa + 25 min de exercícios`;
-      return [`Comece por **${r.name}**.`, `Motivo: ${r.riskReasons.slice(0,3).join('; ') || 'maior prioridade calculada no momento'}.`, `Dificuldade atual para você: **${diff}**.`, `Agora: ${plan}.`, r.workload?.nextExam ? `Avaliação: ${r.workload.nextExam.title} em ${r.workload.nextExam.days} dia(s).` : 'Depois, reavalie a prioridade com base no que você conseguir concluir.'].join(' ');
+      return [`Comece por **${r.name}**.`, `Motivo: ${r.riskReasons.slice(0,3).join('; ') || 'maior prioridade calculada no momento'}.`, `Dificuldade atual para você: **${diff}**.`, `Agora: ${plan}.`, r.workload?.nextExam ? `Avaliação: ${r.workload.nextExam.title} em ${r.workload.nextExam.days} dia${r.workload.nextExam.days===1?'':'s'}.` : 'Depois, reavalie a prioridade com base no que você conseguir concluir.'].join(' ');
     }
 
     function weekPlan() {

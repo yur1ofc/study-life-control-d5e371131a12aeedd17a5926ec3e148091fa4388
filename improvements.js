@@ -53,6 +53,22 @@
     { label: 'Ajuda',              view: 'ajuda',             icon: 'fa-question-circle' },
   ];
 
+  // Resultados de DADOS do usuário (matérias, tarefas, provas...) além das
+  // telas: "buscar tudo" só navegava entre seções e ninguém achava a prova
+  // de Física III digitando "Física".
+  function buildDataItems() {
+    const data = window.app?.data || {};
+    const out = [];
+    const add = (view, icon, label, sub) => { if (label) out.push({ view, icon, label: String(label), sub, isData: true }); };
+    (data.subjects || []).forEach(s => add('materias', 'fa-book', s.nome, 'Matéria'));
+    (data.tasks || []).filter(t => !t.concluida).forEach(t => add('tarefas', 'fa-tasks', t.titulo, t.materia ? `Tarefa · ${t.materia}` : 'Tarefa'));
+    (data.exams || []).filter(e => !e.concluida).forEach(e => add('provas', 'fa-graduation-cap', e.titulo || e.materia, e.materia ? `Prova · ${e.materia}` : 'Prova'));
+    (data.sessions || []).filter(s => !s.concluida).forEach(s => add('sessoes', 'fa-clock', s.topico || s.materia, s.materia ? `Sessão de estudo · ${s.materia}` : 'Sessão de estudo'));
+    (data.learningMap || []).forEach(t => add('mapa-aprendizado', 'fa-map', t.nome, t.materia ? `Tópico · ${t.materia}` : 'Tópico'));
+    (data.curriculum || []).forEach(c => add('grade-curricular', 'fa-sitemap', c.nome, 'Grade curricular'));
+    return out;
+  }
+
   function initNavSearch() {
     const modal   = document.getElementById('nav-search-modal');
     const input   = document.getElementById('nav-search-input');
@@ -71,23 +87,37 @@
       modal.hidden = true;
     }
 
+    const MAX_DATA_RESULTS = 20;
+
     function renderResults(query) {
       const q = query.toLowerCase().trim();
-      const filtered = q
+      const nav = q
         ? NAV_ITEMS.filter(item => item.label.toLowerCase().includes(q))
         : NAV_ITEMS;
 
-      results.innerHTML = filtered.map((item, i) => `
+      const dataItems = q
+        ? buildDataItems()
+            .filter(item => `${item.label} ${item.sub}`.toLowerCase().includes(q))
+            .slice(0, MAX_DATA_RESULTS)
+        : [];
+
+      const btn = (item, i) => `
         <button class="nav-search-result${i === 0 ? ' active' : ''}" data-view="${item.view}">
           <i class="fas ${item.icon}"></i>
-          <span>${item.label}</span>
-        </button>
-      `).join('');
+          <span>${item.label}${item.sub ? ` <small style="opacity:.6">· ${item.sub}</small>` : ''}</span>
+        </button>`;
 
-      results.querySelectorAll('.nav-search-result').forEach(btn => {
-        btn.addEventListener('click', () => {
+      results.innerHTML =
+        nav.map((item, i) => btn(item, i)).join('') +
+        (dataItems.length
+          ? `<div class="nav-search-section" style="padding:.4rem .9rem .2rem;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;opacity:.55;">Seus dados</div>` +
+            dataItems.map((item, i) => btn(item, nav.length ? nav.length + i : i)).join('')
+          : '');
+
+      results.querySelectorAll('.nav-search-result').forEach(el => {
+        el.addEventListener('click', () => {
           close();
-          if (window.app?.loadView) window.app.loadView(btn.dataset.view);
+          if (window.app?.loadView) window.app.loadView(el.dataset.view);
         });
       });
     }

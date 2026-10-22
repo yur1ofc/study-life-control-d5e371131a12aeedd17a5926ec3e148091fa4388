@@ -421,14 +421,19 @@
       }).join('')}</div>`;
   }
 
+  // Rótulos em português para tipos de evento da agenda e tipos de sessão —
+  // antes os valores crus ("sessao", "revisao") apareciam na tela.
+  const EVENT_TYPE_LABELS = { todos: 'Todos', sessao: 'Sessão', tarefa: 'Tarefa', exame: 'Prova', revisao: 'Revisão', aula: 'Aula' };
+  const SESSION_TYPE_LABELS = { teoria: 'Teoria', exercicios: 'Exercícios', revisao: 'Revisão', resumo: 'Resumo', pratica: 'Prática', estudo: 'Estudo', prova: 'Prova', trabalho: 'Trabalho', foco: 'Foco' };
+
   function renderAgendaPanel(view) {
     const eventosBrutos = [
-      ...(view.app.data.sessions || []).map(item => ({ ...item, eventType: 'sessao', when: item.data, title: item.topico || item.materia, subtitle: `${item.materia} • ${item.tipo || 'estudo'}` })),
+      ...(view.app.data.sessions || []).map(item => ({ ...item, eventType: 'sessao', when: item.data, title: item.topico || item.materia, subtitle: `${item.materia} • ${SESSION_TYPE_LABELS[item.tipo] || item.tipo || 'estudo'}` })),
       ...(view.app.data.tasks || []).map(item => ({ ...item, eventType: 'tarefa', when: item.dataLimite, title: item.titulo, subtitle: `${item.materia} • tarefa` })),
       ...(view.app.data.exams || []).map(item => ({ ...item, eventType: 'exame', when: item.data, title: item.titulo, subtitle: `${item.materia} • ${item.tipo || 'avaliação'}` })),
       ...(view.app.data.reviews || []).map(item => ({ ...item, eventType: 'revisao', when: item.data, title: item.topico || 'Revisão', subtitle: `${item.materia} • revisão` })),
       ...(view.app.data.classDiaries || []).map(item => ({ ...item, eventType: 'aula', when: item.data, title: item.conteudoExplicado || 'Registro de aula', subtitle: `${item.materia} • diário de aula` }))
-    ].filter(item => item.when).sort((a,b) => new Date(a.when) - new Date(b.when));
+    ].filter(item => item.when).sort((a,b) => parseDateSafe(a.when) - parseDateSafe(b.when));
 
     // Mesmo filtro de "semestre atual" usado em Tarefas/Provas/Calendário —
     // matérias arquivadas (fora do semestre em curso) não poluem a agenda.
@@ -437,11 +442,11 @@
       : { atuais: eventosBrutos, arquivadas: 0 };
 
     const filters = ['todos', 'sessao', 'tarefa', 'exame', 'revisao', 'aula'];
-    const buttons = filters.map(filter => `<button class="calendar-filter-btn ${filter === 'todos' ? 'active' : ''}" data-filter="${filter}">${filter === 'todos' ? 'Todos' : filter}</button>`).join('');
+    const buttons = filters.map(filter => `<button class="calendar-filter-btn ${filter === 'todos' ? 'active' : ''}" data-filter="${filter}">${EVENT_TYPE_LABELS[filter] || filter}</button>`).join('');
     const list = events.slice(0, 30).map(item => `
       <div class="agenda-item" data-event-filter="${item.eventType}">
         <div><strong>${view.esc(item.title)}</strong><small>${view.esc(item.subtitle)} • ${formatarData(item.when)}</small></div>
-        <span class="risk-pill ${item.eventType === 'exame' ? 'alto' : item.eventType === 'tarefa' ? 'medio' : 'baixo'}">${item.eventType}</span>
+        <span class="risk-pill ${item.eventType === 'exame' ? 'alto' : item.eventType === 'tarefa' ? 'medio' : 'baixo'}">${EVENT_TYPE_LABELS[item.eventType] || item.eventType}</span>
       </div>`).join('') || '<p class="text-secondary">Nenhum evento cadastrado.</p>';
     const nota = arquivadas ? `<small class="text-secondary agenda-archived-note"><i class="fas fa-box-archive"></i> ${arquivadas} matéria${arquivadas > 1 ? 's' : ''} arquivada${arquivadas > 1 ? 's' : ''} escondida${arquivadas > 1 ? 's' : ''} da agenda</small>` : '';
     return `<div class="agenda-card"><div class="agenda-head"><div><h3><i class="fas fa-calendar-check"></i> Agenda acadêmica completa</h3><small>Provas, trabalhos, revisões, sessões e diários.</small></div></div>${nota}<div class="agenda-filters">${buttons}</div><div class="agenda-list" id="agenda-list">${list}</div></div>`;
@@ -652,7 +657,7 @@
         type: 'prova',
         priority: diasAte(exam.data) <= 2 ? 'alta' : 'media',
         title: `${exam.titulo || 'Prova'} chegando`,
-        text: `${exam.materia} em ${Math.max(0, diasAte(exam.data))} dia(s).`,
+        text: `${exam.materia} em ${Math.max(0, diasAte(exam.data))} dia${Math.max(0, diasAte(exam.data)) === 1 ? '' : 's'}.`,
         badge: `${Math.max(0, diasAte(exam.data))}d`
       }));
       (this.data.tasks || []).filter(t => !t?.concluida && diasAte(t.dataLimite) < 0).slice(0, 4).forEach(task => items.push({
@@ -724,7 +729,7 @@
       <div class="progress-bar" style="margin-top:14px"><div class="progress-fill" style="width:${goal.percent}%"></div></div>
       <div class="daily-goal-meta">
         <div class="daily-goal-pill"><span>Progresso</span><strong>${goal.percent}%</strong></div>
-        <div class="daily-goal-pill"><span>Sequência</span><strong>${goal.streak} dias</strong></div>
+        <div class="daily-goal-pill"><span>Sequência</span><strong>${goal.streak} dia${Number(goal.streak)===1?'':'s'}</strong></div>
         <div class="daily-goal-pill"><span>Ritmo sugerido</span><strong>${goal.remaining > 0 ? `${goal.remaining.toFixed(1)}h restantes` : 'Meta batida'}</strong></div>
       </div>
     </div>`;
@@ -787,7 +792,7 @@
           <div class="xp-progress-head"><div><h3>Nível ${game.level}</h3><small>XP só cai quando você conclui ações dentro do sistema.</small></div><div class="today-badge">${game.xp} XP</div></div>
           <div class="impact-kpis">
             <div class="impact-kpi"><span>XP total</span><strong>${game.xp}</strong></div>
-            <div class="impact-kpi"><span>Streak</span><strong>${game.streak} dias</strong></div>
+            <div class="impact-kpi"><span>Streak</span><strong>${game.streak} dia${Number(game.streak)===1?'':'s'}</strong></div>
             <div class="impact-kpi"><span>Tarefas feitas</span><strong>${game.tasksDone}</strong></div>
             <div class="impact-kpi"><span>Horas validadas</span><strong>${game.totalHours}h</strong></div>
           </div>

@@ -10,12 +10,18 @@
       const tasks=Array.isArray(d.tasks)?d.tasks.filter(x=>!x.concluida&&!x.completed):[];
       const exams=Array.isArray(d.exams)?d.exams.filter(x=>!x.concluida):[];
       const reviews=Array.isArray(d.reviews)?d.reviews.filter(x=>!x.completed&&!x.concluida):[];
+      // Pendentes em ordem cronológica (atrasadas aparecem primeiro).
+      const pendRevs=(Array.isArray(d.reviews)?d.reviews:[])
+        .filter(r=>!r?.concluida&&!r?.completed)
+        .map(r=>({r,dt:parseDateSafe(r?.data)}))
+        .filter(x=>!isNaN(x.dt.getTime()))
+        .sort((a,b)=>a.dt-b.dt);
       const sessions=Array.isArray(d.sessions)?d.sessions:[];
       const today=new Date();
       const start=new Date(today.getFullYear(),today.getMonth(),today.getDate());
-      const soon=exams.filter(x=>{const dt=new Date(x.data||x.date||x.dataProva);return !isNaN(dt)&&dt>=start})
-        .sort((a,b)=>new Date(a.data||a.date||a.dataProva)-new Date(b.data||b.date||b.dataProva))[0];
-      const recent=sessions.slice().sort((a,b)=>new Date(b.data||b.date||0)-new Date(a.data||a.date||0)).slice(0,3);
+      const soon=exams.filter(x=>{const dt=parseDateSafe(x.data||x.date||x.dataProva);return !isNaN(dt)&&dt>=start})
+        .sort((a,b)=>parseDateSafe(a.data||a.date||a.dataProva)-parseDateSafe(b.data||b.date||b.dataProva))[0];
+      const recent=sessions.slice().sort((a,b)=>parseDateSafe(b.data||b.date||0)-parseDateSafe(a.data||a.date||0)).slice(0,3);
       const user=d.user||{};
       return `<section class="slc-study-home slc-study-v14">
         <div class="slc-study-head">
@@ -34,7 +40,7 @@
           <div class="card slc-study-plan-card">
             <div class="card-header"><div><span class="slc-card-kicker">EXECUÇÃO</span><h3><i class="fas fa-list-check"></i> Seu próximo estudo</h3></div><button class="btn-secondary btn-sm" data-slcnavigate="mentor-ia">Pedir ao Mentor</button></div>
             <div class="card-body">
-              ${soon ? `<div class="slc-study-focus-item"><div class="slc-study-focus-icon"><i class="fas fa-graduation-cap"></i></div><div class="slc-study-focus-copy"><span>Próxima avaliação</span><strong>${esc(soon.titulo||soon.nome||soon.materia||'Avaliação')}</strong><small>${esc(soon.materia||soon.subject||'')} ${soon.data||soon.date?`• ${new Date(soon.data||soon.date||soon.dataProva).toLocaleDateString('pt-BR')}`:''}</small></div><button class="btn-primary btn-sm" data-slcnavigate="foco" data-slcmateria="${esc(soon.materia||soon.subject||'')}">Estudar</button></div>` : `<div class="slc-empty-study"><i class="fas fa-sparkles"></i><div><strong>Você ainda não tem uma próxima avaliação cadastrada.</strong><span>Use o Mentor para definir uma prioridade ou cadastre uma prova.</span></div><div class="slc-inline-actions"><button class="btn-primary btn-sm" data-slcnavigate="mentor-ia">O que estudar?</button><button class="btn-secondary btn-sm" data-slcnavigate="provas">Adicionar prova</button></div></div>`}
+              ${soon ? `<div class="slc-study-focus-item"><div class="slc-study-focus-icon"><i class="fas fa-graduation-cap"></i></div><div class="slc-study-focus-copy"><span>Próxima avaliação</span><strong>${esc(soon.titulo||soon.nome||soon.materia||'Avaliação')}</strong><small>${esc(soon.materia||soon.subject||'')} ${soon.data||soon.date?`• ${parseDateSafe(soon.data||soon.date||soon.dataProva).toLocaleDateString('pt-BR')}`:''}</small></div><button class="btn-primary btn-sm" data-slcnavigate="foco" data-slcmateria="${esc(soon.materia||soon.subject||'')}">Estudar</button></div>` : `<div class="slc-empty-study"><i class="fas fa-sparkles"></i><div><strong>Você ainda não tem uma próxima avaliação cadastrada.</strong><span>Use o Mentor para definir uma prioridade ou cadastre uma prova.</span></div><div class="slc-inline-actions"><button class="btn-primary btn-sm" data-slcnavigate="mentor-ia">O que estudar?</button><button class="btn-secondary btn-sm" data-slcnavigate="provas">Adicionar prova</button></div></div>`}
               <div class="slc-study-mini-grid"><div><strong>${subjects.length}</strong><span>matérias</span></div><div><strong>${tasks.length}</strong><span>tarefas abertas</span></div><div><strong>${reviews.length}</strong><span>revisões pendentes</span></div><div><strong>${sessions.length}</strong><span>sessões registradas</span></div></div>
             </div>
           </div>
@@ -42,8 +48,15 @@
           <div class="card slc-study-recent-card">
             <div class="card-header"><div><span class="slc-card-kicker">HISTÓRICO</span><h3><i class="fas fa-clock-rotate-left"></i> Estudos recentes</h3></div><button class="btn-secondary btn-sm" data-slcnavigate="sessoes">Ver tudo</button></div>
             <div class="card-body">
-              ${recent.length ? recent.map(s=>`<div class="slc-recent-study"><span class="slc-recent-icon"><i class="fas fa-book"></i></span><div><strong>${esc(s.materia||s.subject||'Sessão de estudo')}</strong><small>${esc(s.duracao||s.duration||'')} ${s.data||s.date?'• '+new Date(s.data||s.date).toLocaleDateString('pt-BR'):''}</small></div></div>`).join('') : `<div class="slc-empty-compact"><i class="fas fa-hourglass-start"></i><span>Nenhuma sessão registrada ainda.</span></div>`}
+              ${recent.length ? recent.map(s=>`<div class="slc-recent-study"><span class="slc-recent-icon"><i class="fas fa-book"></i></span><div><strong>${esc(s.materia||s.subject||'Sessão de estudo')}</strong><small>${esc(s.duracao||s.duration||'')} ${s.data||s.date?'• '+parseDateSafe(s.data||s.date).toLocaleDateString('pt-BR'):''}</small></div></div>`).join('') : `<div class="slc-empty-compact"><i class="fas fa-hourglass-start"></i><span>Nenhuma sessão registrada ainda.</span></div>`}
             </div>
+          </div>
+        </div>
+
+        <div class="card slc-study-reviews-card">
+          <div class="card-header"><div><span class="slc-card-kicker">MEMÓRIA</span><h3><i class="fas fa-repeat"></i> Revisões pendentes</h3></div>${pendRevs.length>6?`<button class="btn-secondary btn-sm" data-slcnavigate="mapa-aprendizado">Ver todas</button>`:''}</div>
+          <div class="card-body">
+            ${pendRevs.slice(0,6).map(x=>`<div class="slc-recent-study"><span class="slc-recent-icon"><i class="fas fa-repeat"></i></span><div><strong>${esc(x.r.topico||x.r.materia||'Revisão')}</strong><small>${esc(x.r.materia||'')}${x.r.data?` • ${x.dt.toLocaleDateString('pt-BR')}`:''}${x.dt<start?' <span class="tag high">atrasada</span>':''}</small></div><button class="btn-secondary btn-sm" data-slc-review-done="${esc(x.r.id)}" style="margin-left:auto;flex-shrink:0;"><i class="fas fa-check"></i> Marcar como revisada</button></div>`).join('') || `<div class="slc-empty-compact"><i class="fas fa-check-circle"></i><span>Nenhuma revisão pendente no momento — você está em dia.</span></div>`}
           </div>
         </div>
 
@@ -96,7 +109,7 @@
       const xp=Number(u.gamification?.xp||0); const level=Number(u.gamification?.level||1); const streak=Number(u.streak||0); const goal=Number(u.dailyStudyGoalHours||3);
       const sessions=(this.app?.data?.sessions||[]).filter(s=>s?.concluida||s?.status==='concluida');
       const totalMin=sessions.reduce((n,s)=>n+(Number(s.duracaoReal||s.duracao)||0),0);
-      return `<section class="slc-profile-page"><div class="slc-profile-hero"><div class="slc-avatar-xl">${esc(initials)}</div><div><span class="slc-eyebrow">MINHA CONTA</span><h2>${esc(u.nome||a?.displayName||'Usuário')}</h2><p>${esc(a?.email||'')} · ${esc(perfil)}</p></div><button class="btn-secondary" data-slcnavigate="configuracoes"><i class="fas fa-cog"></i> Configurações</button></div><div class="slc-profile-stats"><div><strong>${level}</strong><span>Nível</span></div><div><strong>${xp}</strong><span>XP</span></div><div><strong>${streak}</strong><span>Dias seguidos</span></div><div><strong>${(totalMin/60).toFixed(1)}h</strong><span>Estudadas</span></div></div><div class="slc-profile-grid"><div class="card"><div class="card-header"><h3><i class="fas fa-user-graduate"></i> Perfil acadêmico</h3></div><div class="card-body"><div class="slc-profile-row"><span>Perfil</span><strong>${esc(perfil)}</strong></div><div class="slc-profile-row"><span>Objetivo</span><strong>${esc(u.objetivo||u.curso||u.concurso||'Não definido')}</strong></div><div class="slc-profile-row"><span>Universidade</span><strong>${esc(u.universidade||'Não definida')}</strong></div><div class="slc-profile-row"><span>Semestre atual</span><strong>${esc(u.semestre||'Não definido')}</strong></div><div class="slc-profile-row"><span>Matérias ativas</span><strong>${this.app?.data?.subjects?.length||0}</strong></div><div class="slc-profile-row"><span>Meta diária</span><strong>${goal.toFixed(1)}h</strong></div></div></div><div class="card"><div class="card-header"><h3><i class="fas fa-bolt"></i> Ações rápidas</h3></div><div class="card-body slc-profile-actions"><button data-slcnavigate="configuracoes"><i class="fas fa-user-edit"></i> Editar perfil</button><button data-slcnavigate="estatisticas"><i class="fas fa-chart-line"></i> Meu desempenho</button><button data-slcnavigate="mapa-aprendizado"><i class="fas fa-map"></i> Meu mapa de aprendizado</button><button data-slcnavigate="sessoes"><i class="fas fa-clock"></i> Histórico de estudos</button><button data-slcnavigate="biblioteca"><i class="fas fa-layer-group"></i> Minha biblioteca</button></div></div></div></section>`;
+      return `<section class="slc-profile-page"><div class="slc-profile-hero"><div class="slc-avatar-xl">${esc(initials)}</div><div><span class="slc-eyebrow">MINHA CONTA</span><h2>${esc(u.nome||a?.displayName||'Usuário')}</h2><p>${esc(a?.email||'')} · ${esc(perfil)}</p></div><button class="btn-secondary" data-slcnavigate="configuracoes"><i class="fas fa-cog"></i> Configurações</button></div><div class="slc-profile-stats"><div><strong>${level}</strong><span>Nível</span></div><div><strong>${xp}</strong><span>XP</span></div><div><strong>${streak}</strong><span>${streak === 1 ? 'Dia seguido' : 'Dias seguidos'}</span></div><div><strong>${(totalMin/60).toFixed(1)}h</strong><span>Estudadas</span></div></div><div class="slc-profile-grid"><div class="card"><div class="card-header"><h3><i class="fas fa-user-graduate"></i> Perfil acadêmico</h3></div><div class="card-body"><div class="slc-profile-row"><span>Perfil</span><strong>${esc(perfil)}</strong></div><div class="slc-profile-row"><span>Objetivo</span><strong>${esc(u.objetivo||u.curso||u.concurso||'Não definido')}</strong></div><div class="slc-profile-row"><span>Universidade</span><strong>${esc(u.universidade||'Não definida')}</strong></div><div class="slc-profile-row"><span>Semestre atual</span><strong>${esc(u.semestre||'Não definido')}</strong></div><div class="slc-profile-row"><span>Matérias ativas</span><strong>${this.app?.data?.subjects?.length||0}</strong></div><div class="slc-profile-row"><span>Meta diária</span><strong>${goal.toFixed(1)}h</strong></div></div></div><div class="card"><div class="card-header"><h3><i class="fas fa-bolt"></i> Ações rápidas</h3></div><div class="card-body slc-profile-actions"><button data-slcnavigate="configuracoes"><i class="fas fa-user-edit"></i> Editar perfil</button><button data-slcnavigate="estatisticas"><i class="fas fa-chart-line"></i> Meu desempenho</button><button data-slcnavigate="mapa-aprendizado"><i class="fas fa-map"></i> Meu mapa de aprendizado</button><button data-slcnavigate="sessoes"><i class="fas fa-clock"></i> Histórico de estudos</button><button data-slcnavigate="biblioteca"><i class="fas fa-layer-group"></i> Minha biblioteca</button></div></div></div></section>`;
     };
     window.__slcRenderPerfil = () => {
       const app = window.app;
@@ -264,6 +277,30 @@
     addStudyView(); addProfileView(); polishLogin(); polishSetup(); restructureNav(); mobileNav(); patchLoadView(); bindStudyActions();
     document.addEventListener('app-ready',()=>{restructureNav();patchLoadView();updateTitle(titleFor(window.app?.currentView||'dashboard'));setTimeout(mobileNav,50);});
     document.addEventListener('click',e=>{const b=e.target.closest('[data-slcnavigate]');if(b&&!b.dataset.bound){e.preventDefault();navigate(b.dataset.slcnavigate);}});
+
+    // "Marcar como revisada" no painel do Estudar — delegado no document para
+    // funcionar mesmo após re-renders da view (botões são recriados sempre).
+    document.addEventListener('click', async (e) => {
+      const btn = e.target.closest?.('[data-slc-review-done]');
+      if (!btn) return;
+      e.preventDefault();
+      const id = btn.getAttribute('data-slc-review-done');
+      if (!id || btn.disabled) return;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+      try {
+        const ok = window.reviewSystem?.concluirRevisao
+          ? await window.reviewSystem.concluirRevisao(id)
+          : await window.dbService?.updateItem?.('reviews', id, { concluida: true, updatedAt: new Date().toISOString() });
+        if (ok === false) throw new Error('falha');
+        const app = window.app;
+        if (app && app.currentView === 'estudar') app.loadView('estudar');
+      } catch (_) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check"></i> Marcar como revisada';
+        window.showToast?.('Não consegui salvar a revisão. Tente de novo.', 'error');
+      }
+    });
     // Fallback robusto para Safari/iOS: o botão Mais é tratado por delegação no documento.
     if(!document.body.dataset.slcMoreDelegation){
       document.body.dataset.slcMoreDelegation='1';

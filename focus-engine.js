@@ -137,7 +137,7 @@
     const subject = norm(state?.subject);
     const diaries = (app?.data?.classDiaries || [])
       .filter(d => subject && norm(d?.materia) === subject)
-      .sort((a,b) => new Date(b?.data || 0) - new Date(a?.data || 0));
+      .sort((a,b) => parseDateSafe(b?.data || 0) - parseDateSafe(a?.data || 0));
     const diary = diaries[0];
     if (diary?.conteudoExplicado) return String(diary.conteudoExplicado).split(/[.;]/)[0].trim();
     const topics = (app?.data?.learningMap || []).filter(t => subject && norm(t?.materia) === subject);
@@ -382,7 +382,7 @@
     return (app.data.sessions || []).reduce((sum, s) => {
       if (!s?.concluida || s.tipo !== 'foco') return sum;
       if (excludeId && s.id === excludeId) return sum; // sessão em andamento é somada ao vivo
-      const dt = new Date(s.data || 0);
+      const dt = parseDateSafe(s.data || 0);
       if (dt.getFullYear() !== y || dt.getMonth() !== m || dt.getDate() !== d) return sum;
       return sum + Number(s.duracaoReal ?? s.duracao ?? 0);
     }, 0);
@@ -640,9 +640,12 @@
     const scheduled = state.sessionId ? (app?.data?.sessions || []).find(s => s.id === state.sessionId && !s.concluida) : null;
 
     if (scheduled) {
-      if (reason === 'manual') {
-        // Sessão programada concluída pelo usuário: ela passa a carregar o tempo real
-        // e o registro temporário de foco é removido para não contar em dobro.
+      if (reason === 'manual' || reason === 'reset') {
+        // Conclusão explícita do usuário ("Concluir estudo e registrar" OU
+        // "Encerrar e salvar" no Reset): a sessão programada conclui com o
+        // tempo REAL estudado e o registro temporário de foco é removido para
+        // não contar em dobro. Sem isso, encerrar cedo deixava a sessão
+        // pendente para sempre e o Mentor continuava cobrando.
         const updates = {
           concluida: true,
           duracaoPlanejada: scheduled.duracao || null,
@@ -650,7 +653,7 @@
           duracaoReal: minutes,
           estudoRealizado: minutes,
           dataConclusao: new Date().toISOString(),
-          motivoConclusao: reason,
+          motivoConclusao: reason === 'reset' ? 'encerrado-antecipado' : reason,
           topico: scheduled.topico || inferTopic(app, state) || 'Bloco de foco',
           focoMetricas: metrics
         };
@@ -660,8 +663,9 @@
           evidenceId = scheduled.id;
         }
       } else {
-        // Encerramento parcial: fica registrado o progresso, mas a sessão só é
-        // marcada como concluída quando o usuário decide concluir.
+        // Encerramento automático (aparelho reiniciou/abandonado): fica
+        // registrado o progresso, mas a sessão só é marcada como concluída
+        // quando o usuário decide concluir.
         await dbService.updateItem('sessions', scheduled.id, { estudoRealizado: minutes });
       }
     }
@@ -677,7 +681,7 @@
     resetGlobalState();
 
     if (reason === 'manual') showToast?.(`Estudo registrado: ${minutes} min de ${subject}. Agora registre o que você realmente conseguiu recuperar.`, 'success');
-    else if (reason === 'reset') showToast?.(`Sessão salva: ${minutes} min de ${subject}.`, 'success');
+    else if (reason === 'reset') showToast?.(scheduled ? `Encerrado: ${minutes} min de ${subject} — sessão vinculada marcada como concluída.` : `Sessão salva: ${minutes} min de ${subject}.`, 'success');
     else showToast?.(`Sessão anterior registrada automaticamente: ${minutes} min de ${subject}.`, 'success');
 
     // XP pelo tempo realmente estudado (a ref evita pontuar a mesma sessão duas vezes).
@@ -729,7 +733,7 @@
   function focusInsights(days = 14) {
     const sessions = (window.app?.data?.sessions || []).filter(s => s?.focoMetricas && s.tipo === 'foco');
     const since = Date.now() - days * 86400000;
-    const rows = sessions.filter(s => new Date(s.data || 0).getTime() >= since && (Number(s.focoMetricas.totalSec) || 0) >= 600);
+    const rows = sessions.filter(s => parseDateSafe(s.data || 0).getTime() >= since && (Number(s.focoMetricas.totalSec) || 0) >= 600);
     if (!rows.length) return null;
     const sum = (fn) => rows.reduce((n, s) => n + (Number(fn(s.focoMetricas)) || 0), 0);
     const indexes = rows.map(s => s.focoMetricas.indiceFoco).filter(v => Number.isFinite(v));

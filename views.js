@@ -628,12 +628,12 @@ class ViewRenderer {
 
         const sessoesHoje = this.app.data.sessions.filter(s => toDateString(s.data) === hoje && !s.concluida);
         const futuras = this.app.data.sessions
-            .filter(s => new Date(s.data) > agora && !s.concluida && toDateString(s.data) !== hoje)
-            .sort((a, b) => new Date(a.data) - new Date(b.data));
+            .filter(s => parseDateSafe(s.data) > agora && !s.concluida && toDateString(s.data) !== hoje)
+            .sort((a, b) => parseDateSafe(a.data) - parseDateSafe(b.data));
 
         const concluidas = this.app.data.sessions
             .filter(s => s.concluida)
-            .sort((a, b) => new Date(b.data) - new Date(a.data))
+            .sort((a, b) => parseDateSafe(b.data) - parseDateSafe(a.data))
             .slice(0, 10);
 
         return `
@@ -651,7 +651,7 @@ class ViewRenderer {
                                 <li>
                                     <div>
                                         <strong>${this.esc(s.materia)}</strong>
-                                        <small>${this.esc(s.tipo)} • ${this.esc(s.duracao)}min • ${formatarHora(s.data)}</small>
+                                        <small>${this.esc(this.sessionTipoLabel(s.tipo))} • ${this.esc(s.duracao)}min • ${formatarHora(s.data)}</small>
                                     </div>
                                     <div style="display:flex; gap:8px;">
                                         <button class="btn-icon btn-editar-sessao" data-id="${this.esc(s.id)}" title="Editar sessão">
@@ -679,7 +679,7 @@ class ViewRenderer {
                                 <li>
                                     <div>
                                         <strong>${this.esc(s.materia)}</strong>
-                                        <small>${formatarData(s.data)} • ${formatarHora(s.data)} • ${this.esc(s.tipo)}</small>
+                                        <small>${formatarData(s.data)} • ${formatarHora(s.data)} • ${this.esc(this.sessionTipoLabel(s.tipo))}</small>
                                     </div>
                                     <div style="display:flex; gap:8px;">
                                         <button class="btn-icon btn-editar-sessao" data-id="${this.esc(s.id)}" title="Editar sessão">
@@ -729,11 +729,11 @@ class ViewRenderer {
 
         const pendentes = tasksAtuais
             .filter(t => !t.concluida)
-            .sort((a, b) => new Date(a.dataLimite) - new Date(b.dataLimite));
+            .sort((a, b) => parseDateSafe(a.dataLimite) - parseDateSafe(b.dataLimite));
 
         const concluidas = tasksAtuais
             .filter(t => t.concluida)
-            .sort((a, b) => new Date(b.dataLimite) - new Date(a.dataLimite));
+            .sort((a, b) => parseDateSafe(b.dataLimite) - parseDateSafe(a.dataLimite));
 
         return `
             <div class="view-header">
@@ -836,15 +836,15 @@ class ViewRenderer {
 
     renderProvas() {
         const agora = toDateOnly(new Date());
-        const { atuais: examsAtuais, arquivadas } = this.app.filterSemestreAtual(this.app.data.exams, 'materia');
+        const { atuais: examsAtuais, arquivadas, arquivadasNomes } = this.app.filterSemestreAtual(this.app.data.exams, 'materia');
 
         const proximas = examsAtuais
             .filter(e => toDateOnly(e.data) >= agora && !e.concluida)
-            .sort((a, b) => new Date(a.data) - new Date(b.data));
+            .sort((a, b) => parseDateSafe(a.data) - parseDateSafe(b.data));
 
         const passadas = examsAtuais
             .filter(e => toDateOnly(e.data) < agora || e.concluida)
-            .sort((a, b) => new Date(b.data) - new Date(a.data))
+            .sort((a, b) => parseDateSafe(b.data) - parseDateSafe(a.data))
             .slice(0, 15);
 
         // Agrupa os próximos eventos por matéria, ordenando os grupos pelo evento mais próximo
@@ -854,7 +854,7 @@ class ViewRenderer {
             grupos[e.materia].push(e);
         });
         const materiasOrdenadas = Object.keys(grupos).sort((a, b) =>
-            new Date(grupos[a][0].data) - new Date(grupos[b][0].data)
+            parseDateSafe(grupos[a][0].data) - parseDateSafe(grupos[b][0].data)
         );
 
         return `
@@ -862,7 +862,7 @@ class ViewRenderer {
                 <h2><i class="fas fa-graduation-cap"></i> Provas e Trabalhos</h2>
                 <button class="btn-primary" id="btn-nova-prova"><i class="fas fa-plus"></i> Novo Evento</button>
             </div>
-            ${arquivadas ? `<p class="text-secondary archived-note"><i class="fas fa-box-archive"></i> ${arquivadas} matéria${arquivadas > 1 ? 's' : ''} arquivada${arquivadas > 1 ? 's' : ''} (fora do semestre atual) — as provas continuam salvas em Grade Curricular › Semestres anteriores.</p>` : ''}
+            ${this.arquivadasBanner(arquivadas, arquivadasNomes, '(fora do semestre atual) — as provas continuam salvas em Grade Curricular › Semestres anteriores.')}
 
             <h3 class="section-subtitle">📅 Próximos por matéria (${proximas.length})</h3>
             <div class="mapa-grid mapa-grid-compact">
@@ -906,7 +906,7 @@ class ViewRenderer {
             </div>
 
             <div class="mapa-grid mapa-grid-compact">
-                ${this.app.data.subjects.map(s => {
+                ${dedupeMateriasPorSlug(this.app.data.subjects).map(s => {
                     const topicos = this.app.data.learningMap.filter(t => t.materia === s.nome);
                     const dominados = topicos.filter(t => String(t.status).toLowerCase() === 'dominado').length;
                     return `
@@ -1040,11 +1040,11 @@ class ViewRenderer {
             ...this.app.data.tasks.map(t => ({ ...t, tipo: 'tarefa', data: t.dataLimite, label: t.titulo })),
             ...this.app.data.exams.map(e => ({ ...e, tipo: 'exame', data: e.data, label: e.titulo }))
         ];
-        const { atuais: eventos, arquivadas } = this.app.filterSemestreAtual(eventosBrutos, 'materia');
+        const { atuais: eventos, arquivadas, arquivadasNomes } = this.app.filterSemestreAtual(eventosBrutos, 'materia');
 
         return `
             <h2><i class="fas fa-calendar"></i> Calendário</h2>
-            ${arquivadas ? `<p class="text-secondary archived-note"><i class="fas fa-box-archive"></i> ${arquivadas} matéria${arquivadas > 1 ? 's' : ''} arquivada${arquivadas > 1 ? 's' : ''} (fora do semestre atual) escondida${arquivadas > 1 ? 's' : ''} do calendário.</p>` : ''}
+            ${this.arquivadasBanner(arquivadas, arquivadasNomes, '(fora do semestre atual) escondidas do calendário.')}
 
             <div class="card">
                 <div class="card-header">
@@ -1060,7 +1060,7 @@ class ViewRenderer {
                                 if (!d) return '<div class="calendar-day empty"></div>';
 
                                 const eventosDia = eventos.filter(e => {
-                                    const data = new Date(e.data);
+                                    const data = parseDateSafe(e.data);
                                     return data.getDate() === d &&
                                         data.getMonth() === hoje.getMonth() &&
                                         data.getFullYear() === hoje.getFullYear();
@@ -1095,14 +1095,14 @@ class ViewRenderer {
         // "cursando" (+ matérias criadas manualmente, fora do plano). O
         // filtro abaixo é uma segunda camada de proteção, caso o status de
         // uma matéria mude sem passar por esse sincronismo.
-        const { atuais: subjectsAtuais, arquivadas } = this.app.filterSemestreAtual(this.app.data.subjects, 'nome');
+        const { atuais: subjectsAtuais, arquivadas, arquivadasNomes } = this.app.filterSemestreAtual(this.app.data.subjects, 'nome');
 
         return `
             <div class="view-header">
                 <h2><i class="fas fa-chart-line"></i> Previsão de Notas</h2>
                 <button class="btn-primary" id="btn-registrar-nota"><i class="fas fa-plus"></i> Registrar Nota</button>
             </div>
-            ${arquivadas ? `<p class="text-secondary archived-note"><i class="fas fa-box-archive"></i> ${arquivadas} matéria${arquivadas > 1 ? 's' : ''} arquivada${arquivadas > 1 ? 's' : ''} (fora do semestre atual) — as notas continuam salvas em Grade Curricular › Semestres anteriores.</p>` : ''}
+            ${this.arquivadasBanner(arquivadas, arquivadasNomes, '(fora do semestre atual) — as notas continuam salvas em Grade Curricular › Semestres anteriores.')}
 
             <div class="dashboard-grid">
                 ${subjectsAtuais.map(s => {
@@ -1228,7 +1228,7 @@ class ViewRenderer {
                             </div>
                             <div class="stat-item">
                                 <span class="stat-value">${this.esc(this.app.data.user?.streak || 0)}</span>
-                                <span class="stat-label">dias seguidos</span>
+                                <span class="stat-label">${(this.app.data.user?.streak || 0) === 1 ? 'dia seguido' : 'dias seguidos'}</span>
                             </div>
                         </div>
                     </div>
@@ -1240,8 +1240,13 @@ class ViewRenderer {
     renderEstatisticas() {
         const horasPorMateria = this.app.calcularHorasPorMateria();
         const horasPorTipo = this.app.calcularHorasPorTipo();
-        const total = this.app.data.sessions.filter(s => s.concluida)
+        const horasSessoes = this.app.data.sessions.filter(s => s.concluida)
             .reduce((a, s) => a + s.duracao / 60, 0);
+        // Inclui o tempo de estudo lançado no Registro do Dia (diário) — sem
+        // isso, quem só registra por lá via a tela de Estatísticas "0.0h".
+        const horasDiario = (this.app.data.dailyLogs || [])
+            .reduce((a, l) => a + (Number(l?.estudo?.duracao) || 0), 0) / 60;
+        const total = horasSessoes + horasDiario;
 
         const maxHorasMateria = horasPorMateria.length ? Math.max(...horasPorMateria.map(h => h.horas)) : 1;
         const maxHorasTipo = horasPorTipo.length ? Math.max(...horasPorTipo.map(t => t.horas)) : 1;
@@ -1259,7 +1264,7 @@ class ViewRenderer {
                     <div class="card-header"><h3>⏱️ Total Estudado</h3></div>
                     <div class="card-body text-center">
                         <div class="big-number">${total.toFixed(1)}</div>
-                        <p>horas no total</p>
+                        <p>horas no total <small style="opacity:.7">(sessões + registro do dia)</small></p>
                     </div>
                 </div>
 
@@ -1356,10 +1361,10 @@ class ViewRenderer {
         const hoje = toDateString();
         const sessoesHoje = (this.app.data.sessions || [])
             .filter(s => !s.concluida && toDateString(s.data) === hoje)
-            .sort((a, b) => new Date(a.data) - new Date(b.data));
-        const materias = (this.app.data.subjects || []).slice().sort((a, b) => a.nome.localeCompare(b.nome));
+            .sort((a, b) => parseDateSafe(a.data) - parseDateSafe(b.data));
+        const materias = dedupeMateriasPorSlug(this.app.data.subjects || []).slice().sort((a, b) => a.nome.localeCompare(b.nome));
 
-        const optsSessao = sessoesHoje.map(s => `<option value="${this.esc(s.id)}" data-materia="${this.esc(s.materia)}" data-duracao="${this.esc(s.duracao || '')}">${this.esc(s.materia)} • ${this.esc(s.tipo)} (${formatarHora(s.data)})</option>`).join('');
+        const optsSessao = sessoesHoje.map(s => `<option value="${this.esc(s.id)}" data-materia="${this.esc(s.materia)}" data-duracao="${this.esc(s.duracao || '')}">${this.esc(s.materia)} • ${this.esc(this.sessionTipoLabel(s.tipo))} (${formatarHora(s.data)})</option>`).join('');
         const optsMateria = materias.map(m => `<option value="${this.esc(m.nome)}">${this.esc(m.nome)}</option>`).join('');
 
         return `
@@ -1843,7 +1848,7 @@ class ViewRenderer {
                 ${this.app.data.subjects.map(s => {
                     const totalSessoes = this.app.data.sessions.filter(ses => ses.materia === s.nome).length;
                     const totalTarefas = this.app.data.tasks.filter(t => t.materia === s.nome && !t.concluida).length;
-                    const totalProvas = this.app.data.exams.filter(e => e.materia === s.nome && new Date(e.data) >= new Date()).length;
+                    const totalProvas = this.app.data.exams.filter(e => e.materia === s.nome && parseDateSafe(e.data) >= new Date()).length;
 
                     return `
                         <div class="card subject-card">
@@ -1871,6 +1876,35 @@ class ViewRenderer {
                 }).join('')}
             </div>
         `;
+    }
+
+    // Banner "N matérias arquivadas" com ação de restauração: quem arquivou
+    // uma matéria sem querer (ou cuja matéria sumiu por status 'não cursada')
+    // devolve para "cursando" em 1 clique, sem precisar achar a Grade Curricular.
+    arquivadasBanner(arquivadas, arquivadasNomes, texto) {
+        if (!arquivadas) return '';
+        const plural = arquivadas > 1 ? 's' : '';
+        const curriculum = this.app.data.curriculum || [];
+        const restauraveis = (arquivadasNomes || []).filter(nome => {
+            const item = curriculum.find(c => this.app.slugifyName(c.nome) === this.app.slugifyName(nome));
+            // Só oferece devolver o que foi parar fora por status "morno"
+            // (não cursada / trancada). Aprovada/reprovada é resultado
+            // definitivo — devolver exigiria antes limpar o histórico.
+            return item && (item.status === 'nao-cursada' || item.status === 'trancada');
+        });
+        const lista = restauraveis.map(nome => `
+            <button class="btn-secondary" data-subj-sync-cursando="${this.esc(nome)}" style="font-size:.74rem;padding:.25rem .6rem;margin:3px 3px 0 0;">
+                <i class="fas fa-undo"></i> ${this.esc(nome)}
+            </button>`).join('');
+        return `
+            <p class="text-secondary archived-note"><i class="fas fa-box-archive"></i> ${arquivadas} matéria${plural} arquivada${plural} ${texto}
+                ${lista ? `<span style="display:block;margin-top:6px;"><small>Foram para fora do semestre atual por engano? Marque como cursando de volta:</small><br>${lista}</span>` : ''}
+            </p>`;
+    }
+
+    // Rótulo legível do tipo de sessão (o valor cru "revisao" aparecia na tela).
+    sessionTipoLabel(tipo) {
+        return ({ teoria: 'Teoria', exercicios: 'Exercícios', revisao: 'Revisão', resumo: 'Resumo', pratica: 'Prática', foco: 'Foco', estudo: 'Estudo' })[tipo] || tipo || '';
     }
 
     renderAlert(alert) {
@@ -1903,7 +1937,7 @@ class ViewRenderer {
             data.setDate(inicio.getDate() + i);
 
             const temEstudo = this.app.data.sessions.some(s =>
-                new Date(s.data).toDateString() === data.toDateString() && s.concluida
+                parseDateSafe(s.data).toDateString() === data.toDateString() && s.concluida
             );
 
             const intensidade = temEstudo ? 100 : 20;
@@ -2014,7 +2048,7 @@ class ViewRenderer {
             .reduce((acc, s) => acc + s.duracao, 0) / 60;
 
         const horasSemana = sessoesConcluidas
-            .filter(s => new Date(s.data) >= inicioSemana)
+            .filter(s => parseDateSafe(s.data) >= inicioSemana)
             .reduce((acc, s) => acc + s.duracao, 0) / 60;
 
         const horasTotal = sessoesConcluidas
@@ -2031,7 +2065,7 @@ class ViewRenderer {
         return this.app.data.subjects.map(subject => {
             const ultimaSessao = this.app.data.sessions
                 .filter(s => s.materia === subject.nome && s.concluida)
-                .sort((a, b) => new Date(b.data) - new Date(a.data))[0];
+                .sort((a, b) => parseDateSafe(b.data) - parseDateSafe(a.data))[0];
 
             if (!ultimaSessao) {
                 return {
@@ -2068,7 +2102,7 @@ class ViewRenderer {
             data.setDate(inicioSemana.getDate() + index);
 
             const horas = this.app.data.sessions
-                .filter(s => s.concluida && new Date(s.data).toDateString() === data.toDateString())
+                .filter(s => s.concluida && parseDateSafe(s.data).toDateString() === data.toDateString())
                 .reduce((acc, s) => acc + s.duracao, 0) / 60;
 
             const aulas = (window.scheduleManager?.getAulasPorDia(index) || []).length;
@@ -2434,9 +2468,9 @@ class ViewRenderer {
                         const feitos = Number(curso.modulosConcluidos) || 0;
                         linhaAcompanhamento = `<p><strong>Módulos/aulas:</strong> ${feitos}${total ? ` / ${total}` : ''}</p>`;
                     } else if (tipo === 'data') {
-                        const inicio = curso.dataInicio ? new Date(curso.dataInicio + 'T00:00:00').toLocaleDateString('pt-BR') : 'não informada';
-                        const fim = curso.dataFimPrevista ? new Date(curso.dataFimPrevista + 'T00:00:00').toLocaleDateString('pt-BR') : 'não informada';
-                        const faltam = curso.dataFimPrevista ? Math.ceil((new Date(curso.dataFimPrevista + 'T00:00:00') - new Date()) / 86400000) : null;
+                        const inicio = curso.dataInicio ? parseDateSafe(curso.dataInicio + 'T00:00:00').toLocaleDateString('pt-BR') : 'não informada';
+                        const fim = curso.dataFimPrevista ? parseDateSafe(curso.dataFimPrevista + 'T00:00:00').toLocaleDateString('pt-BR') : 'não informada';
+                        const faltam = curso.dataFimPrevista ? Math.ceil((parseDateSafe(curso.dataFimPrevista + 'T00:00:00') - new Date()) / 86400000) : null;
                         const faltamTexto = faltam === null ? '' : (faltam >= 0 ? ` (faltam ${faltam}d)` : ' (prazo encerrado)');
                         linhaAcompanhamento = `<p><strong>Período:</strong> ${inicio} até ${fim}${faltamTexto}</p>`;
                     } else if (tipo === 'manual') {

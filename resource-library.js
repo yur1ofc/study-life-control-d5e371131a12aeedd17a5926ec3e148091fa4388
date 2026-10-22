@@ -74,7 +74,7 @@
       url = await snap.ref.getDownloadURL();
     }
 
-    await ref.set({
+    const payload = {
       titulo: data.titulo.trim().slice(0, 180),
       tipo: data.tipo,
       materia: (data.materia || '').trim().slice(0, 120),
@@ -85,8 +85,14 @@
       favorito: false,
       createdAt: now,
       updatedAt: now
-    });
-    return ref.id;
+    };
+    await ref.set(payload);
+    // Devolve o item COMPLETO (createdAt legível em vez do serverTimestamp
+    // pendente) pra UI inserir na lista na hora. Sem isso, o list() imediato
+    // não enxergava o registro novo: orderBy em campo com timestamp pendente
+    // exclui o doc até o servidor confirmar a escrita — e a lista ficava
+    // vazia até o usuário recarregar a página.
+    return { id: ref.id, ...payload, createdAt: new Date().toISOString() };
   }
 
   async function remove(item) {
@@ -198,8 +204,15 @@
       e.preventDefault(); const submit=e.submitter; submit.disabled=true; submit.innerHTML='<i class="fas fa-spinner fa-spin"></i> Salvando...';
       try {
         const t=type.value, data={tipo:t,titulo:modal.querySelector('#resource-title').value,materia:modal.querySelector('#resource-subject').value,descricao:modal.querySelector('#resource-description').value,url:modal.querySelector('#resource-url').value,tags:modal.querySelector('#resource-tags').value};
-        await add(data,modal.querySelector('#resource-file').files[0]);
-        const fresh=await list(); items.splice(0,items.length,...fresh); modal.remove(); redraw(); window.showToast?.('Recurso adicionado à Biblioteca.','success');
+        const novo=await add(data,modal.querySelector('#resource-file').files[0]);
+        // Insere localmente na hora (sem depender do round-trip do Firestore)
+        // e reordena por data de criação, como o list() faria.
+        items.unshift(novo);
+        items.sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+        modal.remove(); redraw(); window.showToast?.('Recurso adicionado à Biblioteca.','success');
+        // Alinhamento em background: quando o servidor confirmar a escrita,
+        // a lista se atualiza sozinha (cobre renomeações/ids de storage).
+        list().then(fresh=>{ if(Array.isArray(fresh)&&fresh.length){ items.splice(0,items.length,...fresh); if(document.getElementById('resource-grid')) redraw(); } }).catch(()=>{});
       } catch(err) { window.showToast?.(err.message||'Não foi possível salvar.','error'); submit.disabled=false; submit.innerHTML='<i class="fas fa-cloud-arrow-up"></i> Salvar recurso'; }
     };
     modal.style.display='flex';
