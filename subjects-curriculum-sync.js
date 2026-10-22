@@ -35,6 +35,8 @@
             : `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     }
 
+    let pendingCurriculumSave = false;
+
     // Recalcula app.data.subjects a partir das disciplinas "cursando" na
     // Grade Curricular. Retorna true se algo mudou.
     function syncSubjectsWithCurriculum(app) {
@@ -48,6 +50,22 @@
         curriculum.forEach(item => {
             const key = slugifyName(item.nome);
             if (key) curriculumByName.set(key, item);
+        });
+
+        // Armadilha da "não cursada": quem cadastra a matéria na aba Matérias
+        // (wizard, importação por IA, cadastro manual) enquanto o currículo
+        // ainda a marca como "não cursada" tinha a matéria RECOLHIDA da aba
+        // na primeira sincronização — e ela sumia do site inteiro. O cadastro
+        // da matéria É a declaração de que ela está em curso agora, então
+        // promovemos 'nao-cursada' → 'cursando'. Status já decididos
+        // (aprovada, reprovada, trancada) nunca são alterados por aqui.
+        pendingCurriculumSave = false;
+        app.data.subjects.forEach(subject => {
+            const item = curriculumByName.get(slugifyName(subject.nome));
+            if (item && item.status === 'nao-cursada') {
+                item.status = 'cursando';
+                pendingCurriculumSave = true;
+            }
         });
 
         const cursando = curriculum.filter(item => item.status === 'cursando');
@@ -98,11 +116,16 @@
         if (!app) return false;
 
         const changed = syncSubjectsWithCurriculum(app);
-        if (!changed) return false;
+        const curriculumPromoted = pendingCurriculumSave;
+        if (!changed && !curriculumPromoted) return false;
 
         try {
             if (window.dbService && typeof window.dbService.saveData === 'function') {
-                await window.dbService.saveData('subjects', app.data.subjects);
+                if (pendingCurriculumSave) {
+                    pendingCurriculumSave = false;
+                    await window.dbService.saveData('curriculum', app.data.curriculum);
+                }
+                if (changed) await window.dbService.saveData('subjects', app.data.subjects);
             }
         } catch (error) {
             console.warn('Não foi possível salvar a sincronização automática de matérias.', error);
@@ -115,6 +138,7 @@
         if (reload && typeof app.loadView === 'function') {
             const viewsAfetadas = ['materias', 'grade-horaria', 'dashboard', 'sessoes', 'tarefas', 'provas', 'mapa-aprendizado', 'materiais', 'previsao-notas'];
             if (viewsAfetadas.includes(app.currentView)) app.loadView(app.currentView);
+            else if (curriculumPromoted && app.currentView === 'grade-curricular') app.loadView(app.currentView);
         }
 
         return true;
@@ -150,7 +174,41 @@
         wrapAsyncMethod(proto, 'salvarNovoCurriculum');
         wrapAsyncMethod(proto, 'applyCurriculumImport');
         wrapAsyncMethod(proto, 'importarGradeUfob');
+
+        // Reparo na abertura: contas que já foram pegas pela armadilha da
+        // "não cursada" (matéria cadastrada, currículo em 'nao-cursada', e a
+        // matéria sumindo da aba Matérias) são consertadas uma vez no load,
+        // sem depender de o usuário mexer em qualquer formulário.
+        document.addEventListener('app-ready', () => {
+            setTimeout(() => {
+                if (window.app?.data?.curriculum?.length && Array.isArray(window.app.data.subjects)) {
+                    syncAndRefresh(window.app, { reload: false }).catch(() => {});
+                }
+            }, 1200);
+        });
     }
+
+    // Clique em "Marcar como cursando" nos banners de matérias arquivadas
+    // (Provas, Calendário, Previsão de Notas) — devolve a matéria para o
+    // semestre atual em 1 clique.
+    document.addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-subj-sync-cursando]');
+        if (!btn || !window.app?.data?.curriculum) return;
+        const nome = btn.getAttribute('data-subj-sync-cursando');
+        const item = window.app.data.curriculum.find(c => slugifyName(c.nome) === slugifyName(nome));
+        if (!item) return;
+        item.status = 'cursando';
+        btn.disabled = true;
+        try {
+            if (window.dbService?.saveData) await window.dbService.saveData('curriculum', window.app.data.curriculum);
+            await syncAndRefresh(window.app);
+            if (window.app.currentView) window.app.loadView(window.app.currentView);
+            window.showToast?.(`${item.nome} voltou para "cursando".`, 'success');
+        } catch (_) {
+            btn.disabled = false;
+            window.showToast?.('Não consegui devolver a matéria. Tente novamente.', 'error');
+        }
+    });
 
     document.addEventListener('DOMContentLoaded', patch);
     if (document.readyState !== 'loading') patch();

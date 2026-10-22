@@ -558,7 +558,7 @@
                 <h2><i class="fas fa-clock"></i> Nova Sessão de Estudo</h2>
                 <button type="button" class="close-modal" aria-label="Fechar" onclick="this.closest('.modal').style.display='none'">&times;</button>
             </div>
-            <form id="form-sessao" class="modal-form" onsubmit="app.handleSessaoSubmit(event)">
+            <form id="form-sessao" class="modal-form">
                 <div class="form-group">
                     <label>Matéria</label>
                     <select id="sessao-materia" required>
@@ -602,7 +602,7 @@
                 <h2><i class="fas fa-tasks"></i> Nova Tarefa</h2>
                 <button type="button" class="close-modal" aria-label="Fechar" onclick="this.closest('.modal').style.display='none'">&times;</button>
             </div>
-            <form id="form-tarefa" class="modal-form" onsubmit="app.handleTarefaSubmit(event)">
+            <form id="form-tarefa" class="modal-form">
                 <div class="form-group">
                     <label>Título da tarefa</label>
                     <input type="text" id="tarefa-titulo" required>
@@ -646,7 +646,7 @@
                 <h2><i class="fas fa-graduation-cap"></i> Nova Prova/Trabalho</h2>
                 <button type="button" class="close-modal" aria-label="Fechar" onclick="this.closest('.modal').style.display='none'">&times;</button>
             </div>
-            <form id="form-prova" class="modal-form" onsubmit="app.handleProvaSubmit(event)">
+            <form id="form-prova" class="modal-form">
                 <div class="form-group">
                     <label>Título</label>
                     <input type="text" id="prova-titulo" required>
@@ -713,7 +713,7 @@
                 <h2><i class="fas fa-calendar-week"></i> Nova Aula</h2>
                 <button type="button" class="close-modal" aria-label="Fechar" onclick="this.closest('.modal').style.display='none'">&times;</button>
             </div>
-            <form id="form-aula" class="modal-form" onsubmit="app.handleAulaSubmit(event)">
+            <form id="form-aula" class="modal-form">
                 <div class="form-group">
                     <label>Disciplina</label>
                     <select id="aula-materia" required>
@@ -775,7 +775,7 @@
                 <h2><i class="fas fa-map-marker-alt"></i> Novo Tópico</h2>
                 <button type="button" class="close-modal" aria-label="Fechar" onclick="this.closest('.modal').style.display='none'">&times;</button>
             </div>
-            <form id="form-topico" class="modal-form" onsubmit="app.handleTopicoSubmit(event)">
+            <form id="form-topico" class="modal-form">
                 <div class="form-group">
                     <label>Matéria</label>
                     <select id="topico-materia" required>
@@ -818,7 +818,7 @@
                 <h2><i class="fas fa-star"></i> Registrar Nota</h2>
                 <button type="button" class="close-modal" aria-label="Fechar" onclick="this.closest('.modal').style.display='none'">&times;</button>
             </div>
-            <form id="form-nota" class="modal-form" onsubmit="app.handleNotaSubmit(event)">
+            <form id="form-nota" class="modal-form">
                 <div class="form-group">
                     <label>Matéria</label>
                     <select id="nota-materia" required>
@@ -852,7 +852,7 @@
                 <h2><i class="fas fa-folder"></i> Novo Material</h2>
                 <button type="button" class="close-modal" aria-label="Fechar" onclick="this.closest('.modal').style.display='none'">&times;</button>
             </div>
-            <form id="form-material" class="modal-form" onsubmit="app.handleMaterialSubmit(event)">
+            <form id="form-material" class="modal-form">
                 <div class="form-group">
                     <label>Título</label>
                     <input type="text" id="material-titulo" required>

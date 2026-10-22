@@ -77,6 +77,7 @@ Retorne SOMENTE um objeto JSON válido neste formato exato:
 
 Extraia todas as disciplinas realmente presentes no conteúdo. Não invente disciplinas.
 Se semestre, código, carga horária ou créditos não estiverem disponíveis, use 0 ou string vazia.
+Em grades brasileiras, "Módulo N", "Período N", "Ano N/Mês N" e "Ciclo N" equivalem a semestre: use o número do módulo/período em que a disciplina aparece (ex.: "Módulo 3" → 3). Use 0 só quando não houver indicação de posição na grade.
 O conteúdo pode vir de PDF, tabela, fluxograma ou texto com quebras de linha desorganizadas.
 
 Conteúdo original:

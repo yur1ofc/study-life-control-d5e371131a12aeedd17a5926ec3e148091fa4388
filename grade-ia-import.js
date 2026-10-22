@@ -35,7 +35,7 @@ Formato obrigatório:
 
 Regras:
 - Retorne APENAS JSON puro. Absolutamente nada mais.
-- "semestre" deve ser número inteiro. Se não encontrar, use 0.
+- "semestre" deve ser número inteiro. Em grades brasileiras, "Módulo N", "Período N", "Ano N/Mês N" e "Ciclo N" equivalem a semestre: use o número do módulo/período em que a disciplina aparece (ex.: "Módulo 3" → 3, "2º período" → 2). Use 0 só se o conteúdo realmente não indicar posição alguma da disciplina na grade.
 - "cargaHoraria" e "creditos" devem ser números. Se não encontrar, use 0.
 - "prerequisitos" é lista de nomes. Se não houver, use [].
 - "tipo" deve ser "obrigatoria" para componentes obrigatórios/núcleo comum, e "optativa" para optativas/eletivas/complementares/extensão.
@@ -150,11 +150,15 @@ Regras:
   }
 
   function normalizeItem(app, d) {
+    // Aceita sinônimos comuns em grades brasileiras: "Módulo N", "Período N"
+    // chegam como campo "modulo"/"periodo" quando o JSON da IA não usou
+    // "semestre" — sem isso, tudo caía em semestre 0 e sumia dos filtros.
+    const semestreBruto = d.semestre || d.modulo || d.periodo || d.ciclo || 0;
     const item = {
       id: makeId(),
       nome: d.nome || '',
       codigo: d.codigo || '',
-      semestre: d.semestre || 0,
+      semestre: parseInt(semestreBruto, 10) || 0,
       cargaHoraria: Number(d.cargaHoraria) || 0,
       creditos: Number(d.creditos) || 0,
       tipo: d.tipo || 'obrigatoria',
@@ -491,9 +495,10 @@ Regras:
           parts = [{ text: GRADE_PROMPT + '\n\nConteúdo da grade:\n\n' + text }];
         }
 
-        const result = await callGemini(parts, (tentativa) => {
-          setStatus(`<i class="fas fa-spinner fa-spin"></i> A IA está com alta demanda, tentando de novo automaticamente (${tentativa}/2)...`, 'loading');
-        });
+        // O retry/fallback entre modelos acontece DENTRO do servidor (a
+        // resposta já vem tratada) — daqui não dá pra contar tentativas, e a
+        // antiga mensagem "(undefined/2)" só assustava quem estava importando.
+        const result = await callGemini(parts);
         const disciplinas = result?.disciplinas || [];
         if (!disciplinas.length) throw new Error('Nenhuma disciplina encontrada no arquivo.');
 

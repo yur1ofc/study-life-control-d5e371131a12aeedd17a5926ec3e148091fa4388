@@ -871,9 +871,22 @@ Regras:
           // sem esperar a pessoa voltar pra etapa 2.
           const semestre = wizardState.semestre || q('#wiz-semestre')?.value || '';
           const existingSubjNames = new Set((wizardState.subjects || []).map(s => (s.nome || '').toLowerCase().trim()));
-          const toAdd = wizardState.importedCurriculum.filter(d => String(d.semestre) === String(semestre))
+          let toAdd = wizardState.importedCurriculum.filter(d => String(d.semestre) === String(semestre))
             .filter(d => !existingSubjNames.has((d.nome || '').toLowerCase().trim()))
             .map(d => ({ nome: d.nome, dificuldade: 3, peso: d.tipo === 'optativa' ? 3 : 4, notaDesejada: 7 }));
+          // Rede de segurança: se nenhuma disciplina casou com o semestre
+          // atual (ex.: a IA não conseguiu identificar os módulos e marcou
+          // tudo como semestre 0), a pessoa PEDIU importar as matérias ali —
+          // em vez de deixar a lista vazia (aviso falso + passo seguinte
+          // sem nada), adiciona todas as importadas pra ela ajustar/excluir.
+          if (!toAdd.length && wizardState.importedCurriculum.length) {
+            toAdd = wizardState.importedCurriculum
+              .filter(d => !existingSubjNames.has((d.nome || '').toLowerCase().trim()))
+              .map(d => ({ nome: d.nome, dificuldade: 3, peso: d.tipo === 'optativa' ? 3 : 4, notaDesejada: 7 }));
+            if (toAdd.length && window.showToast) {
+              window.showToast('Não consegui identificar o módulo/semestre de cada disciplina — adicionei todas as importadas. Ajuste ou exclua as que não são deste semestre.', 'info');
+            }
+          }
           if (toAdd.length) {
             wizardState.subjects = [...(wizardState.subjects || []).filter(s => s.nome), ...toAdd];
             wizardState.touched[4] = true;
@@ -1686,6 +1699,11 @@ Regras:
       return !(wizardState.touched && wizardState.touched[step]);
     }
     if (kind === 'materias') {
+      // Confere o estado em memória E o DOM: a importação por IA preenche
+      // wizardState.subjects e só depois desenha as linhas — checar só o DOM
+      // mostrava um aviso falso de "sem matérias" logo após um import válido.
+      const stateHasSubjects = (wizardState.subjects || []).some(s => (s.nome || '').trim());
+      if (stateHasSubjects) return false;
       const hasSubjects = document.querySelectorAll('#wiz-subjects-list .wiz-subject-item .wiz-subject-nome')
         && Array.from(document.querySelectorAll('#wiz-subjects-list .wiz-subject-nome')).some(i => i.value.trim());
       return !hasSubjects;
@@ -1934,13 +1952,43 @@ Regras:
         lastStudyDate:    null
       };
 
-      // Injetar no app
+      // Injetar no app — SEM apagar nada que já exista. Re-rodar o wizard
+      // numa conta com dados antigamente: (1) trocava app.data por um objeto
+      // de só 4 chaves (sumiam tarefas, sessões, notas e diários da memória
+      // até o próximo reload); (2) substituía subjects inteiro; (3) gravava
+      // classSchedule: [] no Firestore, zerando a grade horária.
       if (window.app) {
         window.app.data = window.app.data || {};
-        window.app.data.user     = userData;
-        window.app.data.subjects = subjects;
-        window.app.data.curriculum = curriculum;
-        window.app.data.classSchedule = window.app.data.classSchedule || [];
+        const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
+        // Matérias: mantém as existentes (com id/progresso) e só acrescenta
+        // as novas do wizard que ainda não estão cadastradas.
+        const existentes = Array.isArray(window.app.data.subjects) ? window.app.data.subjects : [];
+        const porNome = new Map(existentes.map(s => [norm(s.nome), s]));
+        const mergedSubjects = existentes.slice();
+        subjects.forEach(s => {
+          if (!porNome.has(norm(s.nome))) { mergedSubjects.push(s); porNome.set(norm(s.nome), s); }
+        });
+        window.app.data.subjects = mergedSubjects;
+
+        // Currículo: mesma lógica — preserva status/progresso de quem já
+        // existe (cursadas/concluídas não podem ser resetadas por re-run).
+        const curExistente = Array.isArray(window.app.data.curriculum) ? window.app.data.curriculum : [];
+        const curPorNome = new Map(curExistente.map(c => [norm(c.nome), c]));
+        const mergedCurriculum = curExistente.slice();
+        curriculum.forEach(c => {
+          if (!curPorNome.has(norm(c.nome))) { mergedCurriculum.push(c); curPorNome.set(norm(c.nome), c); }
+        });
+        window.app.data.curriculum = mergedCurriculum;
+        if (!Array.isArray(window.app.data.classSchedule)) window.app.data.classSchedule = [];
+
+        // User: preserva progresso (createdAt, streak, última data de estudo).
+        const userAnterior = window.app.data.user || {};
+        window.app.data.user = Object.assign({}, userAnterior, userData, {
+          createdAt: userAnterior.createdAt || userData.createdAt,
+          streak: userAnterior.streak ?? userData.streak,
+          lastStudyDate: userAnterior.lastStudyDate ?? userData.lastStudyDate
+        });
       }
 
       // Usar o handleSetupSubmit original via evento sintético se disponível
@@ -1949,9 +1997,11 @@ Regras:
         _fillOriginalFormFields(userData, subjects);
       }
 
-      // Salvar via dbService
+      // Salvar via dbService — grava o app.data INTERO já mesclado. Nunca um
+      // objeto parcial: com merge:true no Firestore, um objeto de 4 chaves
+      // com classSchedule: [] apagava a grade horária de verdade.
       if (window.dbService && typeof window.dbService.saveAllData === 'function') {
-        await window.dbService.saveAllData({ user: userData, subjects, curriculum, classSchedule: [] });
+        await window.dbService.saveAllData();
       }
 
       if (window.app && typeof window.app.ensurePostSetupReady === 'function') {
