@@ -2,11 +2,13 @@
 const quota=require('./_lib/gemini-admin-quota');
 const AI=require('./_lib/ai-core');
 const adminAuth=require('./_lib/admin-auth');
+const rateLimit=require('./_lib/rate-limit');
 const ALLOWED_ORIGINS=['https://slcampus.vercel.app','https://study-life-control.vercel.app'];
 function origin(req){const o=req.headers.origin||'';if(ALLOWED_ORIGINS.includes(o))return o;if(/^https:\/\/(?:slcampus|study-life-control)(-[a-z0-9-]+)?\.vercel\.app$/.test(o))return o;if(/^http:\/\/(?:localhost|127\.0\.0\.1)(:\d+)?$/.test(o))return o;return ALLOWED_ORIGINS[0];}
 async function verifyFirebaseToken(idToken){const decoded=await adminAuth.getFirebaseAdmin().auth().verifyIdToken(idToken,true);return {uid:decoded.uid,email:String(decoded.email||'').toLowerCase()};}
 module.exports=async function handler(req,res){res.setHeader('Access-Control-Allow-Origin',origin(req));res.setHeader('Vary','Origin');res.setHeader('Access-Control-Allow-Methods','POST, OPTIONS');res.setHeader('Access-Control-Allow-Headers','Content-Type, Authorization');if(req.method==='OPTIONS')return res.status(200).end();if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
  const auth=req.headers.authorization||'';const token=auth.startsWith('Bearer ')?auth.slice(7):'';if(!token)return res.status(401).json({error:'É preciso estar logado no app para conversar com o Mentor IA.'});let user;try{user=await verifyFirebaseToken(token);}catch{return res.status(401).json({error:'Sessão inválida ou expirada. Recarregue a página e faça login novamente.'});}
+ const rlChat=await rateLimit('mentor',user.uid,10,60);if(!rlChat.ok)return res.status(429).json({error:'Muitas mensagens em sequência. Aguarde um minuto antes de continuar a conversa.',code:'RATE_LIMITED'});
  let body;try{body=typeof req.body==='string'?JSON.parse(req.body||'{}'):(req.body||{});}catch{return res.status(400).json({error:'JSON inválido.'});}
  if(JSON.stringify(body).length>120000)return res.status(413).json({error:'Requisição grande demais.',code:'REQUEST_TOO_LARGE'});
  if(!Array.isArray(body.contents)||!body.contents.length)return res.status(400).json({error:'Requisição inválida: falta "contents".'});
