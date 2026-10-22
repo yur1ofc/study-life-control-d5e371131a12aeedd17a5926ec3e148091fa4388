@@ -6,6 +6,26 @@ function fireAppReady() {
 }
 window.__slcFireAppReady = fireAppReady;
 
+// Self-heal do streak no carregamento: recalcula user.streak a partir dos
+// dados reais e persiste se estiver defasado (a lógica antiga incremental
+// via lastStudyDate deixava o contador do sidebar/perfil divergindo da tela
+// de Diário). Dispara DEPOIS do loadData (init), então os dados estão
+// completos — a única condição é ter usuário logado.
+document.addEventListener('app-ready', () => {
+    setTimeout(() => {
+        try {
+            const app = window.app;
+            if (!app?.data?.user || typeof window.calcularStreakDados !== 'function') return;
+            const streak = window.calcularStreakDados(app.data);
+            if ((app.data.user.streak || 0) !== streak) {
+                app.data.user.streak = streak;
+                if (window.dbService?.saveData) window.dbService.saveData('user', app.data.user);
+                app.updateSidebarInfo?.();
+            }
+        } catch (_) { /* não bloqueia o boot por causa do streak */ }
+    }, 1500);
+});
+
 class StudyLifeControl {
     constructor() {
         this.data = typeof DEFAULT_APP_DATA === 'function' ? DEFAULT_APP_DATA() : {
@@ -405,7 +425,14 @@ class StudyLifeControl {
 
         if (nameEl) nameEl.textContent = this.data.user.nome || 'Usuário';
         if (emailEl) emailEl.textContent = user?.email || '';
-        if (streakEl) streakEl.textContent = `${this.data.user.streak || 0} dias`;
+        if (streakEl) {
+            // Sempre a contagem calculada (fonte única) — nunca o contador
+            // persistido, que pode estar defasado até o próximo evento de estudo.
+            const streak = (typeof calcularStreakDados === 'function')
+                ? calcularStreakDados(this.data)
+                : (this.data.user.streak || 0);
+            streakEl.textContent = `${streak} dia${streak === 1 ? '' : 's'}`;
+        }
 
         if (avatarEl) {
             if (user?.photoURL) {
@@ -426,6 +453,14 @@ class StudyLifeControl {
         document.body.dataset.view = view;
         const container = document.getElementById('view-container');
         if (!container) return;
+
+        // Fecha overlays órfãos ao trocar de tela: o modal do Telegram, o da
+        // importação por IA e os `.modal` genéricos ficavam presos por cima
+        // da nova view quando o usuário navegava com eles abertos.
+        document.querySelectorAll('.modal').forEach(m => {
+            if (m.style.display && m.style.display !== 'none') m.style.display = 'none';
+        });
+        document.querySelectorAll('.slc-telegram-modal-backdrop, .slc-telegram-modal-card, #slc-grade-ia-modal, #wiz-confirm-modal').forEach(el => el.remove());
 
         let html = '';
 
@@ -1010,7 +1045,10 @@ class StudyLifeControl {
             const currentValue = select.value;
             select.innerHTML = '<option value="">Selecione</option>';
 
-            this.data.subjects.forEach(s => {
+            // dedupeMateriasPorSlug: variações com typo/acentos de um mesmo
+            // nome (ex.: "Georreferenciamneto" vs "Georreferenciamento")
+            // apareciam duplicadas aqui.
+            dedupeMateriasPorSlug(this.data.subjects).forEach(s => {
                 const option = document.createElement('option');
                 option.value = s.nome;
                 option.textContent = s.nome;
@@ -1222,6 +1260,12 @@ class StudyLifeControl {
         const materiaData = {
             nome: document.getElementById('materia-nome-modal')?.value?.trim() || '',
             dificuldade: parseInt(document.getElementById('materia-dificuldade-modal')?.value, 10) || 3,
+            // Escolha manual registrada: alimenta o piso do motor de
+            // dificuldade (subject-difficulty.js) — o badge mantém "Difícil/
+            // Média-alta" em vez de ser rebaixado sozinho pelos primeiros
+            // dados de desempenho.
+            dificuldadeManual: parseInt(document.getElementById('materia-dificuldade-modal')?.value, 10) || 3,
+            dificuldadeAutomatica: false,
             peso: parseInt(document.getElementById('materia-peso-modal')?.value, 10) || 3,
             notaDesejada: parseFloat(document.getElementById('materia-nota-desejada-modal')?.value) || 7,
             cargaHoraria: parseInt(document.getElementById('materia-carga-horaria-modal')?.value, 10) || 0,
@@ -1958,19 +2002,19 @@ class StudyLifeControl {
     updateStreak() {
         if (!this.data.user) return;
 
+        // Recalcula a partir dos dados reais (utils.calcularStreakDados) em
+        // vez de incrementar um contador — a lógica antiga via lastStudyDate
+        // se perdia com edições, fuso e registros atrasados e divergia do
+        // Diário. Neste ponto o dado em memória já está rebaseado pelo
+        // dbService (addItem/updateItem refazem o state depois da transação).
+        const streak = typeof calcularStreakDados === 'function'
+            ? calcularStreakDados(this.data)
+            : (this.data.user.streak || 0);
         const hoje = toDateString();
-        if (this.data.user.lastStudyDate === hoje) return;
 
-        const ontem = new Date();
-        ontem.setDate(ontem.getDate() - 1);
-        const ontemStr = toDateString(ontem);
+        if (this.data.user.streak === streak && this.data.user.lastStudyDate === hoje) return;
 
-        if (this.data.user.lastStudyDate === ontemStr) {
-            this.data.user.streak = (this.data.user.streak || 0) + 1;
-        } else {
-            this.data.user.streak = 1;
-        }
-
+        this.data.user.streak = streak;
         this.data.user.lastStudyDate = hoje;
         dbService.saveData('user', this.data.user);
         this.updateSidebarInfo();
@@ -2140,7 +2184,7 @@ class StudyLifeControl {
             .map(subject => {
                 const ultima = this.data.sessions
                     .filter(s => s.materia === subject.nome && s.concluida)
-                    .sort((a, b) => new Date(b.data) - new Date(a.data))[0];
+                    .sort((a, b) => parseDateSafe(b.data) - parseDateSafe(a.data))[0];
 
                 if (!ultima) {
                     return { nome: subject.nome, diasSemEstudar: null, nunca: true };
@@ -2172,10 +2216,10 @@ class StudyLifeControl {
                 .filter(s => toDateOnly(s.data).getTime() === hoje.getTime())
                 .reduce((acc, s) => acc + s.duracao, 0) / 60,
             semana: sessoesConcluidas
-                .filter(s => new Date(s.data) >= inicioSemana)
+                .filter(s => parseDateSafe(s.data) >= inicioSemana)
                 .reduce((acc, s) => acc + s.duracao, 0) / 60,
             mes: sessoesConcluidas
-                .filter(s => new Date(s.data) >= inicioMes)
+                .filter(s => parseDateSafe(s.data) >= inicioMes)
                 .reduce((acc, s) => acc + s.duracao, 0) / 60,
             total: sessoesConcluidas.reduce((acc, s) => acc + s.duracao, 0) / 60
         };
@@ -2187,7 +2231,7 @@ class StudyLifeControl {
         this.data.subjects.forEach(materia => {
             const ultimo = this.data.sessions
                 .filter(ses => ses.materia === materia.nome && ses.concluida)
-                .sort((a, b) => new Date(b.data) - new Date(a.data))[0];
+                .sort((a, b) => parseDateSafe(b.data) - parseDateSafe(a.data))[0];
 
             if (ultimo && diasDesde(ultimo.data) >= 5) {
                 alerts.push({
@@ -2225,7 +2269,7 @@ class StudyLifeControl {
         this.data.subjects.forEach(subject => {
             const notas = this.data.grades.filter(g => g.materia === subject.nome);
             const media = calcularMediaPonderada(notas);
-            const exames = this.data.exams.filter(e => e.materia === subject.nome && new Date(e.data) >= hoje && diasAte(e.data) <= 14);
+            const exames = this.data.exams.filter(e => e.materia === subject.nome && parseDateSafe(e.data) >= hoje && diasAte(e.data) <= 14);
             const horas = this.data.sessions
                 .filter(ses => ses.materia === subject.nome && ses.concluida)
                 .reduce((a, ses) => a + ses.duracao, 0) / 60;
@@ -2335,13 +2379,13 @@ class StudyLifeControl {
     getUrgentTasks() {
         return this.data.tasks
             .filter(t => !t.concluida && diasAte(t.dataLimite) <= 3)
-            .sort((a, b) => new Date(a.dataLimite) - new Date(b.dataLimite));
+            .sort((a, b) => parseDateSafe(a.dataLimite) - parseDateSafe(b.dataLimite));
     }
 
     getUpcomingExams(days) {
         return this.data.exams
             .filter(e => !e.concluida && diasAte(e.data) <= days && diasAte(e.data) >= 0)
-            .sort((a, b) => new Date(a.data) - new Date(b.data));
+            .sort((a, b) => parseDateSafe(a.data) - parseDateSafe(b.data));
     }
 
     calcularHorasPorMateria() {
@@ -2369,7 +2413,7 @@ class StudyLifeControl {
     calcularMediaDiaria() {
         if (!this.data.user?.createdAt) return '0.0';
 
-        const dias = Math.max(1, Math.ceil((new Date() - new Date(this.data.user.createdAt)) / 86400000));
+        const dias = Math.max(1, Math.ceil((new Date() - parseDateSafe(this.data.user.createdAt)) / 86400000));
         const total = this.data.sessions
             .filter(s => s.concluida)
             .reduce((a, s) => a + s.duracao / 60, 0);
@@ -2382,7 +2426,7 @@ class StudyLifeControl {
         const horas = new Array(7).fill(0);
 
         this.data.sessions.filter(s => s.concluida).forEach(s => {
-            horas[new Date(s.data).getDay()] += s.duracao / 60;
+            horas[parseDateSafe(s.data).getDay()] += s.duracao / 60;
         });
 
         const maxIndex = horas.indexOf(Math.max(...horas));
@@ -2393,7 +2437,7 @@ class StudyLifeControl {
         const horas = new Array(7).fill(0);
 
         this.data.sessions.filter(s => s.concluida).forEach(s => {
-            horas[new Date(s.data).getDay()] += s.duracao / 60;
+            horas[parseDateSafe(s.data).getDay()] += s.duracao / 60;
         });
 
         return Math.max(...horas).toFixed(1);
@@ -2411,7 +2455,7 @@ class StudyLifeControl {
 
         const dias = new Set();
         this.data.sessions.filter(s => s.concluida).forEach(s => {
-            const d = new Date(s.data);
+            const d = parseDateSafe(s.data);
             if (d >= inicio) dias.add(toDateString(d));
         });
 
@@ -2536,16 +2580,18 @@ StudyLifeControl.prototype.filterSemestreAtual = function(list, materiaField = '
     // Aplicar o filtro de "semestre atual" aqui esconderia matérias concluídas e
     // faria o usuário entrar no histórico e encontrar telas vazias.
     if (this._semesterContext?.type === 'archived') {
-        return { atuais: items, arquivadas: 0 };
+        return { atuais: items, arquivadas: 0, arquivadasNomes: [] };
     }
     const atuais = [];
-    const materiasArquivadas = new Set();
+    const materiasArquivadas = new Map(); // slug → nome de exibição
     items.forEach(item => {
         const nome = item ? item[materiaField] : null;
-        if (this.isMateriaSemestrePassado(nome)) materiasArquivadas.add(this.slugifyName(nome));
+        if (this.isMateriaSemestrePassado(nome)) materiasArquivadas.set(this.slugifyName(nome), nome);
         else atuais.push(item);
     });
-    return { atuais, arquivadas: materiasArquivadas.size };
+    // arquivadasNomes permite à UI oferecer "Marcar como cursando" para
+    // quem arquivou uma matéria sem querer (em vez de só mostrar a contagem).
+    return { atuais, arquivadas: materiasArquivadas.size, arquivadasNomes: [...materiasArquivadas.values()] };
 };
 
 
@@ -3171,18 +3217,18 @@ StudyLifeControl.prototype.excluirExtraCourse = async function(id) {
         today.setHours(0,0,0,0);
         return (this.data.reviews || []).filter(item => {
             if (item?.concluida) return false;
-            const date = new Date(item?.data);
+            const date = parseDateSafe(item?.data);
             if (Number.isNaN(date.getTime())) return false;
             date.setHours(0,0,0,0);
             const diff = Math.round((date - today) / 86400000);
             return diff >= 0 && diff <= days;
-        }).sort((a,b) => new Date(a.data) - new Date(b.data));
+        }).sort((a,b) => parseDateSafe(a.data) - parseDateSafe(b.data));
     };
 
     proto.getPomodoroCount = function(days = 7) {
         const limit = Date.now() - (days * 86400000);
         return (this.data.sessions || []).filter(s => {
-            const date = new Date(s?.data || 0).getTime();
+            const date = parseDateSafe(s?.data || 0).getTime();
             return (s?.concluida || s?.status === 'concluida') && date >= limit && ['foco', 'pomodoro'].includes(String(s?.tipo || '').toLowerCase());
         }).length;
     };
@@ -3195,7 +3241,7 @@ StudyLifeControl.prototype.excluirExtraCourse = async function(id) {
         const limit = Date.now() - (days * 86400000);
         return (this.data.reviews || []).filter(r => {
             if (!r?.concluida) return false;
-            const updated = new Date(r?.updatedAt || r?.data || 0).getTime();
+            const updated = parseDateSafe(r?.updatedAt || r?.data || 0).getTime();
             return updated >= limit;
         }).length;
     };
@@ -3209,8 +3255,8 @@ StudyLifeControl.prototype.excluirExtraCourse = async function(id) {
         const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
         const completedSessions = (this.data.sessions || []).filter(s => s?.concluida || s?.status === 'concluida');
-        const weeklyMinutes = completedSessions.filter(s => new Date(s.data) >= startWeek).reduce((a,s) => a + (Number(s?.duracao)||0), 0);
-        const monthlyMinutes = completedSessions.filter(s => new Date(s.data) >= startMonth).reduce((a,s) => a + (Number(s?.duracao)||0), 0);
+        const weeklyMinutes = completedSessions.filter(s => parseDateSafe(s.data) >= startWeek).reduce((a,s) => a + (Number(s?.duracao)||0), 0);
+        const monthlyMinutes = completedSessions.filter(s => parseDateSafe(s.data) >= startMonth).reduce((a,s) => a + (Number(s?.duracao)||0), 0);
 
         const weeklyHours = weeklyMinutes / 60;
         const monthlyHours = monthlyMinutes / 60;
@@ -3245,11 +3291,11 @@ StudyLifeControl.prototype.excluirExtraCourse = async function(id) {
         const subject = (this.data.subjects || []).find(s => s?.nome === subjectName);
         if (!subject) return null;
         const tasks = (this.data.tasks || []).filter(t => t?.materia === subjectName && !t?.concluida);
-        const exams = (this.data.exams || []).filter(e => e?.materia === subjectName && !e?.concluida).sort((a,b) => new Date(a.data) - new Date(b.data));
+        const exams = (this.data.exams || []).filter(e => e?.materia === subjectName && !e?.concluida).sort((a,b) => parseDateSafe(a.data) - parseDateSafe(b.data));
         const sessions = (this.data.sessions || []).filter(s => s?.materia === subjectName && (s?.concluida || s?.status === 'concluida'));
         const grades = (this.data.grades || []).filter(g => g?.materia === subjectName);
         const reviewsPending = (this.data.reviews || []).filter(r => r?.materia === subjectName && !r?.concluida);
-        const diaries = (this.data.classDiaries || []).filter(d => d?.materia === subjectName).sort((a,b) => new Date(b.data) - new Date(a.data));
+        const diaries = (this.data.classDiaries || []).filter(d => d?.materia === subjectName).sort((a,b) => parseDateSafe(b.data) - parseDateSafe(a.data));
         const upcomingExam = exams[0] || null;
         const average = this.calcularMedia(grades);
         const hours = sessions.reduce((a,s) => a + (Number(s?.duracao)||0), 0) / 60;
@@ -3261,15 +3307,32 @@ StudyLifeControl.prototype.excluirExtraCourse = async function(id) {
         const hasDiaries = diaries.length > 0;
         const hasSessions = sessions.length > 0;
         const hasGrades = grades.length > 0;
-        const lastStudy = sessions.sort((a,b) => new Date(b.data) - new Date(a.data))[0];
+        const lastStudy = sessions.sort((a,b) => parseDateSafe(b.data) - parseDateSafe(a.data))[0];
         const daysWithoutStudy = lastStudy ? diasDesde(lastStudy.data) : null;
         const risk = this.analyzeAcademicRisk().find(r => r.materia === subjectName) || null;
+        const topicos = (this.data.learningMap || []).filter(t => t?.materia === subjectName);
+        const topicosDominados = topicos.filter(t => String(t?.status).toLowerCase() === 'dominado').length;
+        const topicosPendentes = topicos.length - topicosDominados;
 
-        let recommendation = 'Manter constância com teoria e exercícios.';
+        // Recomendação POR MATÉRIA: o default antigo ("Manter constância com
+        // teoria e exercícios.") era o mesmo em todo card de matéria nova —
+        // todos os cards do dashboard liam exatamente o mesmo texto. Cada
+        // ramo abaixo usa um sinal específico (dados faltando, atraso,
+        // frequência, dificuldade, tópicos, constância).
+        let recommendation = '';
         if (upcomingExam && diasAte(upcomingExam.data) <= 7) recommendation = `Focar em ${subjectName} agora: revisar conteúdo + resolver questões até ${formatarData(upcomingExam.data)}.`;
-        else if (average > 0 && average < 6) recommendation = 'Prioridade alta: recuperar média com revisão ativa e lista de exercícios.';
-        else if (tasks.length >= 2) recommendation = 'Fechar pendências dessa matéria antes de abrir novos conteúdos.';
-        else if (reviewsPending.length) recommendation = 'Aproveitar revisões pendentes para fixar o conteúdo.';
+        else if (average > 0 && average < 6) recommendation = `Prioridade alta em ${subjectName}: recuperar média com revisão ativa e lista de exercícios.`;
+        else if (tasks.length >= 2) recommendation = `Fechar ${tasks.length} pendências de ${subjectName} antes de abrir novos conteúdos.`;
+        else if (reviewsPending.length) recommendation = `${reviewsPending.length} revisão(ões) de ${subjectName} pendente(s) — é o caminho mais rápido pra fixar.`;
+        else if (!hasGrades && !hasSessions && !hasDiaries) recommendation = `${subjectName} ainda não tem registros — lance a primeira sessão ou diário pra análise ganhar forma.`;
+        else if (daysWithoutStudy !== null && daysWithoutStudy >= 5) recommendation = `${daysWithoutStudy} dias sem sessão em ${subjectName} — retome com um bloco curto de revisão.`;
+        else if (!hasGrades) recommendation = `Sem notas em ${subjectName} ainda — lance a primeira avaliação para acompanhar a média.`;
+        else if (attendance !== null && attendance < 75) recommendation = `Frequência de ${subjectName} em ${attendance}% — combine o conteúdo perdido e registre no diário.`;
+        else if (topicos.length && topicosPendentes === 0) recommendation = `Todos os tópicos de ${subjectName} dominados — mantenha firme com revisões.`;
+        else if (topicosPendentes > 0) recommendation = `${topicosPendentes} de ${topicos.length} tópicos de ${subjectName} ainda por dominar.`;
+        else if ((Number(subject?.dificuldade) || 3) >= 4) recommendation = `${subjectName} é marcada como difícil pra você — priorize exercícios e revisão espaçada.`;
+        else if (hours >= 3) recommendation = `${hours.toFixed(1)}h estudadas em ${subjectName} — bom ritmo, mantenha a constância.`;
+        else recommendation = `Poucas horas em ${subjectName} nesta semana — encaixe ao menos um bloco curto.`;
 
         return {
             subject,
@@ -3282,7 +3345,12 @@ StudyLifeControl.prototype.excluirExtraCourse = async function(id) {
             absences: Math.max(0, diaries.length - attended),
             reviewsPending: reviewsPending.length,
             riskLevel: risk?.nivel || (average > 0 && average < 6 ? 'alto' : upcomingExam && diasAte(upcomingExam.data) <= 7 ? 'medio' : 'baixo'),
-            riskReason: risk?.motivo || (daysWithoutStudy !== null && daysWithoutStudy >= 7 ? `${daysWithoutStudy} dias sem estudar` : 'sem alerta forte agora'),
+            riskReason: risk?.motivo
+                || (daysWithoutStudy !== null && daysWithoutStudy >= 7 ? `${daysWithoutStudy} dias sem estudar`
+                : average >= 7 ? `média ${average.toFixed(1)} — desempenho estável`
+                : upcomingExam ? `próxima avaliação em ${Math.max(0, diasAte(upcomingExam.data))} dia${Math.max(0, diasAte(upcomingExam.data)) === 1 ? '' : 's'}`
+                : !hasSessions && !hasDiaries ? 'poucos dados registrados até agora'
+                : 'sem alerta forte agora'),
             recommendation,
             daysWithoutStudy,
             hasDiaries,
@@ -4415,6 +4483,10 @@ StudyLifeControl.prototype.ensureSetupImportJsonInput = function() {
             document.getElementById('btn-importar-ufob')?.addEventListener('click', () => this.showCurriculumImportWizard());
         }
         if (view === 'configuracoes') {
+            // O botão de exportar é recriado a cada render da aba — o bind no
+            // init (setupEventListeners) atingia null e o "Exportar todos os
+            // dados (JSON)" ficava sem clique algum.
+            document.getElementById('exportar-dados')?.addEventListener('click', () => this.exportarDados());
             document.getElementById('importar-dados')?.addEventListener('click', () => this.ensureBackupImportInput().click());
             document.getElementById('carregar-demo-publica')?.addEventListener('click', () => this.carregarDemoPublica());
         }

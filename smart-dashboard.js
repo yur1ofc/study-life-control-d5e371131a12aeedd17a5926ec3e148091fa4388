@@ -28,8 +28,8 @@ class SmartDashboard {
     // Próximas provas com detalhes
     getProximasProvasDetalhadas() {
         return (this.app.data.exams || [])
-            .filter(e => new Date(e.data) >= new Date())
-            .sort((a, b) => new Date(a.data) - new Date(b.data))
+            .filter(e => parseDateSafe(e.data) >= new Date())
+            .sort((a, b) => parseDateSafe(a.data) - parseDateSafe(b.data))
             .map(prova => {
                 const horasEstudadas = this.calcularHorasMateria(prova.materia);
                 const horasNecessarias = this.calcularHorasNecessarias(prova);
@@ -55,7 +55,7 @@ class SmartDashboard {
             .map(materia => {
                 const ultimaSessao = this.app.data.sessions
                     .filter(s => s.materia === materia.nome && s.concluida)
-                    .sort((a, b) => new Date(b.data) - new Date(a.data))[0];
+                    .sort((a, b) => parseDateSafe(b.data) - parseDateSafe(a.data))[0];
                 
                 if (!ultimaSessao) return null;
                 
@@ -85,15 +85,15 @@ class SmartDashboard {
         const sessoes = this.app.data.sessions.filter(s => s.concluida);
         
         const horasHoje = sessoes
-            .filter(s => new Date(s.data).toDateString() === hoje.toDateString())
+            .filter(s => parseDateSafe(s.data).toDateString() === hoje.toDateString())
             .reduce((acc, s) => acc + s.duracao, 0) / 60;
             
         const horasSemana = sessoes
-            .filter(s => new Date(s.data) >= inicioSemana)
+            .filter(s => parseDateSafe(s.data) >= inicioSemana)
             .reduce((acc, s) => acc + s.duracao, 0) / 60;
             
         const horasMes = sessoes
-            .filter(s => new Date(s.data) >= inicioMes)
+            .filter(s => parseDateSafe(s.data) >= inicioMes)
             .reduce((acc, s) => acc + s.duracao, 0) / 60;
             
         const horasTotal = sessoes.reduce((acc, s) => acc + s.duracao, 0) / 60;
@@ -114,7 +114,7 @@ class SmartDashboard {
             const dataStr = data.toDateString();
             
             const horas = this.app.data.sessions
-                .filter(s => s.concluida && new Date(s.data).toDateString() === dataStr)
+                .filter(s => s.concluida && parseDateSafe(s.data).toDateString() === dataStr)
                 .reduce((acc, s) => acc + s.duracao, 0) / 60;
                 
             const meta = this.app.data.user?.horasMaximas || 6;

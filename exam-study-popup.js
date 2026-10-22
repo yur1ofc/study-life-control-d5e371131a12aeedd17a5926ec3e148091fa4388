@@ -36,7 +36,7 @@
     return sessions.some(s => {
       if (s.materia !== materia) return false;
       const dias = Math.abs(diasAte(s.data));
-      return dias <= 1 || new Date(s.data) <= new Date(alvoData);
+      return dias <= 1 || parseDateSafe(s.data) <= new Date(alvoData);
     });
   }
 

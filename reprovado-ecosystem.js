@@ -42,7 +42,7 @@
                 return {
                     id: item.id,
                     nome: item.nome,
-                    tentativas: item.tentativas.slice().sort((a, b) => new Date(a.data || 0) - new Date(b.data || 0)),
+                    tentativas: item.tentativas.slice().sort((a, b) => parseDateSafe(a.data || 0) - parseDateSafe(b.data || 0)),
                     vezesReprovada: reprovadas.length,
                     ultimaTentativa: reprovadas[reprovadas.length - 1]
                 };

@@ -68,7 +68,7 @@ class ClassDiaryService {
 
     getDiariosPorMateria(materiaNome) {
         return this.diaries.filter(d => d.materia === materiaNome)
-            .sort((a, b) => new Date(b.data) - new Date(a.data));
+            .sort((a, b) => parseDateSafe(b.data) - parseDateSafe(a.data));
     }
 
     getUltimoDiarioPorMateria(materiaNome) {
@@ -77,7 +77,7 @@ class ClassDiaryService {
 
     getDiariosParaRevisar() {
         return this.diaries.filter(d => d.precisoRevisar)
-            .sort((a, b) => new Date(b.data) - new Date(a.data));
+            .sort((a, b) => parseDateSafe(b.data) - parseDateSafe(a.data));
     }
 
     calcularFrequencia(materiaNome) {

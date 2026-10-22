@@ -106,6 +106,19 @@
       value = Math.max(1, value - 1);
     }
 
+    // Escolha manual ALTA (≥4) é informação, não ruído: se a pessoa marcou a
+    // matéria como difícil/média-alta e os dados ainda são poucos (menos de3
+    // notas), mantemos o piso dela — sem isso, o primeiro boletim bom
+    // rebaixava a matéria para "Fácil" e o badge da tela de Matérias
+    // contradizia a escolha da pessoa. Com dados suficientes, a evidência
+    // vence a escolha inicial. dificuldadeManual guarda o valor que a
+    // pessoa digitou (preservado no recalc); se ainda não existe, o valor
+    // atual só é manual quando o motor nunca calibrou aquela matéria.
+    const manualDificuldade = clamp(Math.round(num(
+        subject?.dificuldadeManual ?? (subject?.dificuldadeAutomatica === true ? null : subject?.dificuldade)
+    ) ?? 3), 1, 5);
+    if (manualDificuldade >= 4 && values.length < 3) value = Math.max(value, manualDificuldade);
+
     value = clamp(value,1,5);
     const labels = {1:'fácil',2:'média-baixa',3:'média',4:'média-alta',5:'difícil'};
     const confidence = clamp(Math.round(35 + values.length * 15 + (failedHistory ? 10 : 0)), 35, 95);
@@ -152,6 +165,10 @@
       if (!s?.nome) return;
       const d = computeDifficulty(s, app);
       const before = Number(s.dificuldade) || 3;
+      // Primeira calibração guarda a escolha manual original: depois que o
+      // motor passa a gravar em s.dificuldade, o valor digitado pela pessoa
+      // só sobrevive em dificuldadeManual (usado como piso quando ≥4).
+      if (s.dificuldadeAutomatica !== true && s.dificuldadeManual == null) s.dificuldadeManual = before;
       if (before !== d.value || s.dificuldadeAutomatica !== (d.source === 'automática') || s.dificuldadeMotivo !== d.reason || s.dificuldadeAcao !== d.action) {
         s.dificuldade = d.value;
         s.dificuldadeAutomatica = d.source === 'automática';

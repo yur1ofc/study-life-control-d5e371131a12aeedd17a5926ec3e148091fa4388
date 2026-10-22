@@ -29,7 +29,7 @@
   }
   function nextExam(subject){
     const now=new Date();
-    return (data().exams||[]).filter(e=>!e?.concluida&&norm(e?.materia)===norm(subject)).map(e=>({...e,_d:new Date(e.data||e.date||e.dataProva)})).filter(e=>!Number.isNaN(e._d.getTime())&&e._d>=now).sort((a,b)=>a._d-b._d)[0]||null;
+    return (data().exams||[]).filter(e=>!e?.concluida&&norm(e?.materia)===norm(subject)).map(e=>({...e,_d:parseDateSafe(e.data||e.date||e.dataProva)})).filter(e=>!Number.isNaN(e._d.getTime())&&e._d>=now).sort((a,b)=>a._d-b._d)[0]||null;
   }
   function topicRows(subject){
     return (data().learningMap||[]).filter(t=>norm(t?.materia)===norm(subject));
@@ -79,7 +79,7 @@
     score += Math.min(10,recentDoubts*4);
     score += Math.min(10,qErrors*2);
     score += Math.min(8,failures*2);
-    const last=(data().sessions||[]).filter(s=>s?.concluida&&norm(s?.materia)===norm(name)).sort((a,b)=>new Date(b.data)-new Date(a.data))[0];
+    const last=(data().sessions||[]).filter(s=>s?.concluida&&norm(s?.materia)===norm(name)).sort((a,b)=>parseDateSafe(b.data)-parseDateSafe(a.data))[0];
     if(last&&daysSince(last.data)>=7)score+=Math.min(8,daysSince(last.data));
     return {name,score:Math.round(Math.min(100,score)),avg,exam,topics,weak,reviews,tasks,failures,recentDoubts,qErrors,materials};
   }
@@ -150,7 +150,7 @@
     const container=document.getElementById('view-container');if(!container||window.app?.currentView!=='estudar')return;
     const existing=document.getElementById('slc-v18-brain-card');if(existing)existing.remove();
     const plan=getPlan(4);const best=bestTopic();
-    const reviews=(data().reviews||[]).filter(r=>!r?.concluida);const overdue=reviews.filter(r=>{const d=new Date(r.data);return !Number.isNaN(d)&&d<new Date(new Date().toDateString());});
+    const reviews=(data().reviews||[]).filter(r=>!r?.concluida);const overdue=reviews.filter(r=>{const d=parseDateSafe(r.data);return !Number.isNaN(d)&&d<new Date(new Date().toDateString());});
     const card=document.createElement('section');card.id='slc-v18-brain-card';card.className='card slc-v18-brain-card';
     card.innerHTML=`<div class="card-header"><div><span class="slc-card-kicker">MOTOR DE APRENDIZAGEM</span><h3><i class="fas fa-brain"></i> O que vale estudar agora</h3></div><span class="v18-brain-badge">adaptativo</span></div><div class="card-body"><div class="v18-plan-grid">${plan.length?plan.map((p,i)=>`<article class="v18-plan-item"><div class="v18-plan-rank">${i+1}</div><div class="v18-plan-copy"><strong>${esc(p.name)}</strong><small>Prioridade ${p.score}/100${p.avg!==null?` • média ${p.avg.toFixed(1)}`:''}${p.exam?` • avaliação em ${Math.max(0,Math.ceil((p.exam._d-Date.now())/86400000))}d`:''}${p.materials?` • ${p.materials} material(is)`:''}</small><span>${esc(p.weak[0]?.nome|| (p.recentDoubts?'há evidência de dúvida/revisão':'revisão/questões conforme os dados disponíveis'))}</span></div><button class="btn-primary btn-sm v18-focus" data-subject="${esc(p.name)}" data-topic="${esc(p.weak[0]?.nome||'')}">Focar</button></article>`).join(''):`<div class="v18-empty">Cadastre matérias, provas ou tópicos para o motor conseguir priorizar o estudo.</div>`}</div><div class="v18-brain-actions">${best?`<button class="btn-secondary" id="v18-questions"><i class="fas fa-list-check"></i> 3 questões sobre ${esc(best.topic?.nome||best.subject)}</button>`:''}<button class="btn-secondary" id="v18-map"><i class="fas fa-map"></i> Abrir mapa</button><button class="btn-secondary" id="v18-materials"><i class="fas fa-book-open"></i> Materiais</button><button class="btn-secondary" id="v18-mentor"><i class="fas fa-robot"></i> Perguntar ao Mentor</button></div><div class="v18-brain-foot">${overdue.length?`Há <strong>${overdue.length}</strong> revisão(ões) vencida(s).`:''} A prioridade combina evidências de aprendizagem, tópicos fracos, avaliações próximas, notas, tarefas, revisões e histórico quando esses dados existem.</div></div>`;
     const anchor=container.querySelector('.slc-study-main-grid')||container.firstElementChild;anchor?.insertAdjacentElement('afterend',card);

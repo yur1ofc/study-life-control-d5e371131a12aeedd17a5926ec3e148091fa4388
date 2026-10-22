@@ -133,6 +133,11 @@ class DiaryView {
     }
 
     calcularStreak(app) {
+        // Fonte única: mesma contagem do sidebar/estatísticas
+        // (utils.calcularStreakDados — diários, sessões e tarefas concluídas).
+        if (typeof window.calcularStreakDados === 'function') {
+            return window.calcularStreakDados(app.data);
+        }
         const logs = app.data.dailyLogs || [];
         const datasComLog = new Set(logs.map(l => l.data));
         let streak = 0;
@@ -159,7 +164,7 @@ class DiaryView {
         const energiaInfo = this.energiaInfo(medias.energia);
         const focoInfo = this.focoInfo(medias.foco);
 
-        const subjects = app.data.subjects || [];
+        const subjects = dedupeMateriasPorSlug(app.data.subjects || []);
         const subjectsComDiario = subjects.filter(s => (app.data.classDiaries || []).some(d => d.materia === s.nome));
         const freqMedia = subjectsComDiario.length
             ? Math.round(subjectsComDiario.reduce((acc, s) => acc + window.classDiaryService.calcularFrequencia(s.nome), 0) / subjectsComDiario.length)
@@ -173,6 +178,7 @@ class DiaryView {
                 <div><h2><i class="fas fa-book-open"></i> Diário</h2><p>Registre cada aula, presença, conteúdo, dificuldade e dúvidas. Depois, consulte tudo por dia ou por matéria.</p></div>
                 <div class="diario-quick-actions">
                     ${this.temRegistroHoje(app) ? '' : `<button class="btn-secondary" id="diario-dia-livre-btn" title="Salva o dia em 1 clique, sem abrir o formulário completo"><i class="fas fa-mug-hot"></i> Dia sem nada pra registrar</button>`}
+                    <button class="btn-secondary" id="diario-outro-dia-btn" title="Abre o registro apontando para ontem — troque a data no topo do formulário se precisar de outro dia"><i class="fas fa-calendar-day"></i> Registrar outro dia</button>
                     <button class="btn-primary" id="diario-novo-btn"><i class="fas fa-plus"></i> Registrar hoje</button>
                 </div>
             </div>
@@ -423,6 +429,11 @@ class DiaryView {
 
     bindPageEvents(app) {
         document.getElementById('diario-novo-btn')?.addEventListener('click', () => this.openModal());
+        document.getElementById('diario-outro-dia-btn')?.addEventListener('click', () => {
+            // Abre já apontando para ontem; o listener de change do campo de
+            // data recarrega o modal corretamente se o usuário trocar de novo.
+            this.openModal(toDateString(new Date(Date.now() - 86400000)));
+        });
         document.getElementById('diario-empty-novo-btn')?.addEventListener('click', () => this.openModal());
         document.getElementById('diario-dia-livre-btn')?.addEventListener('click', () => this.marcarDiaLivre(app));
 
@@ -488,6 +499,7 @@ class DiaryView {
             : `Novo registro — ${formatarData(data)}`;
 
         document.getElementById('diario-data').value = data;
+        this._modalDataAtual = data;
         document.getElementById('diario-estudo-inicio').value = log?.estudo?.inicio || '';
         document.getElementById('diario-estudo-fim').value = log?.estudo?.fim || '';
         this.setPillValue('diario-energia', log?.energia || 'media');
@@ -525,7 +537,7 @@ class DiaryView {
         if (!container) return;
 
         const idx = this._blockCounter++;
-        const subjects = app.data.subjects || [];
+        const subjects = dedupeMateriasPorSlug(app.data.subjects || []);
         const materiaAtual = existente?.materia || '';
 
         const presencaAtual = existente?.presenca === 'absent' ? 'absent' : 'present';
@@ -623,8 +635,10 @@ class DiaryView {
         const app = window.app;
         if (!app) return;
 
-        const data = document.getElementById('diario-data').value;
-        if (!data) { showToast('Escolha uma data.', 'warning'); return; }
+        const dataBruta = document.getElementById('diario-data').value;
+        if (!dataBruta) { showToast('Escolha uma data.', 'warning'); return; }
+        // Normaliza para "YYYY-MM-DD" local (nunca UTC) antes de salvar.
+        const data = toDateString(parseDateSafe(dataBruta));
 
         const blocos = Array.from(document.querySelectorAll('#diario-aulas-container .diario-aula-block'));
         const temAula = blocos.some(b => b.querySelector('.diario-aula-materia').value);
@@ -687,4 +701,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // recriadas a cada abertura do modal), então só precisam ser ligadas
     // uma vez aqui.
     window.diaryView.bindPillGroups(document);
+    // Trocar a data dentro do modal recarrega o dia escolhido. Sem isso,
+    // abrir "Registrar hoje" e mudar a data para ontem fazia o salvar
+    // sobrescrever os registros DO DIA ORIGINAL (os blocos continuavam com
+    // os ids antigos) — já causou perda/mutação de diários reais.
+    document.getElementById('diario-data')?.addEventListener('change', (e) => {
+        const nova = e.target.value;
+        if (!nova || nova === window.diaryView._modalDataAtual) return;
+        const modalAberto = document.getElementById('modal-diario') &&
+            getComputedStyle(document.getElementById('modal-diario')).display !== 'none';
+        if (modalAberto) window.diaryView.openModal(nova);
+    });
+    // Dica do campo de duração do trabalho (em minutos).
+    const durTrab = document.getElementById('diario-trabalho-duracao');
+    if (durTrab && !durTrab.placeholder) durTrab.placeholder = 'min — ex.: 240 (4h)';
 });

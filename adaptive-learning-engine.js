@@ -31,7 +31,7 @@
     const out = {};
     const now = Date.now();
     (app?.data?.sessions || []).filter(completed).forEach(s => {
-      const d = new Date(s.data || s.dataConclusao || s.inicio || 0);
+      const d = parseDateSafe(s.data || s.dataConclusao || s.inicio || 0);
       if (Number.isNaN(d.getTime())) return;
       if (now - d.getTime() > daysBack * DAY || d.getTime() > now + DAY) return;
       const key = dateKey(d);

@@ -72,7 +72,7 @@ class DailyLogService {
 
     // Obter último log
     getUltimoLog() {
-        return this.logs.sort((a, b) => new Date(b.data) - new Date(a.data))[0];
+        return this.logs.sort((a, b) => parseDateSafe(b.data) - parseDateSafe(a.data))[0];
     }
 
     // Calcular médias de energia e foco dos últimos 7 dias
@@ -83,7 +83,7 @@ class DailyLogService {
         for (let i = 0; i < 7; i++) {
             const data = new Date(hoje);
             data.setDate(hoje.getDate() - i);
-            const dataStr = data.toISOString().split('T')[0];
+            const dataStr = toDateString(data);
             const log = this.logs.find(l => l.data === dataStr);
             ultimos7Dias.push(log);
         }
@@ -101,8 +101,10 @@ class DailyLogService {
             logsComFoco.reduce((acc, l) => acc + focoMap[l.foco], 0) / logsComFoco.length : 0;
 
         return {
-            energia: mediaEnergia > 2.5 ? 'alta' : mediaEnergia > 1.5 ? 'media' : 'baixa',
-            foco: mediaFoco > 2.5 ? 'bom' : mediaFoco > 1.5 ? 'normal' : 'ruim'
+            // Sem registros ainda: null (a UI mostra "—" cinza em vez de
+            // um vermelho alarmista de "Baixa/Ruim" sem nenhum dado).
+            energia: !logsComEnergia.length ? null : (mediaEnergia > 2.5 ? 'alta' : mediaEnergia > 1.5 ? 'media' : 'baixa'),
+            foco: !logsComFoco.length ? null : (mediaFoco > 2.5 ? 'bom' : mediaFoco > 1.5 ? 'normal' : 'ruim')
         };
     }
 }

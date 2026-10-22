@@ -23,7 +23,7 @@ class ReviewSystem {
         if (!classDiary?.precisoRevisar && classDiary?.criarRevisoesAutomaticas !== true) return [];
         this.loadReviews();
         const hoje = new Date();
-        const dataBase = new Date(classDiary.data || hoje);
+        const dataBase = parseDateSafe(classDiary.data || hoje);
         const revisoesGeradas = [];
         const topicoBase = classDiary.conteudoExplicado || classDiary.naoEntendi || 'Conteúdo da aula';
 
@@ -41,7 +41,7 @@ class ReviewSystem {
                 concluida: false,
                 aulaId: classDiary.id,
                 sourceClassDate: classDiary.data || '',
-                sourceClassWeekday: new Date(`${classDiary.data}T00:00:00Z`).getUTCDay(),
+                sourceClassWeekday: parseDateSafe(`${classDiary.data}T00:00:00Z`).getUTCDay(),
                 notificationPolicy: 'due-day-free-window'
             };
             const exists = this.revisoes.some(item => this._signature(item) === this._signature(review));
@@ -53,12 +53,12 @@ class ReviewSystem {
         }
 
         const provasMateria = (window.app?.data?.exams || [])
-            .filter(e => e.materia === classDiary.materia && !e.concluida && new Date(e.data) > hoje)
-            .sort((a, b) => new Date(a.data) - new Date(b.data));
+            .filter(e => e.materia === classDiary.materia && !e.concluida && parseDateSafe(e.data) > hoje)
+            .sort((a, b) => parseDateSafe(a.data) - parseDateSafe(b.data));
 
         if (provasMateria.length) {
             const provaMaisProxima = provasMateria[0];
-            const dataProva = new Date(provaMaisProxima.data);
+            const dataProva = parseDateSafe(provaMaisProxima.data);
             const preExam = new Date(dataProva);
             preExam.setDate(dataProva.getDate() - 2);
             const review = {
@@ -72,7 +72,7 @@ class ReviewSystem {
                 aulaId: classDiary.id,
                 provaId: provaMaisProxima.id,
                 sourceClassDate: classDiary.data || '',
-                sourceClassWeekday: new Date(`${classDiary.data}T00:00:00Z`).getUTCDay(),
+                sourceClassWeekday: parseDateSafe(`${classDiary.data}T00:00:00Z`).getUTCDay(),
                 notificationPolicy: 'due-day-free-window'
             };
             const exists = this.revisoes.some(item => this._signature(item) === this._signature(review));
@@ -102,7 +102,7 @@ class ReviewSystem {
             .sort((a, b) => {
                 if (a.tipo === 'pre-exam') return -1;
                 if (b.tipo === 'pre-exam') return 1;
-                return new Date(a.data) - new Date(b.data);
+                return parseDateSafe(a.data) - parseDateSafe(b.data);
             });
     }
 

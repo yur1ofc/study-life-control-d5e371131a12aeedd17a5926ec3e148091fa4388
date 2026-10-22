@@ -42,6 +42,31 @@ function toDateString(dateInput = new Date()) {
     return `${y}-${m}-${day}`;
 }
 
+// Sequência de dias com atividade — FONTE ÚNICA de streak do site.
+// Conta para trás os dias que têm qualquer coisa: diário do dia, diário de
+// aula, sessão concluída ou tarefa concluída. Substitui o contador
+// incremental antigo (via lastStudyDate), que se dessincronizava do Diário
+// (sidebar mostrava "1" enquanto a tela de Diário mostrava "2").
+function calcularStreakDados(dados) {
+    if (!dados) return 0;
+    const dias = new Set();
+    const add = (v) => { if (v) { try { dias.add(toDateString(v)); } catch (_) {} } };
+    (dados.dailyLogs || []).forEach(l => add(l?.data));
+    (dados.classDiaries || []).forEach(d => add(d?.data));
+    (dados.sessions || []).forEach(s => { if (s?.concluida) add(s.data); });
+    (dados.tasks || []).forEach(t => { if (t?.concluida) add(t.dataConclusao || t.data); });
+    if (!dias.size) return 0;
+    let streak = 0;
+    const cursor = new Date();
+    // Se hoje ainda não tem registro, começa a contagem de ontem pra trás.
+    if (!dias.has(toDateString(cursor))) cursor.setDate(cursor.getDate() - 1);
+    while (dias.has(toDateString(cursor))) {
+        streak++;
+        cursor.setDate(cursor.getDate() - 1);
+    }
+    return streak;
+}
+
 function diasAte(data) {
     if (!data) return 0;
     const hoje = toDateOnly(new Date());
@@ -78,7 +103,7 @@ function formatarHoraString(horaString) {
 function tempoRestante(data) {
     if (!data) return 'Sem data';
     const agora = new Date();
-    const evento = new Date(data);
+    const evento = parseDateSafe(data);
     const diff = evento - agora;
 
     if (diff < 0) return 'Passado';
@@ -211,10 +236,40 @@ function updateSyncStatus(success) {
     }
 }
 
+// Normaliza nome de matéria pra comparação (minúsculas, sem acento, sem
+// espaços extras) — mesma regra usada em varios módulos pra casar materias
+// com o currículo.
+function slugifyNome(value) {
+    return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+}
+
+// Remove variantes "fantasma" de nomes de matéria (typo, acento ou espaço
+// diferente gerando duas opções no mesmo dropdown). Mantém a PRIMEIRA
+// ocorrência — a ordem da lista original define qual nome vira canônico.
+function dedupeMateriasPorSlug(list) {
+    const vistos = new Set();
+    return (Array.isArray(list) ? list : []).filter(item => {
+        const key = slugifyNome(item?.nome ?? item);
+        if (!key) return true; // opção vazia/seletor "sem matéria" passa reto
+        if (vistos.has(key)) return false;
+        vistos.add(key);
+        return true;
+    });
+}
+
 window.utils = {
     generateId,
+    parseDateSafe,
     toDateOnly,
     toDateString,
+    calcularStreakDados,
+    slugifyNome,
+    dedupeMateriasPorSlug,
     diasAte,
     diasDesde,
     formatarData,
@@ -232,8 +287,12 @@ window.utils = {
 };
 
 window.generateId = generateId;
+window.parseDateSafe = parseDateSafe;
+window.slugifyNome = slugifyNome;
+window.dedupeMateriasPorSlug = dedupeMateriasPorSlug;
 window.toDateOnly = toDateOnly;
 window.toDateString = toDateString;
+window.calcularStreakDados = calcularStreakDados;
 window.diasAte = diasAte;
 window.diasDesde = diasDesde;
 window.formatarData = formatarData;
