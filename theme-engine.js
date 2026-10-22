@@ -476,11 +476,10 @@
 
       </div>
     </div>`;
+
   }
 
-  function getContrastColor(hex) {
-    return isColorDark(hex) ? '#ffffff' : '#0f172a';
-  }
+  // getContrastColor duplicada removida: a definição em ~linha 342 é a canônica.
 
   // ── Bind eventos do painel ────────────────────────────────────────────────
   function bindThemePanel() {

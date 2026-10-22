@@ -18,7 +18,8 @@ module.exports=async function handler(req,res){
   if(req.method!=='POST')return res.status(405).json({error:'Método não permitido.'});
   try{
     const t=token(req);if(!t)return res.status(401).json({error:'Login necessário.'});
-    const decoded=await admin.auth().verifyIdToken(t);
+    db(); // inicializa o app ANTES de admin.auth() — sem isso dá 500 em cold start
+    const decoded=await admin.auth().verifyIdToken(t,true);
     const body=req.body||{};
     const ref=db().collection('users').doc(decoded.uid);
     if(body.action==='cancel'){

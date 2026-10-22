@@ -93,7 +93,7 @@ module.exports = async function handler(req, res) {
       if (!token) return res.status(401).json({ error: 'Login necessário.' });
       let user;
       try {
-        user = await getFirebaseAdmin().auth().verifyIdToken(token);
+        user = await getFirebaseAdmin().auth().verifyIdToken(token, true);
       } catch (_) {
         return res.status(401).json({ error: 'Sessão inválida.' });
       }
