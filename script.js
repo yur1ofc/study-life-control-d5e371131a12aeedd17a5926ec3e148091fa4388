@@ -339,65 +339,10 @@
     updateFocusUI(app);
   }
 
-  function patchFocusTimer() {
-    if (!window.StudyLifeControl || window.StudyLifeControl.prototype.__focusEnhanced) return;
-    const proto = window.StudyLifeControl.prototype;
-    proto.startTimer = function () {
-      const state = ensureFocusState(this);
-      if (!this.timerDuration) this.timerDuration = (state.phase === 'break' ? state.shortBreakMinutes : state.lastFocusMinutes) * 60;
-      if (!this.timerSeconds) this.timerSeconds = this.timerDuration;
-      if (this.timerRunning) return;
-      this.timerRunning = true;
-      clearInterval(this.timerInterval);
-      this.timerInterval = setInterval(async () => {
-        this.timerSeconds = Math.max(0, (this.timerSeconds || 0) - 1);
-        updateFocusUI(this);
-        if (this.timerSeconds <= 0) {
-          clearInterval(this.timerInterval);
-          this.timerRunning = false;
-          state.canAdvance = true;
-          if (state.phase === 'focus') {
-            state.completedFocusBlocks += 1;
-            const duracaoReal = Math.round((this.timerDuration || 0) / 60);
-            const linkedId = this.focusLinkedSessionId;
-            const sessaoVinculada = linkedId ? this.data.sessions.find(s => s.id === linkedId && !s.concluida) : null;
-
-            if (sessaoVinculada) {
-              const ok = await dbService.updateItem('sessions', sessaoVinculada.id, { concluida: true, duracaoReal });
-              if (ok) {
-                sessaoVinculada.concluida = true;
-                sessaoVinculada.duracaoReal = duracaoReal;
-                if (this.updateStreak) this.updateStreak();
-                if (window.reviewSystem?.gerarRevisoesFromSessao) await window.reviewSystem.gerarRevisoesFromSessao(sessaoVinculada);
-              }
-              this.focusLinkedSessionId = null;
-              showToast(`Sessão "${sessaoVinculada.materia}" concluída via Modo Foco!`, 'success');
-            } else {
-              const materia = this.focusMateria || 'Modo Foco';
-              const item = { id: generateId(), materia, tipo: 'foco', duracao: duracaoReal, data: new Date().toISOString(), concluida: true, topico: 'Bloco de foco concluído' };
-              await dbService.addItem('sessions', item);
-              if (window.reviewSystem?.gerarRevisoesFromSessao) await window.reviewSystem.gerarRevisoesFromSessao(item);
-              showToast('Bloco de foco concluído. Hora do descanso.', 'success');
-            }
-          } else {
-            showToast('Descanso concluído. Bora voltar para o foco.', 'info');
-          }
-          updateFocusUI(this);
-          if (this.currentView === 'foco') {
-            const list = el('sessoes-foco-hoje');
-            if (list && this.viewRenderer?.renderSessoesFocoHoje) list.innerHTML = this.viewRenderer.renderSessoesFocoHoje();
-            if (state.phase === 'focus') {
-              this.loadView('foco');
-            }
-          }
-        }
-      }, 1000);
-      updateFocusUI(this);
-    };
-    proto.pauseTimer = function () { clearInterval(this.timerInterval); this.timerRunning = false; updateFocusUI(this); };
-    proto.resetTimer = function () { const state = ensureFocusState(this); clearInterval(this.timerInterval); this.timerRunning = false; this.timerDuration = (state.phase === 'break' ? state.shortBreakMinutes : state.lastFocusMinutes) * 60; this.timerSeconds = this.timerDuration; state.canAdvance = false; updateFocusUI(this); };
-    proto.__focusEnhanced = true;
-  }
+  // patchFocusTimer removido: focus-engine.js substitui startTimer/pauseTimer/
+  // resetTimer/timerComplete na INSTÂNCIA do app (instância vence protótipo),
+  // tornando este patch um código morto. O app.js mantém os métodos originais
+  // como fallback caso o focus-engine não carregue.
 
   function renderTodayHero(view) {
     const snap = view.app.getHojeInteligenteData();
@@ -1454,18 +1399,9 @@
         return result;
       };
 
-      const originalTimerComplete = proto.timerComplete;
-      proto.timerComplete = async function () {
-        const beforeIds = new Set((this.data.sessions || []).map(s => s.id));
-        const result = await originalTimerComplete.call(this);
-        const session = (this.data.sessions || []).find(s => !beforeIds.has(s.id) && (s.concluida || s.status === 'concluida') && String(s.tipo || '').toLowerCase() === 'foco');
-        if (session) {
-          const xp = Math.max(18, Math.round((Number(session.duracao) || 25) * 0.9));
-          await this.awardXP({ ref: `session:${session.id}`, xp, type: 'focus', label: `Sessão foco concluída`, meta: `${session.duracao || 25} min` });
-          setTimeout(() => { this.loadView?.(this.currentView); updateSidebarLevelRing(this); }, 80);
-        }
-        return result;
-      };
+      // Wrapper de timerComplete removido: focus-engine.js substitui
+      // app.timerComplete na instância (instância vence protótipo) e já
+      // dá o XP do tempo estudado com ref `session:${evidenceId}`.
       proto.__xpRuntimePatched = true;
     }
 
@@ -1491,7 +1427,6 @@
     injectStyles();
     patchDbService();
     patchSubmitGuards();
-    patchFocusTimer();
     patchLaunchMethods();
     patchGamificationRuntime();
     patchViewRenderer();
@@ -1517,8 +1452,8 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     window.app = new StudyLifeControl();
-    el('whats-now-btn')?.addEventListener('click', () => window.app?.whatsNow?.());
-    el('daily-log-btn')?.addEventListener('click', () => window.diaryView?.openModal());
+    // daily-log-btn: o handler já existe como onclick inline no index.html
+    // (linha ~537) — aqui ficava uma segunda chamada, executando openModal 2x.
     el('setup-form')?.addEventListener('submit', e => { e.preventDefault(); window.app?.handleSetupSubmit?.(e); });
     el('add-materia')?.addEventListener('click', () => window.app?.addMateriaField?.());
     el('add-aula')?.addEventListener('click', () => window.app?.addAulaField?.());

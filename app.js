@@ -439,7 +439,18 @@ class StudyLifeControl {
             case 'provas': html = this.viewRenderer.renderProvas(); break;
             case 'mapa-aprendizado': html = this.viewRenderer.renderMapaAprendizado(); break;
             case 'materiais': html = this.viewRenderer.renderMateriais(); break;
-            case 'biblioteca': html = window.ResourceLibrary?.renderView?.() || '<div class="card"><p>Biblioteca carregando...</p></div>'; break;
+            case 'biblioteca': {
+                const resultado = window.ResourceLibrary?.renderView?.();
+                if (resultado && typeof resultado.then === 'function') {
+                    // renderView() é assíncrono e preenche o próprio #view-container;
+                    // atribuir a Promise ao innerHTML renderizaria "[object Promise]".
+                    resultado.catch(err => console.error('Erro ao renderizar biblioteca:', err));
+                    window.aiAssistant?.updateContext(this.data);
+                    return;
+                }
+                html = resultado || '<div class="card"><p>Biblioteca carregando...</p></div>';
+                break;
+            }
             case 'calendario': html = this.viewRenderer.renderCalendario(); break;
             case 'previsao-notas': html = this.viewRenderer.renderPrevisaoNotas(); break;
             case 'habitos': html = this.viewRenderer.renderHabitos(); break;

@@ -114,14 +114,25 @@
   }
 
   function setupGlobalErrorHandling() {
+    // Throttle: evita uma rajada de toasts vermelhos quando vários erros
+    // acontecem juntos (ex.: rede caindo dispara vários promises rejeitados).
+    // O console.error continua sendo emitido SEMPRE — só o toast é limitado.
+    let lastErrorToastAt = 0;
+    const showErrorToast = (msg) => {
+      const now = Date.now();
+      if (now - lastErrorToastAt < 3000) return;
+      lastErrorToastAt = now;
+      window.showToast?.(msg, 'error');
+    };
+
     window.addEventListener('error', (event) => {
       console.error('Erro global capturado:', event.error || event.message);
-      window.showToast?.('Ocorreu um erro inesperado. Tente atualizar a página.', 'error');
+      showErrorToast('Ocorreu um erro inesperado. Tente atualizar a página.');
     });
 
     window.addEventListener('unhandledrejection', (event) => {
       console.error('Promise rejeitada sem tratamento:', event.reason);
-      window.showToast?.('Falha ao processar uma ação. Revise sua conexão e tente de novo.', 'error');
+      showErrorToast('Falha ao processar uma ação. Revise sua conexão e tente de novo.');
     });
   }
 
