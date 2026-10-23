@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Média com Pesos — Média Ponderada Grátis | SLCampus</title>
+    <meta name="description" content="Calcule sua média com pesos em segundos: média ponderada, soma dos pesos e quanto você precisa nas próximas provas. Grátis e sem cadastro.">
+    <meta name="theme-color" content="#0a0f1f">
+    <link rel="canonical" href="https://slcampus.vercel.app/ferramentas/calculadora-de-media">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SLCampus">
+    <meta property="og:locale" content="pt_BR">
+    <meta property="og:title" content="Calculadora de Média com Pesos">
+    <meta property="og:description" content="Média ponderada, soma dos pesos e quanto falta pra passar — grátis e sem cadastro.">
+    <meta property="og:url" content="https://slcampus.vercel.app/ferramentas/calculadora-de-media">
+    <meta property="og:image" content="https://slcampus.vercel.app/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Calculadora de Média com Pesos">
+    <meta name="twitter:description" content="Média ponderada, soma dos pesos e quanto falta pra passar.">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon-180.png">
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all';this.onload=null">
+    <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all';this.onload=null">
+    <noscript>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    </noscript>
+    <link rel="stylesheet" href="./ferramentas.css">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Calculadora de Média com Pesos",
+      "url": "https://slcampus.vercel.app/ferramentas/calculadora-de-media",
+      "applicationCategory": "EducationalApplication",
+      "operatingSystem": "Web",
+      "inLanguage": "pt-BR",
+      "description": "Calculadora de média ponderada com pesos: descubra a média final, a soma dos pesos e quanto precisa tirar nas próximas avaliações para passar.",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "BRL" }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Início", "item": "https://slcampus.vercel.app/" },
+        { "@type": "ListItem", "position": 2, "name": "Ferramentas", "item": "https://slcampus.vercel.app/ferramentas/" },
+        { "@type": "ListItem", "position": 3, "name": "Calculadora de Média com Pesos" }
+      ]
+    }
+    </script>
+</head>
+<body>
+    <header class="tool-nav">
+        <a class="tool-brand" href="/">
+            <img src="/logo.png" alt="SLCampus — voltar ao início">
+            <span>SLC<em>ampus</em></span>
+        </a>
+        <a class="tool-nav-cta" href="/">Abrir o SLCampus <i class="fas fa-arrow-right"></i></a>
+    </header>
+
+    <main class="tool-main">
+        <nav class="breadcrumb" aria-label="Trilha de navegação">
+            <a href="/">Início</a><span>/</span>Ferramentas<span>/</span>Calculadora de Média
+        </nav>
+
+        <h1>Calculadora de <em>Média com Pesos</em></h1>
+        <p class="tool-lead">Coloque suas notas e os pesos de cada avaliação e veja na hora a média final, quanto dos pesos já foi usado e o que falta pra passar. Grátis, sem cadastro e sem enrolação.</p>
+
+        <section class="tool-card" aria-labelledby="calc-title">
+            <h2 id="calc-title"><i class="fas fa-calculator"></i> Monte sua média</h2>
+
+            <div class="grade-rows" id="grade-rows"></div>
+
+            <div class="btn-row">
+                <button type="button" class="btn-ghost" id="add-row"><i class="fas fa-plus"></i> Adicionar avaliação</button>
+            </div>
+
+            <div class="tool-grid tool-grid-2" style="margin-top:16px">
+                <div class="field">
+                    <label for="min-pass">Média mínima pra passar</label>
+                    <select class="input" id="min-pass">
+                        <option value="5">5,0 (padrão da maioria)</option>
+                        <option value="6">6,0</option>
+                        <option value="7">7,0</option>
+                        <option value="8">8,0</option>
+                        <option value="10">10,0 (não reprovar)</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="next-weight">Peso das avaliações que faltam (%)</label>
+                    <input class="input" id="next-weight" type="number" min="0" max="100" step="0.5" placeholder="ex.: 40" inputmode="decimal">
+                    <span class="hint">Opcional — mostra quanto você precisa nas próximas.</span>
+                </div>
+            </div>
+
+            <div class="tool-result" id="result" role="status" aria-live="polite">
+                <div class="result-label">Média final</div>
+                <div class="result-value" id="result-value">—</div>
+                <div class="result-note" id="result-note">Preencha as notas acima para ver o resultado.</div>
+                <div class="badge-line" id="result-badges"></div>
+            </div>
+        </section>
+
+        <section class="tool-content">
+            <h2>Como calcular a média com pesos</h2>
+            <p>A <strong>média ponderada</strong> não trata todas as avaliações igual: cada nota entra multiplicada pelo seu peso, e o resultado é dividido pela soma dos pesos. É assim que faculdades, concursos e a maioria das escolas calculam a média final.</p>
+
+            <div class="formula">
+                Média = (nota₁ × peso₁ + nota₂ × peso₂ + …) ÷ (peso₁ + peso₂ + …)
+                <span class="muted">Se os pesos somam 100, a divisão é direta por 100.</span>
+            </div>
+
+            <p><strong>Exemplo prático:</strong> você tirou 8,0 na prova que vale 40% da média e 6,0 no trabalho que vale 60%. Então: (8,0 × 40 + 6,0 × 60) ÷ 100 = <strong>6,8</strong>.</p>
+
+            <h2>Peso é porcentagem da média final</h2>
+            <p>O <strong>peso</strong> é a participação de cada avaliação na média final — não é a nota multiplicada "à toa". Por isso, os pesos somam até 100% do total: se a prova 1 vale 40 e a prova 2 vale 60, juntas já fecham a média. Se ainda sobra peso disponível, é porque ainda faltam avaliações — e é exatamente aí que esta calculadora mostra <strong>quanto você ainda pode tirar</strong>.</p>
+
+            <h2>Quanto preciso nas próximas provas?</h2>
+            <p>Preencha o campo "peso das avaliações que faltam" e a calculadora mostra a nota média necessária nas avaliações restantes para atingir a mínima escolhida:</p>
+            <ul>
+                <li>Se a conta der <strong>até 10,0</strong>, é possível — siga estudando por aí;</li>
+                <li>Se der <strong>mais que 10,0</strong>, a média já não dá mais (a conta está no vermelho);</li>
+                <li>Se der <strong>menos que zero</strong>, você já <strong>garantiu a aprovação</strong> mesmo sem as próximas avaliações.</li>
+            </ul>
+
+            <h2>Dicas pra não errar na hora de lançar as notas</h2>
+            <ol>
+                <li>Confira a unidade do peso: em alguns boletins o peso entra como <strong>valor</strong> (1, 2, 3) e em outros como <strong>%</strong> — aqui tanto faz, a conta normaliza pela soma.</li>
+                <li>Não some notas de semestres diferentes na mesma média.</li>
+                <li>Use a <strong>média mínima</strong> que vale no seu curso (5,0, 6,0 ou 7,0) para a projeção ficar confiável.</li>
+            </ol>
+        </section>
+
+        <section class="tool-cta">
+            <div>
+                <h2><i class="fas fa-graduation-cap"></i> Guarde essas notas no SLCampus</h2>
+                <p>Cadastre a estrutura de notas da matéria e o app calcula a média, avisa quanto falta e acompanha provas, tarefas e revisões do semestre inteiro.</p>
+            </div>
+            <a class="btn-primary" href="/">Começar grátis <i class="fas fa-arrow-right"></i></a>
+        </section>
+
+        <section class="tool-related">
+            <h2>Outras ferramentas de estudo</h2>
+            <div class="tool-related-grid">
+                <a href="/ferramentas/quanto-preciso-na-prova">
+                    <strong>Quanto preciso na prova <i class="fas fa-arrow-right"></i></strong>
+                    <small>Simulador: quanto tirar na última avaliação pra fechar a média.</small>
+                </a>
+                <a href="/ferramentas/calculadora-de-frequencia">
+                    <strong>Calculadora de frequência <i class="fas fa-arrow-right"></i></strong>
+                    <small>Veja seu percentual de presença e quantas faltas ainda pode ter.</small>
+                </a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="tool-footer">
+        <a href="/">SLCampus</a><span class="sep">·</span>
+        <a href="/ferramentas/quanto-preciso-na-prova">Quanto preciso na prova</a><span class="sep">·</span>
+        <a href="/ferramentas/calculadora-de-frequencia">Frequência</a><span class="sep">·</span>
+        Organize seus estudos de verdade no <a href="/">SLCampus</a>
+    </footer>
+
+    <script>
+    (function () {
+        var rowsHost = document.getElementById('grade-rows');
+        var addBtn = document.getElementById('add-row');
+        var minPass = document.getElementById('min-pass');
+        var nextWeight = document.getElementById('next-weight');
+        var resultBox = document.getElementById('result');
+        var resultValue = document.getElementById('result-value');
+        var resultNote = document.getElementById('result-note');
+        var resultBadges = document.getElementById('result-badges');
+        var seq = 0;
+
+        function num(v) {
+            if (v === '' || v == null) return null;
+            var n = parseFloat(String(v).replace(',', '.'));
+            return isNaN(n) ? null : n;
+        }
+
+        function fmt(n) { return n.toFixed(2).replace('.', ','); }
+
+        function addRow(nota, peso) {
+            seq++;
+            var row = document.createElement('div');
+            row.className = 'grade-row';
+            row.innerHTML =
+                '<input class="input mini-label" type="text" placeholder="Avaliação ' + seq + '" aria-label="Nome da avaliação">' +
+                '<input class="input nota" type="number" step="0.1" min="0" max="10" placeholder="Nota" inputmode="decimal" aria-label="Nota de 0 a 10">' +
+                '<input class="input peso" type="number" step="0.5" min="0" max="100" placeholder="Peso %" inputmode="decimal" aria-label="Peso da avaliação em porcentagem">' +
+                '<button type="button" class="icon-btn" title="Remover" aria-label="Remover avaliação"><i class="fas fa-times"></i></button>';
+            var notaInput = row.querySelector('.nota');
+            if (nota != null) notaInput.value = nota;
+            row.querySelector('.peso').addEventListener('input', calc);
+            notaInput.addEventListener('input', calc);
+            row.querySelector('.icon-btn').addEventListener('click', function () {
+                row.remove();
+                calc();
+            });
+            rowsHost.appendChild(row);
+            return row;
+        }
+
+        function ensureRows() {
+            if (!rowsHost.children.length) {
+                addRow();
+                addRow();
+            }
+        }
+
+        function calc() {
+            var rows = Array.prototype.slice.call(rowsHost.querySelectorAll('.grade-row'));
+            var items = [];
+            var allHavePeso = rows.length > 0;
+            var algumPeso = false;
+            rows.forEach(function (r) {
+                var inputs = r.querySelectorAll('input');
+                var nota = num(inputs[1].value);
+                var peso = inputs[2] ? num(inputs[2].value) : null;
+                if (nota == null) return;
+                if (peso != null && peso > 0) { algumPeso = true; } else { allHavePeso = false; }
+                items.push({ nota: Math.max(0, Math.min(10, nota)), peso: peso });
+            });
+
+            if (!items.length) {
+                resultBox.classList.remove('has-result');
+                resultValue.textContent = '—';
+                resultValue.className = 'result-value';
+                resultNote.textContent = 'Preencha as notas acima para ver o resultado.';
+                resultBadges.innerHTML = '';
+                return;
+            }
+
+            resultBox.classList.add('has-result');
+            var meta = parseFloat(minPass.value);
+            var somaNotaPeso = 0, somaPeso = 0, media;
+            items.forEach(function (it) { somaNotaPeso += it.nota * it.peso; somaPeso += it.peso; });
+
+            if (allHavePeso && somaPeso > 0) {
+                media = somaNotaPeso / somaPeso;
+            } else {
+                media = items.reduce(function (s, it) { return s + it.nota; }, 0) / items.length;
+                somaPeso = 0;
+            }
+
+            resultValue.textContent = fmt(media);
+            var aprovado = media >= meta;
+            resultValue.className = 'result-value ' + (aprovado ? 'ok' : 'bad');
+
+            var badges = [];
+            if (!allHavePeso && algumPeso) {
+                badges.push('<span class="tbadge warn">Peso em falta — média simples</span>');
+            }
+            badges.push('<span class="tbadge">' + items.length + ' avaliação' + (items.length > 1 ? 'es' : '') + '</span>');
+            if (somaPeso > 0) {
+                var usados = Math.round(somaPeso * 100) / 100;
+                badges.push('<span class="tbadge">' + (usados % 1 ? fmt(usados) : String(usados).replace('.', ',')) + '% dos pesos usados</span>');
+            }
+            badges.push(aprovado
+                ? '<span class="tbadge ok">Aprovado (>= ' + String(meta).replace('.', ',') + ')</span>'
+                : '<span class="tbadge bad">Abaixo de ' + String(meta).replace('.', ',') + '</span>');
+
+            var note = (allHavePeso && somaPeso > 0)
+                ? 'Média ponderada: cada nota entrou multiplicada pelo seu peso.'
+                : 'Média simples (todas as notas com o mesmo peso). Informe o peso de todas as linhas pra usar a ponderada.';
+            var restante = num(nextWeight.value);
+            if (restante != null && restante > 0 && restante <= 100) {
+                // somaNotaPeso está em escala dos pesos informados; normaliza p/ base 100
+                var base = somaPeso > 0 ? somaPeso : 100;
+                var ganho = somaNotaPeso; // Σ(nota×peso)
+                var faltaPeso = (base === 100 ? restante : restante); // % da média final
+                if (base !== 100) {
+                    // converte o ganho para escala 100 quando pesos não somam 100
+                    ganho = somaNotaPeso * (100 / base);
+                }
+                var precisa = ((meta * 100) - ganho) / faltaPeso;
+                if (precisa <= 0) {
+                    note = 'Com as notas atuais você <strong>já garantiu ' + String(meta).replace('.', ',') + '</strong> — mesmo sem as próximas avaliações.';
+                    badges.push('<span class="tbadge ok">Meta garantida</span>');
+                } else if (precisa > 10) {
+                    note = 'Para chegar a ' + String(meta).replace('.', ',') + ' seria preciso média <strong>' + fmt(precisa) + '</strong> nas avaliações que valem ' + String(restante).replace('.', ',') + '% — acima de 10,0, ou seja, <strong>não dá mais</strong>.';
+                    badges.push('<span class="tbadge bad">Meta fora de alcance</span>');
+                } else {
+                    note = 'Para fechar o semestre com ' + String(meta).replace('.', ',') + ', você precisa de média <strong>' + fmt(precisa) + '</strong> nas avaliações que valem ' + String(restante).replace('.', ',') + '% dos pesos.';
+                    badges.push('<span class="tbadge warn">Precisa de ' + fmt(precisa) + ' nas próximas</span>');
+                }
+            }
+            resultNote.innerHTML = note;
+            resultBadges.innerHTML = badges.join('');
+        }
+
+        addBtn.addEventListener('click', function () { addRow(); calc(); });
+        minPass.addEventListener('change', calc);
+        nextWeight.addEventListener('input', calc);
+
+        ensureRows();
+        calc();
+    })();
+    </script>
+</body>
+</html>

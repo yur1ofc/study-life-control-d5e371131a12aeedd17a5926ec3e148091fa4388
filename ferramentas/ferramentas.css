@@ -1,0 +1,326 @@
+/* SLCampus — Ferramentas grátis de estudo (páginas standalone de SEO)
+   Visual coerente com o app: dark, cards, gradiente azul→roxo. */
+
+:root {
+  --t-bg: #0a0f1f;
+  --t-bg-2: #0d1428;
+  --t-card: #111a33;
+  --t-card-2: #0f1730;
+  --t-border: rgba(148, 163, 184, .16);
+  --t-text: #e6ecf7;
+  --t-muted: #9aa8c4;
+  --t-accent: #3b82f6;
+  --t-accent-2: #8b5cf6;
+  --t-ok: #34d399;
+  --t-warn: #fbbf24;
+  --t-bad: #f87171;
+  --t-radius: 16px;
+  --t-font: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: var(--t-font);
+  background:
+    radial-gradient(1100px 520px at 12% -8%, rgba(59, 130, 246, .16), transparent 60%),
+    radial-gradient(900px 460px at 88% 4%, rgba(139, 92, 246, .14), transparent 60%),
+    var(--t-bg);
+  color: var(--t-text);
+  line-height: 1.6;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+a { color: var(--t-accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Topo ─────────────────────────────────────────────────────────── */
+.tool-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
+}
+.tool-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--t-text);
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: -.02em;
+}
+.tool-brand:hover { text-decoration: none; }
+.tool-brand img { height: 30px; width: auto; display: block; }
+.tool-brand span em { font-style: normal; color: var(--t-accent); }
+.tool-nav-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, var(--t-accent), var(--t-accent-2));
+  color: #fff;
+  font-weight: 700;
+  font-size: .9rem;
+  padding: 10px 18px;
+  border-radius: 999px;
+  box-shadow: 0 10px 26px rgba(59, 130, 246, .28);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+.tool-nav-cta:hover { transform: translateY(-2px); text-decoration: none; box-shadow: 0 14px 30px rgba(59, 130, 246, .36); }
+
+/* ── Conteúdo ─────────────────────────────────────────────────────── */
+.tool-main {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 8px 20px 56px;
+  flex: 1;
+}
+
+.breadcrumb {
+  font-size: .82rem;
+  color: var(--t-muted);
+  margin: 6px 0 18px;
+}
+.breadcrumb a { color: var(--t-muted); }
+.breadcrumb a:hover { color: var(--t-accent); }
+.breadcrumb span { margin: 0 6px; opacity: .55; }
+
+.tool-main h1 {
+  font-size: clamp(1.7rem, 4.5vw, 2.5rem);
+  line-height: 1.15;
+  letter-spacing: -.03em;
+  margin-bottom: 12px;
+}
+.tool-main h1 em {
+  font-style: normal;
+  background: linear-gradient(120deg, var(--t-accent), var(--t-accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.tool-lead {
+  color: var(--t-muted);
+  font-size: 1.03rem;
+  max-width: 640px;
+  margin-bottom: 26px;
+}
+
+/* ── Card da calculadora ──────────────────────────────────────────── */
+.tool-card {
+  background: linear-gradient(180deg, var(--t-card), var(--t-card-2));
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius);
+  padding: 22px;
+  box-shadow: 0 18px 46px rgba(2, 8, 23, .42);
+}
+.tool-card h2 { font-size: 1.05rem; margin-bottom: 14px; letter-spacing: -.01em; }
+
+.tool-grid { display: grid; gap: 14px; }
+.tool-grid-2 { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: .84rem; font-weight: 700; color: var(--t-muted); }
+.field .hint { font-size: .76rem; color: var(--t-muted); opacity: .8; }
+
+.input {
+  width: 100%;
+  background: rgba(2, 8, 23, .55);
+  border: 1px solid var(--t-border);
+  border-radius: 11px;
+  color: var(--t-text);
+  font: inherit;
+  font-weight: 600;
+  font-size: 1.02rem;
+  padding: 11px 13px;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.input:focus {
+  outline: none;
+  border-color: var(--t-accent);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, .22);
+}
+.input::placeholder { color: rgba(154, 168, 196, .55); font-weight: 500; }
+
+/* linhas da calculadora de média */
+.grade-rows { display: flex; flex-direction: column; gap: 10px; }
+.grade-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(74px, 110px) minmax(74px, 110px) 34px;
+  gap: 10px;
+  align-items: center;
+}
+.grade-row input.mini-label {
+  font-size: .86rem;
+  font-weight: 600;
+  padding: 10px 12px;
+}
+.icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--t-border);
+  background: rgba(148, 163, 184, .08);
+  color: var(--t-muted);
+  font-size: .95rem;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.icon-btn:hover { background: rgba(248, 113, 113, .16); color: var(--t-bad); }
+
+.btn-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.btn-ghost {
+  background: rgba(59, 130, 246, .12);
+  border: 1px solid rgba(59, 130, 246, .4);
+  color: #bcd6ff;
+  font: inherit;
+  font-weight: 700;
+  font-size: .88rem;
+  padding: 9px 16px;
+  border-radius: 11px;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+.btn-ghost:hover { background: rgba(59, 130, 246, .22); }
+
+/* ── Resultado ────────────────────────────────────────────────────── */
+.tool-result {
+  margin-top: 18px;
+  padding: 18px;
+  border-radius: 13px;
+  background: rgba(2, 8, 23, .5);
+  border: 1px dashed rgba(148, 163, 184, .3);
+  text-align: center;
+}
+.tool-result.has-result { border-style: solid; border-color: rgba(59, 130, 246, .45); }
+.result-label { font-size: .82rem; font-weight: 700; color: var(--t-muted); text-transform: uppercase; letter-spacing: .06em; }
+.result-value {
+  font-size: clamp(2rem, 6vw, 2.9rem);
+  font-weight: 800;
+  letter-spacing: -.03em;
+  line-height: 1.1;
+  margin: 6px 0 4px;
+}
+.result-value.ok { color: var(--t-ok); }
+.result-value.warn { color: var(--t-warn); }
+.result-value.bad { color: var(--t-bad); }
+.result-note { font-size: .92rem; color: var(--t-muted); }
+.result-note strong { color: var(--t-text); }
+
+.badge-line { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 10px; }
+.tbadge {
+  font-size: .76rem;
+  font-weight: 700;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, .14);
+  color: var(--t-muted);
+}
+.tbadge.ok { background: rgba(52, 211, 153, .15); color: var(--t-ok); }
+.tbadge.warn { background: rgba(251, 191, 36, .15); color: var(--t-warn); }
+.tbadge.bad { background: rgba(248, 113, 113, .15); color: var(--t-bad); }
+
+/* ── Texto SEO ────────────────────────────────────────────────────── */
+.tool-content { margin-top: 34px; }
+.tool-content h2 {
+  font-size: 1.25rem;
+  letter-spacing: -.02em;
+  margin: 26px 0 10px;
+}
+.tool-content p { color: var(--t-muted); margin-bottom: 12px; max-width: 720px; }
+.tool-content ol, .tool-content ul { color: var(--t-muted); margin: 0 0 14px 20px; max-width: 720px; }
+.tool-content li { margin-bottom: 7px; }
+.tool-content strong, .tool-content b { color: var(--t-text); }
+
+.formula {
+  background: rgba(2, 8, 23, .55);
+  border: 1px solid var(--t-border);
+  border-left: 3px solid var(--t-accent);
+  border-radius: 11px;
+  padding: 13px 16px;
+  font-weight: 700;
+  color: var(--t-text);
+  margin: 12px 0 16px;
+  overflow-x: auto;
+}
+.formula .muted { display: block; font-weight: 500; font-size: .85rem; color: var(--t-muted); margin-top: 4px; }
+
+/* ── CTA do app ───────────────────────────────────────────────────── */
+.tool-cta {
+  margin-top: 34px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, .18), rgba(139, 92, 246, .18));
+  border: 1px solid rgba(99, 132, 255, .35);
+  border-radius: var(--t-radius);
+  padding: 22px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.tool-cta h2 { font-size: 1.15rem; letter-spacing: -.02em; margin-bottom: 4px; }
+.tool-cta p { color: var(--t-muted); font-size: .93rem; max-width: 520px; }
+.tool-cta .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, var(--t-accent), var(--t-accent-2));
+  color: #fff;
+  font-weight: 800;
+  font-size: .95rem;
+  padding: 13px 24px;
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(59, 130, 246, .3);
+  transition: transform .18s ease;
+  white-space: nowrap;
+}
+.tool-cta .btn-primary:hover { transform: translateY(-2px); text-decoration: none; }
+
+/* ── Ferramentas relacionadas ─────────────────────────────────────── */
+.tool-related { margin-top: 34px; }
+.tool-related h2 { font-size: 1.05rem; margin-bottom: 12px; letter-spacing: -.01em; }
+.tool-related-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+.tool-related-grid a {
+  display: block;
+  background: var(--t-card);
+  border: 1px solid var(--t-border);
+  border-radius: 13px;
+  padding: 15px;
+  color: var(--t-text);
+  transition: transform .18s ease, border-color .18s ease;
+}
+.tool-related-grid a:hover {
+  transform: translateY(-3px);
+  border-color: rgba(59, 130, 246, .5);
+  text-decoration: none;
+}
+.tool-related-grid strong { display: block; font-size: .95rem; margin-bottom: 3px; }
+.tool-related-grid small { color: var(--t-muted); font-size: .82rem; line-height: 1.45; display: block; }
+
+/* ── Rodapé ───────────────────────────────────────────────────────── */
+.tool-footer {
+  border-top: 1px solid var(--t-border);
+  padding: 20px;
+  text-align: center;
+  color: var(--t-muted);
+  font-size: .82rem;
+}
+.tool-footer a { color: var(--t-muted); }
+.tool-footer a:hover { color: var(--t-accent); }
+.tool-footer .sep { margin: 0 8px; opacity: .5; }
+
+@media (max-width: 560px) {
+  .tool-nav { padding: 14px 16px; }
+  .tool-main { padding: 4px 16px 44px; }
+  .tool-card { padding: 17px; }
+  .grade-row { grid-template-columns: minmax(0, 1fr) minmax(64px, 88px) minmax(64px, 88px) 34px; }
+  .tool-cta { flex-direction: column; align-items: flex-start; }
+}

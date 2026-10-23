@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Frequência — Presença e Faltas Grátis | SLCampus</title>
+    <meta name="description" content="Calcule seu percentual de frequência com as faltas que já deu e veja quantas aulas ainda pode faltar sem ser reprovado por frequência.">
+    <meta name="theme-color" content="#0a0f1f">
+    <link rel="canonical" href="https://slcampus.vercel.app/ferramentas/calculadora-de-frequencia">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SLCampus">
+    <meta property="og:locale" content="pt_BR">
+    <meta property="og:title" content="Calculadora de Frequência">
+    <meta property="og:description" content="Percentual de presença e quantas faltas ainda pode dar — grátis, na hora.">
+    <meta property="og:url" content="https://slcampus.vercel.app/ferramentas/calculadora-de-frequencia">
+    <meta property="og:image" content="https://slcampus.vercel.app/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Calculadora de Frequência">
+    <meta name="twitter:description" content="Percentual de presença e quantas faltas ainda pode dar.">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon-180.png">
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all';this.onload=null">
+    <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all';this.onload=null">
+    <noscript>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    </noscript>
+    <link rel="stylesheet" href="./ferramentas.css">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Calculadora de Frequência",
+      "url": "https://slcampus.vercel.app/ferramentas/calculadora-de-frequencia",
+      "applicationCategory": "EducationalApplication",
+      "operatingSystem": "Web",
+      "inLanguage": "pt-BR",
+      "description": "Calcula o percentual de presença a partir do total de aulas e das faltas, e indica quantas aulas ainda é possível faltar dentro do mínimo exigido.",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "BRL" }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Início", "item": "https://slcampus.vercel.app/" },
+        { "@type": "ListItem", "position": 2, "name": "Ferramentas", "item": "https://slcampus.vercel.app/ferramentas/" },
+        { "@type": "ListItem", "position": 3, "name": "Calculadora de Frequência" }
+      ]
+    }
+    </script>
+</head>
+<body>
+    <header class="tool-nav">
+        <a class="tool-brand" href="/">
+            <img src="/logo.png" alt="SLCampus — voltar ao início">
+            <span>SLC<em>ampus</em></span>
+        </a>
+        <a class="tool-nav-cta" href="/">Abrir o SLCampus <i class="fas fa-arrow-right"></i></a>
+    </header>
+
+    <main class="tool-main">
+        <nav class="breadcrumb" aria-label="Trilha de navegação">
+            <a href="/">Início</a><span>/</span>Ferramentas<span>/</span>Calculadora de Frequência
+        </nav>
+
+        <h1>Calculadora de <em>frequência</em></h1>
+        <p class="tool-lead">Descubra seu percentual de presença e quantas aulas você ainda pode faltar sem ser reprovado por frequência. Funciona com aulas, horas-aula ou dias letivos.</p>
+
+        <section class="tool-card" aria-labelledby="freq-title">
+            <h2 id="freq-title"><i class="fas fa-calendar-check"></i> Suas aulas e faltas</h2>
+
+            <div class="tool-grid tool-grid-2">
+                <div class="field">
+                    <label for="total-aulas">Total de aulas já dadas</label>
+                    <input class="input" id="total-aulas" type="number" min="1" step="1" placeholder="ex.: 40" inputmode="numeric">
+                    <span class="hint">Aulas, horas-aula ou dias letivos — a unidade é com você.</span>
+                </div>
+                <div class="field">
+                    <label for="faltas">Faltas que você já deu</label>
+                    <input class="input" id="faltas" type="number" min="0" step="1" placeholder="ex.: 6" inputmode="numeric">
+                </div>
+                <div class="field">
+                    <label for="min-freq">Frequência mínima exigida (%)</label>
+                    <select class="input" id="min-freq">
+                        <option value="75" selected>75% (padrão da maioria)</option>
+                        <option value="70">70%</option>
+                        <option value="80">80%</option>
+                        <option value="85">85%</option>
+                        <option value="60">60%</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="tool-result" id="result" role="status" aria-live="polite">
+                <div class="result-label">Sua frequência</div>
+                <div class="result-value" id="result-value">—</div>
+                <div class="result-note" id="result-note">Preencha os campos acima para ver seu percentual.</div>
+                <div class="badge-line" id="result-badges"></div>
+            </div>
+        </section>
+
+        <section class="tool-content">
+            <h2>Como calcular a frequência</h2>
+            <p>A frequência é a proporção de aulas em que você esteve presente em relação ao total de aulas dadas até agora:</p>
+
+            <div class="formula">
+                Frequência (%) = (Aulas presentes ÷ Total de aulas) × 100
+                <span class="muted">Aulas presentes = total de aulas − faltas.</span>
+            </div>
+
+            <p><strong>Exemplo:</strong> 40 aulas dadas e 6 faltas: você esteve em 34 aulas. (34 ÷ 40) × 100 = <strong>85%</strong> de frequência.</p>
+
+            <h2>Quantas faltas posso ainda dar?</h2>
+            <p>Com o mínimo exigido (75% na maioria das instituições), existe um teto de faltas: acima dele, o aluno é reprovado por frequência, mesmo com nota suficiente. Esta calculadora mostra <strong>quantas aulas ainda cabem</strong> dentro do mínimo — e, se você já passou do limite, quanto falta pra recuperar a frequência assistindo às aulas.</p>
+            <ul>
+                <li><strong>Dentro do limite:</strong> aparece quantas faltas ainda são possíveis;</li>
+                <li><strong>No limite:</strong> faltas zeradas — qualquer falta nova derruba;</li>
+                <li><strong>Acima do limite:</strong> mostra quantas aulas seguidas você precisa assistir pra voltar ao mínimo.</li>
+            </ul>
+
+            <h2>Regras de frequência que valem conferir</h2>
+            <ol>
+                <li>Confirme o mínimo da sua instituição: <strong>75%</strong> é o comum, mas cursos e concursos variam (às vezes por bimestre, não só no fim);</li>
+                <li>Faltas justificadas costumam ser abonadas — desconte-as do total de faltas;</li>
+                <li>Em aulas práticas e laboratório, a frequência costuma ser cobrada por dia letivo inteiro;</li>
+                <li>Atenção ao corte por unidade/bimestre: uma folga no ano inteiro não salva um bimestre abaixo do mínimo.</li>
+            </ol>
+        </section>
+
+        <section class="tool-cta">
+            <div>
+                <h2><i class="fas fa-bell"></i> Nunca mais se perca de aula sem querer</h2>
+                <p>No SLCampus você registra as aulas do dia, acompanha provas e tarefas e vê a rotina do semestre inteiro num lugar só.</p>
+            </div>
+            <a class="btn-primary" href="/">Começar grátis <i class="fas fa-arrow-right"></i></a>
+        </section>
+
+        <section class="tool-related">
+            <h2>Outras ferramentas de estudo</h2>
+            <div class="tool-related-grid">
+                <a href="/ferramentas/calculadora-de-media">
+                    <strong>Calculadora de média com pesos <i class="fas fa-arrow-right"></i></strong>
+                    <small>Média ponderada completa, com soma dos pesos e complemento.</small>
+                </a>
+                <a href="/ferramentas/quanto-preciso-na-prova">
+                    <strong>Quanto preciso na prova <i class="fas fa-arrow-right"></i></strong>
+                    <small>Simulador: quanto tirar na última avaliação pra fechar a média.</small>
+                </a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="tool-footer">
+        <a href="/">SLCampus</a><span class="sep">·</span>
+        <a href="/ferramentas/calculadora-de-media">Calculadora de média</a><span class="sep">·</span>
+        <a href="/ferramentas/quanto-preciso-na-prova">Quanto preciso na prova</a><span class="sep">·</span>
+        Organize seus estudos de verdade no <a href="/">SLCampus</a>
+    </footer>
+
+    <script>
+    (function () {
+        var totalEl = document.getElementById('total-aulas');
+        var faltasEl = document.getElementById('faltas');
+        var minEl = document.getElementById('min-freq');
+        var resultBox = document.getElementById('result');
+        var resultValue = document.getElementById('result-value');
+        var resultNote = document.getElementById('result-note');
+        var resultBadges = document.getElementById('result-badges');
+
+        function int(v) {
+            var n = parseInt(v, 10);
+            return isNaN(n) || n < 0 ? null : n;
+        }
+
+        function calc() {
+            var total = int(totalEl.value);
+            var faltas = int(faltasEl.value);
+            var min = parseFloat(minEl.value);
+
+            if (total == null || total < 1 || faltas == null || faltas > total) {
+                resultBox.classList.remove('has-result');
+                resultValue.textContent = '—';
+                resultValue.className = 'result-value';
+                resultNote.textContent = 'Preencha os campos acima para ver seu percentual. (As faltas não podem passar do total de aulas.)';
+                resultBadges.innerHTML = '';
+                return;
+            }
+
+            var presentes = total - faltas;
+            var pct = (presentes / total) * 100;
+            var minAulas = Math.ceil(total * (min / 100)); // aulas mínimas p/ estar dentro
+            var podeFaltar = presentes - minAulas;         // faltas ainda possíveis
+            var faltasMax = total - minAulas;              // teto de faltas no total
+
+            resultBox.classList.add('has-result');
+            var pctTxt = (Math.round(pct * 10) / 10).toString().replace('.', ',') + '%';
+            resultValue.textContent = pctTxt;
+
+            var badges = [];
+            var note;
+            var dentro = pct >= min;
+
+            resultValue.className = 'result-value ' + (dentro ? (pct - min < 3 ? 'warn' : 'ok') : 'bad');
+            badges.push('<span class="tbadge">' + presentes + ' de ' + total + ' aulas</span>');
+            badges.push(dentro
+                ? '<span class="tbadge ok">Dentro do mínimo (' + min + '%)</span>'
+                : '<span class="tbadge bad">Abaixo de ' + min + '%</span>');
+
+            if (podeFaltar > 0) {
+                note = 'Você ainda pode faltar <strong>' + podeFaltar + ' aula' + (podeFaltar > 1 ? 's' : '') + '</strong> e continuar acima de ' + min + '%. O teto é ' + faltasMax + ' falta' + (faltasMax > 1 ? 's' : '') + ' no total.';
+                badges.push('<span class="tbadge">' + podeFaltar + ' falta' + (podeFaltar > 1 ? 's' : '') + ' em aberto</span>');
+            } else if (podeFaltar === 0) {
+                note = 'Você está exatamente <strong>no limite</strong>: qualquer falta nova já deixa a frequência abaixo de ' + min + '%.';
+                badges.push('<span class="tbadge warn">No limite — sem folga</span>');
+            } else {
+                var precisaAssistir = Math.abs(podeFaltar);
+                note = 'Frequência abaixo do mínimo. Para voltar a ' + min + '%, você precisa assistir <strong>' + precisaAssistir + ' aula' + (precisaAssistir > 1 ? 's' : '') + '</strong> seguidas sem faltar.';
+                badges.push('<span class="tbadge bad">Precisa recuperar ' + precisaAssistir + ' aula' + (precisaAssistir > 1 ? 's' : '') + '</span>');
+            }
+
+            resultNote.innerHTML = note;
+            resultBadges.innerHTML = badges.join('');
+        }
+
+        totalEl.addEventListener('input', calc);
+        faltasEl.addEventListener('input', calc);
+        minEl.addEventListener('change', calc);
+        calc();
+    })();
+    </script>
+</body>
+</html>

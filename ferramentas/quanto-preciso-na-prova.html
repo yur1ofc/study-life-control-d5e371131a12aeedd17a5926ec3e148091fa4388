@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quanto Preciso na Prova Final? Simulador de Média Grátis | SLCampus</title>
+    <meta name="description" content="Descubra quanto você precisa tirar na prova final ou nas próximas avaliações para passar de ano. Simulador de média grátis, com resposta na hora.">
+    <meta name="theme-color" content="#0a0f1f">
+    <link rel="canonical" href="https://slcampus.vercel.app/ferramentas/quanto-preciso-na-prova">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SLCampus">
+    <meta property="og:locale" content="pt_BR">
+    <meta property="og:title" content="Quanto Preciso na Prova Final?">
+    <meta property="og:description" content="Simulador de média grátis: coloque sua média e o peso da prova e veja na hora quanto precisa tirar.">
+    <meta property="og:url" content="https://slcampus.vercel.app/ferramentas/quanto-preciso-na-prova">
+    <meta property="og:image" content="https://slcampus.vercel.app/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Quanto Preciso na Prova Final?">
+    <meta name="twitter:description" content="Simulador de média grátis: quanto precisa tirar pra passar.">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon-180.png">
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all';this.onload=null">
+    <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all';this.onload=null">
+    <noscript>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    </noscript>
+    <link rel="stylesheet" href="./ferramentas.css">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Quanto Preciso na Prova Final — Simulador de Média",
+      "url": "https://slcampus.vercel.app/ferramentas/quanto-preciso-na-prova",
+      "applicationCategory": "EducationalApplication",
+      "operatingSystem": "Web",
+      "inLanguage": "pt-BR",
+      "description": "Simulador que calcula a nota necessária na prova final ou nas avaliações restantes para atingir a média desejada.",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "BRL" }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Início", "item": "https://slcampus.vercel.app/" },
+        { "@type": "ListItem", "position": 2, "name": "Ferramentas", "item": "https://slcampus.vercel.app/ferramentas/" },
+        { "@type": "ListItem", "position": 3, "name": "Quanto Preciso na Prova Final" }
+      ]
+    }
+    </script>
+</head>
+<body>
+    <header class="tool-nav">
+        <a class="tool-brand" href="/">
+            <img src="/logo.png" alt="SLCampus — voltar ao início">
+            <span>SLC<em>ampus</em></span>
+        </a>
+        <a class="tool-nav-cta" href="/">Abrir o SLCampus <i class="fas fa-arrow-right"></i></a>
+    </header>
+
+    <main class="tool-main">
+        <nav class="breadcrumb" aria-label="Trilha de navegação">
+            <a href="/">Início</a><span>/</span>Ferramentas<span>/</span>Quanto Preciso na Prova
+        </nav>
+
+        <h1>Quanto preciso tirar <em>na prova final?</em></h1>
+        <p class="tool-lead">Coloque sua média atual, o peso da prova e a média que você quer fechar. A resposta aparece na hora — inclusive se ainda dá tempo ou não.</p>
+
+        <section class="tool-card" aria-labelledby="sim-title">
+            <h2 id="sim-title"><i class="fas fa-bullseye"></i> Simulador de média</h2>
+
+            <div class="tool-grid tool-grid-2">
+                <div class="field">
+                    <label for="media-atual">Sua média atual</label>
+                    <input class="input" id="media-atual" type="number" step="0.1" min="0" max="10" placeholder="ex.: 6,4" inputmode="decimal">
+                    <span class="hint">Média das avaliações já feitas (0 a 10).</span>
+                </div>
+                <div class="field">
+                    <label for="peso-falta">Peso das avaliações que faltam (%)</label>
+                    <input class="input" id="peso-falta" type="number" step="1" min="1" max="100" placeholder="ex.: 40" inputmode="decimal">
+                    <span class="hint">Se a prova final vale metade da média, coloque 50.</span>
+                </div>
+                <div class="field">
+                    <label for="media-desejada">Média que você quer</label>
+                    <select class="input" id="media-desejada">
+                        <option value="5">5,0 — ser aprovado</option>
+                        <option value="6">6,0</option>
+                        <option value="7">7,0</option>
+                        <option value="8">8,0</option>
+                        <option value="9">9,0</option>
+                        <option value="10">10,0 — média máxima</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="tool-result" id="result" role="status" aria-live="polite">
+                <div class="result-label">Nota necessária</div>
+                <div class="result-value" id="result-value">—</div>
+                <div class="result-note" id="result-note">Preencha os campos acima para ver quanto você precisa tirar.</div>
+                <div class="badge-line" id="result-badges"></div>
+            </div>
+        </section>
+
+        <section class="tool-content">
+            <h2>Como calcular a nota necessária na prova</h2>
+            <p>A fórmula é simples: a média final é a soma de tudo que você já fez (multiplicado pelo peso) mais a nota da prova que falta, também multiplicada pelo peso dela. Pra descobrir a nota necessária, a gente isola a incógnita:</p>
+
+            <div class="formula">
+                Nota necessária = (Média desejada − Média atual × Peso já feito) ÷ Peso que falta
+                <span class="muted">Média atual e nota necessária vão de 0 a 10; os pesos entram em porcentagem.</span>
+            </div>
+
+            <p><strong>Exemplo:</strong> sua média é 6,4, a prova final vale 40% da média e você quer fechar com 5,0. A conta fica (5,0 − 6,4 × 0,60) ÷ 0,40 = <strong>2,9</strong>. Ou seja: tirando 2,9 você passa.</p>
+
+            <h2>O que os resultados significam</h2>
+            <ul>
+                <li><strong>Nota até 10,0:</strong> dá tempo — estude por esse alvo;</li>
+                <li><strong>Nota maior que 10,0:</strong> a média desejada ficou fora de alcance com esses pesos (vale rever a meta ou ganhar ponto em outras avaliações);</li>
+                <li><strong>Valor zero ou negativo:</strong> você <strong>já garantiu</strong> a média mesmo sem fazer a prova.</li>
+            </ul>
+
+            <h2>Dicas de estudo pro final do semestre</h2>
+            <ol>
+                <li>Priorize os conteúdos que mais caem e que valem mais peso — estudar proporcional ao peso é o caminho mais rápido;</li>
+                <li>Faça simulado com tempo cronometrado da prova real;</li>
+                <li>Reveja os erros: a segunda tentativa de cada questão é onde o aprendizado consolida;</li>
+                <li>Comece pelas matérias onde você está mais perto da meta — pequenos pontos valem mais lá.</li>
+            </ol>
+        </section>
+
+        <section class="tool-cta">
+            <div>
+                <h2><i class="fas fa-chart-line"></i> Deixe o SLCampus fazer essa conta sempre</h2>
+                <p>Lançando as notas no app, ele acompanha a média de cada matéria, projeta o final do semestre e avisa quando uma matéria entra em risco.</p>
+            </div>
+            <a class="btn-primary" href="/">Começar grátis <i class="fas fa-arrow-right"></i></a>
+        </section>
+
+        <section class="tool-related">
+            <h2>Outras ferramentas de estudo</h2>
+            <div class="tool-related-grid">
+                <a href="/ferramentas/calculadora-de-media">
+                    <strong>Calculadora de média com pesos <i class="fas fa-arrow-right"></i></strong>
+                    <small>Média ponderada completa, com soma dos pesos e complemento.</small>
+                </a>
+                <a href="/ferramentas/calculadora-de-frequencia">
+                    <strong>Calculadora de frequência <i class="fas fa-arrow-right"></i></strong>
+                    <small>Percentual de presença e quantas faltas ainda pode dar.</small>
+                </a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="tool-footer">
+        <a href="/">SLCampus</a><span class="sep">·</span>
+        <a href="/ferramentas/calculadora-de-media">Calculadora de média</a><span class="sep">·</span>
+        <a href="/ferramentas/calculadora-de-frequencia">Frequência</a><span class="sep">·</span>
+        Organize seus estudos de verdade no <a href="/">SLCampus</a>
+    </footer>
+
+    <script>
+    (function () {
+        var mediaAtual = document.getElementById('media-atual');
+        var pesoFalta = document.getElementById('peso-falta');
+        var mediaDesejada = document.getElementById('media-desejada');
+        var resultBox = document.getElementById('result');
+        var resultValue = document.getElementById('result-value');
+        var resultNote = document.getElementById('result-note');
+        var resultBadges = document.getElementById('result-badges');
+
+        function num(v) {
+            if (v === '' || v == null) return null;
+            var n = parseFloat(String(v).replace(',', '.'));
+            return isNaN(n) ? null : n;
+        }
+        function fmt(n) { return n.toFixed(1).replace('.', ','); }
+
+        function calc() {
+            var atual = num(mediaAtual.value);
+            var peso = num(pesoFalta.value);
+            var meta = parseFloat(mediaDesejada.value);
+
+            if (atual == null || peso == null || peso <= 0 || peso > 100) {
+                resultBox.classList.remove('has-result');
+                resultValue.textContent = '—';
+                resultValue.className = 'result-value';
+                resultNote.textContent = 'Preencha os campos acima para ver quanto você precisa tirar.';
+                resultBadges.innerHTML = '';
+                return;
+            }
+
+            atual = Math.max(0, Math.min(10, atual));
+            var w = peso / 100;
+            var precisa = (meta - atual * (1 - w)) / w;
+
+            resultBox.classList.add('has-result');
+            var badges = [];
+            var note;
+
+            if (precisa <= 0) {
+                resultValue.textContent = '0,0';
+                resultValue.className = 'result-value ok';
+                note = 'Você <strong>já garantiu ' + String(meta).replace('.', ',') + '</strong> mesmo sem as avaliações que faltam. Aprovação confirmada!';
+                badges.push('<span class="tbadge ok">Meta garantida</span>');
+            } else if (precisa > 10) {
+                resultValue.textContent = fmt(precisa);
+                resultValue.className = 'result-value bad';
+                note = 'Com esses pesos, seria preciso <strong>' + fmt(precisa) + '</strong> — acima de 10,0. A média desejada <strong>não dá mais</strong> por essa rota.';
+                badges.push('<span class="tbadge bad">Fora de alcance</span>');
+            } else {
+                resultValue.textContent = fmt(precisa);
+                resultValue.className = 'result-value ' + (precisa >= 8 ? 'warn' : 'ok');
+                note = 'Tirando <strong>' + fmt(precisa) + '</strong> ou mais, você fecha com ' + String(meta).replace('.', ',') + '.';
+                badges.push('<span class="tbadge ok">Dá tempo</span>');
+                if (precisa >= 9) badges.push('<span class="tbadge warn">Meta apertada — estude focado</span>');
+            }
+
+            // Média máxima possível com esses pesos (dá contexto quando impossível)
+            var maxPossivel = atual * (1 - w) + 10 * w;
+            if (maxPossivel < meta) {
+                badges.push('<span class="tbadge bad">Máximo possível: ' + fmt(maxPossivel) + '</span>');
+            }
+
+            resultNote.innerHTML = note;
+            resultBadges.innerHTML = badges.join('');
+        }
+
+        mediaAtual.addEventListener('input', calc);
+        pesoFalta.addEventListener('input', calc);
+        mediaDesejada.addEventListener('change', calc);
+        calc();
+    })();
+    </script>
+</body>
+</html>
