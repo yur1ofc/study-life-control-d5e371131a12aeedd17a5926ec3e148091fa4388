@@ -1,5 +1,11 @@
 // ai-assistant.js - Mentor IA mais útil, contextual e menos genérico
 
+// Helper GLOBAL de plural: o arquivo tem DOIS blocos (IIFEs) e o bloco do
+// plano de estudos/prioridades (2º bloco) não enxerga um const do 1º.
+// Definido em window para valer nos dois — sem isso, "diaPlural is not
+// defined" derrubava a inicialização inteira no meio do render do dashboard.
+window.diaPlural = (n) => `${n} dia${Number(n) === 1 ? '' : 's'}`;
+
 (function () {
   const toDateStringLocal = (value = new Date()) => { const d = value instanceof Date ? value : new Date(value); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 
