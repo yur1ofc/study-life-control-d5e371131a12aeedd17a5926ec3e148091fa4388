@@ -201,7 +201,7 @@
       const pdf=b.dataset.type==='pdf'; modal.querySelector('.resource-file-field').style.display=pdf?'block':'none'; modal.querySelector('.resource-url-field').style.display=pdf?'none':'block';
     });
     modal.querySelector('#resource-form').onsubmit=async e=>{
-      e.preventDefault(); const submit=e.submitter; submit.disabled=true; submit.innerHTML='<i class="fas fa-spinner fa-spin"></i> Salvando...';
+      e.preventDefault(); const submit=e.submitter || modal.querySelector('#resource-form [type="submit"]'); if(submit){submit.disabled=true;submit.innerHTML='<i class="fas fa-spinner fa-spin"></i> Salvando...';}
       try {
         const t=type.value, data={tipo:t,titulo:modal.querySelector('#resource-title').value,materia:modal.querySelector('#resource-subject').value,descricao:modal.querySelector('#resource-description').value,url:modal.querySelector('#resource-url').value,tags:modal.querySelector('#resource-tags').value};
         const novo=await add(data,modal.querySelector('#resource-file').files[0]);
@@ -213,7 +213,7 @@
         // Alinhamento em background: quando o servidor confirmar a escrita,
         // a lista se atualiza sozinha (cobre renomeações/ids de storage).
         list().then(fresh=>{ if(Array.isArray(fresh)&&fresh.length){ items.splice(0,items.length,...fresh); if(document.getElementById('resource-grid')) redraw(); } }).catch(()=>{});
-      } catch(err) { window.showToast?.(err.message||'Não foi possível salvar.','error'); submit.disabled=false; submit.innerHTML='<i class="fas fa-cloud-arrow-up"></i> Salvar recurso'; }
+      } catch(err) { window.showToast?.(err.message||'Não foi possível salvar.','error'); if(submit){submit.disabled=false;submit.innerHTML='<i class="fas fa-cloud-arrow-up"></i> Salvar recurso';} }
     };
     modal.style.display='flex';
   }
