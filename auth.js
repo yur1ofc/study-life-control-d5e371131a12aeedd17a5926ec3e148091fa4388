@@ -143,6 +143,13 @@ async function loginWithGoogle() {
   if (errorEl) errorEl.style.display = 'none';
 
   try {
+    // App Android (Capacitor): a WebView não suporta popup, então usamos redirect
+    // na mesma origem. Fora do app (web/desktop) o fluxo por popup continua
+    // exatamente o mesmo de sempre — este ramo só roda dentro do app nativo.
+    if (window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) {
+      await auth.signInWithRedirect(googleProvider);
+      return;
+    }
     await auth.signInWithPopup(googleProvider);
   } catch (error) {
     console.error('Erro no login:', error);

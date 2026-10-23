@@ -394,6 +394,20 @@
         // App desktop instalado: notificação nativa do Windows (aparece na central
         // de notificações mesmo com o app oculto na bandeja).
         window.slcDesktop.notify(title, body);
+      } else if (window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform() && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
+        // App Android: notificação nativa (mesmo papel do app de PC). Ramo só
+        // ativo dentro do Capacitor — web e desktop continuam como estão.
+        const ln = window.Capacitor.Plugins.LocalNotifications;
+        try { Promise.resolve(ln.requestPermissions && ln.requestPermissions()).catch(() => {}); } catch (_) {}
+        ln.schedule({
+          notifications: [{
+            id: Date.now() % 100000,
+            title,
+            body,
+            schedule: { at: new Date(Date.now() + 100) },
+            channelId: 'slcampus'
+          }]
+        }).catch(() => {});
       } else if ('Notification' in window && Notification.permission === 'granted') {
         if (navigator.serviceWorker?.ready) {
           navigator.serviceWorker.ready.then(reg => {
