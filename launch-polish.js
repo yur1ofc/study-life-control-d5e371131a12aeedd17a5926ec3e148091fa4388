@@ -227,6 +227,10 @@
     const badge=$('#notification-badge');
     if(count) count.textContent=String(unread);
     badge?.classList.toggle('has-alert', unread>0);
+    // O accessible name precisa CONTER o texto visível (a contagem) — senão o
+    // axe acusa label-content-name-mismatch e leitores de tela anunciam "5"
+    // sem contexto nenhum.
+    badge?.setAttribute('aria-label', unread > 0 ? `Notificações — ${unread} novas não lidas` : 'Notificações — 0 novas');
   }
   function renderNotifications(){
     const list = ensureNotificationPanel();
