@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de Citação ABNT Grátis — Referência e Citação Direta | SLCampus</title>
+    <meta name="description" content="Gere referências e citações ABNT (livro, site, artigo e tese) em segundos e copie o modelo pronto. Grátis, sem cadastro e sem marca d'água.">
+    <meta name="theme-color" content="#0a0f1f">
+    <link rel="canonical" href="https://slcampus.vercel.app/ferramentas/citacao-abnt">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SLCampus">
+    <meta property="og:locale" content="pt_BR">
+    <meta property="og:title" content="Gerador de Citação ABNT Grátis — SLCampus">
+    <meta property="og:description" content="Referência, citação direta e indireta em modelo ABNT — preencha e copie.">
+    <meta property="og:url" content="https://slcampus.vercel.app/ferramentas/citacao-abnt">
+    <meta property="og:image" content="https://slcampus.vercel.app/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Gerador de Citação ABNT Grátis — SLCampus">
+    <meta name="twitter:description" content="Modelos ABNT prontos pra copiar, sem cadastro.">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon-180.png">
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all';this.onload=null">
+    <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all';this.onload=null">
+    <noscript>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    </noscript>
+    <link rel="stylesheet" href="./ferramentas.css">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Gerador de Citação ABNT",
+      "url": "https://slcampus.vercel.app/ferramentas/citacao-abnt",
+      "applicationCategory": "EducationalApplication",
+      "operatingSystem": "Web",
+      "inLanguage": "pt-BR",
+      "description": "Monta referências e citações diretas e indiretas conforme a norma ABNT (NBR 6023) para livros, sites, artigos e teses.",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "BRL" }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Início", "item": "https://slcampus.vercel.app/" },
+        { "@type": "ListItem", "position": 2, "name": "Ferramentas", "item": "https://slcampus.vercel.app/ferramentas/" },
+        { "@type": "ListItem", "position": 3, "name": "Gerador de Citação ABNT" }
+      ]
+    }
+    </script>
+</head>
+<body>
+    <header class="tool-nav">
+        <a class="tool-brand" href="/">
+            <img src="/logo.png" alt="SLCampus — voltar ao início">
+            <span>SLC<em>ampus</em></span>
+        </a>
+        <a class="tool-nav-cta" href="/">Abrir o SLCampus <i class="fas fa-arrow-right"></i></a>
+    </header>
+
+    <main class="tool-main">
+        <nav class="breadcrumb" aria-label="Trilha de navegação">
+            <a href="/">Início</a><span>/</span>Ferramentas<span>/</span>Gerador de Citação ABNT
+        </nav>
+
+        <h1>Gerador de citação <em>ABNT</em></h1>
+        <p class="tool-lead">Monte a referência, a citação direta e a indireta conforme a NBR 6023 — livro, site, artigo ou tese. Preencha, copie e cole no trabalho. Sem cadastro.</p>
+
+        <section class="tool-card" aria-labelledby="cite-title">
+            <h2 id="cite-title"><i class="fas fa-quote-left"></i> Dados da fonte</h2>
+
+            <div class="tool-grid tool-grid-2">
+                <div class="field">
+                    <label for="tipo-fonte">Tipo de fonte</label>
+                    <select class="input" id="tipo-fonte">
+                        <option value="livro" selected>Livro</option>
+                        <option value="site">Site ou página web</option>
+                        <option value="artigo">Artigo em periódico</option>
+                        <option value="tese">Tese ou dissertação</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="ano">Ano</label>
+                    <input class="input" id="ano" type="text" placeholder="ex.: 2024" inputmode="numeric">
+                </div>
+                <div class="field">
+                    <label for="sobrenome">Sobrenome do autor</label>
+                    <input class="input" id="sobrenome" type="text" placeholder="ex.: Silva" autocomplete="off">
+                </div>
+                <div class="field">
+                    <label for="nome">Nome do autor</label>
+                    <input class="input" id="nome" type="text" placeholder="ex.: Maria" autocomplete="off">
+                </div>
+                <div class="field">
+                    <label for="titulo">Título da obra</label>
+                    <input class="input" id="titulo" type="text" placeholder="ex.: Aprendizado ativo na educação">
+                </div>
+                <div class="field">
+                    <label for="subtitulo">Subtítulo (opcional)</label>
+                    <input class="input" id="subtitulo" type="text" placeholder="ex.: teoria e prática">
+                </div>
+            </div>
+
+            <div class="tipo-grupo" data-tipo="livro">
+                <div class="tool-grid tool-grid-2">
+                    <div class="field">
+                        <label for="editora">Editora</label>
+                        <input class="input" id="editora" type="text" placeholder="ex.: Atlas">
+                    </div>
+                    <div class="field">
+                        <label for="local-livro">Local (cidade)</label>
+                        <input class="input" id="local-livro" type="text" placeholder="ex.: São Paulo">
+                    </div>
+                    <div class="field">
+                        <label for="edicao">Edição (se não for a 1ª)</label>
+                        <input class="input" id="edicao" type="text" placeholder="ex.: 3">
+                    </div>
+                </div>
+            </div>
+
+            <div class="tipo-grupo" data-tipo="site" hidden>
+                <div class="tool-grid tool-grid-2">
+                    <div class="field">
+                        <label for="url">URL da página</label>
+                        <input class="input" id="url" type="url" placeholder="https://exemplo.com.br/pagina">
+                    </div>
+                </div>
+            </div>
+
+            <div class="tipo-grupo" data-tipo="artigo" hidden>
+                <div class="tool-grid tool-grid-2">
+                    <div class="field">
+                        <label for="periodico">Nome do periódico</label>
+                        <input class="input" id="periodico" type="text" placeholder="ex.: Revista Brasileira de Educação">
+                    </div>
+                    <div class="field">
+                        <label for="local-periodico">Local do periódico (cidade)</label>
+                        <input class="input" id="local-periodico" type="text" placeholder="ex.: Rio de Janeiro">
+                    </div>
+                    <div class="field">
+                        <label for="volume">Volume</label>
+                        <input class="input" id="volume" type="text" placeholder="ex.: 12">
+                    </div>
+                    <div class="field">
+                        <label for="numero">Número</label>
+                        <input class="input" id="numero" type="text" placeholder="ex.: 3">
+                    </div>
+                    <div class="field">
+                        <label for="paginas">Páginas</label>
+                        <input class="input" id="paginas" type="text" placeholder="ex.: 45-62">
+                    </div>
+                </div>
+            </div>
+
+            <div class="tipo-grupo" data-tipo="tese" hidden>
+                <div class="tool-grid tool-grid-2">
+                    <div class="field">
+                        <label for="tipo-doc">Tipo de trabalho</label>
+                        <select class="input" id="tipo-doc">
+                            <option value="Dissertação" selected>Dissertação (Mestrado)</option>
+                            <option value="Tese">Tese (Doutorado)</option>
+                            <option value="Monografia">Monografia (Graduação)</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="instituicao">Instituição</label>
+                        <input class="input" id="instituicao" type="text" placeholder="ex.: Universidade de São Paulo">
+                    </div>
+                    <div class="field">
+                        <label for="local-tese">Local (cidade)</label>
+                        <input class="input" id="local-tese" type="text" placeholder="ex.: São Paulo">
+                    </div>
+                </div>
+            </div>
+
+            <div class="tipo-grupo" data-tipo="citacao" style="display:block">
+                <div class="tool-grid tool-grid-2">
+                    <div class="field">
+                        <label for="texto-citacao">Texto que você vai citar (pra citação direta)</label>
+                        <input class="input" id="texto-citacao" type="text" placeholder="ex.: O estudo ativo aumenta a retenção">
+                    </div>
+                    <div class="field">
+                        <label for="pagina">Página da citação</label>
+                        <input class="input" id="pagina" type="number" min="1" step="1" placeholder="ex.: 15" inputmode="numeric">
+                    </div>
+                </div>
+            </div>
+
+            <div class="tool-result" id="result" role="status" aria-live="polite">
+                <div class="result-label">Referência ABNT</div>
+                <div class="cite-out" id="out-referencia">Preencha ao menos o autor e o título para gerar a referência.</div>
+                <div class="badge-line">
+                    <button class="btn-ghost" type="button" data-copy="out-referencia"><i class="fas fa-copy"></i> Copiar referência</button>
+                </div>
+            </div>
+
+            <div class="cite-block">
+                <div class="cite-out" id="out-direta">Citação direta: preencha o texto e a página acima.</div>
+                <div class="badge-line" style="justify-content:flex-start">
+                    <button class="btn-ghost" type="button" data-copy="out-direta"><i class="fas fa-copy"></i> Copiar citação direta</button>
+                </div>
+            </div>
+
+            <div class="cite-block">
+                <div class="cite-out" id="out-indireta">Citação indireta: preencha a página acima e escreva o trecho com suas palavras.</div>
+                <div class="badge-line" style="justify-content:flex-start">
+                    <button class="btn-ghost" type="button" data-copy="out-indireta"><i class="fas fa-copy"></i> Copiar citação indireta</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="tool-content">
+            <h2>Como citar selon a NBR 6023 (resumo prático)</h2>
+            <ul>
+                <li><strong>Referência</strong> vai na lista ao final do trabalho — sobrenome em CAIXA ALTA, título da obra em itálico ou negrito;</li>
+                <li><strong>Citação direta</strong> (palavras do autor entre aspas) traz a página: <em>“texto exato” (SILVA, 2024, p. 15)</em> — acima de 3 linhas, recue o bloco;</li>
+                <li><strong>Citação indireta</strong> (suas palavras) também leva autor, ano e página;</li>
+                <li><strong>Toda citação no texto tem a referência correspondente</strong> na lista final — e vice-versa.</li>
+            </ul>
+
+            <div class="formula">
+                Sobrenome, Nome. Título da obra: subtítulo. edição. Local: Editora, ano.
+                <span class="muted">Modelo de livro — os demais tipos mudam só o final (URL, periódico ou instituição).</span>
+            </div>
+
+            <p><strong>Dica de formatação:</strong> gere o texto aqui, cole no trabalho e aplique itálico (ou negrito, conforme sua instituição) no título da obra — em texto puro a formatação não viaja junto.</p>
+
+            <h2>Erros comuns em citação ABNT</h2>
+            <ol>
+                <li>Esquecer o ponto final em cada elemento da referência;</li>
+                <li>Pular o acesso em datas em fontes eletrônicas (obrigatório no modelo de site);</li>
+                <li>Citar sem página em citação direta — a página é obrigatória quando existe na fonte paginada;</li>
+                <li>Confundir a lista de referências (final do texto) com as citações (no corpo).</li>
+            </ol>
+        </section>
+
+        <section class="tool-cta">
+            <div>
+                <h2><i class="fas fa-book"></i> Organize fontes e materiais no SLCampus</h2>
+                <p>Guarde PDFs, links e anotações por matéria na biblioteca pessoal e acesse tudo no celular e no computador.</p>
+            </div>
+            <a class="btn-primary" href="/">Começar grátis <i class="fas fa-arrow-right"></i></a>
+        </section>
+
+        <section class="tool-related">
+            <h2>Outras ferramentas de estudo</h2>
+            <div class="tool-related-grid">
+                <a href="/ferramentas/calculadora-de-media">
+                    <strong>Calculadora de média com pesos <i class="fas fa-arrow-right"></i></strong>
+                    <small>Média ponderada do semestre, com soma dos pesos e complemento.</small>
+                </a>
+                <a href="/ferramentas/planificador-de-horas-de-estudo">
+                    <strong>Planificador de horas de estudo <i class="fas fa-arrow-right"></i></strong>
+                    <small>Quantas horas por dia estudar até a prova.</small>
+                </a>
+                <a href="/ferramentas/pomodoro">
+                    <strong>Cronômetro Pomodoro <i class="fas fa-arrow-right"></i></strong>
+                    <small>Foco de 25 minutos com pausas — grátis online.</small>
+                </a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="tool-footer">
+        <a href="/">SLCampus</a><span class="sep">·</span>
+        <a href="/ferramentas/calculadora-de-cra">Calculadora de CRA</a><span class="sep">·</span>
+        <a href="/ferramentas/pomodoro">Pomodoro</a><span class="sep">·</span>
+        Organize seus estudos de verdade no <a href="/">SLCampus</a><span class="sep">·</span>
+        <a href="https://link.mercadopago.com.br/slcampus" target="_blank" rel="noopener">Apoie o SLCampus <i class="fas fa-heart"></i></a>
+    </footer>
+
+    <script>
+    (function () {
+        var $ = function (id) { return document.getElementById(id); };
+        var tipoEl = $('tipo-fonte');
+        var anoEl = $('ano');
+        var sobrenomeEl = $('sobrenome');
+        var nomeEl = $('nome');
+        var tituloEl = $('titulo');
+        var subtituloEl = $('subtitulo');
+        var textoCitEl = $('texto-citacao');
+        var paginaEl = $('pagina');
+        var outRef = $('out-referencia');
+        var outDir = $('out-direta');
+        var outInd = $('out-indireta');
+
+        var MESES = ['jan.', 'fev.', 'mar.', 'abr.', 'mai.', 'jun.', 'jul.', 'ago.', 'set.', 'out.', 'nov.', 'dez.'];
+
+        function val(id) { return ($(id).value || '').trim(); }
+
+        function acessoEm() {
+            var d = new Date();
+            return 'Acesso em: ' + d.getDate() + ' ' + MESES[d.getMonth()] + ' ' + d.getFullYear() + '.';
+        }
+
+        function obraTitulo() {
+            var t = val('titulo');
+            var sub = val('subtitulo');
+            if (!t) return '';
+            return sub ? t + ': ' + sub : t;
+        }
+
+        function autorPrefixo() {
+            var sob = val('sobrenome').toUpperCase();
+            var nome = val('nome');
+            if (!sob || !nome) return '';
+            return sob + ', ' + nome;
+        }
+
+        function anoAtual() { return val('ano'); }
+
+        function gerarReferencia() {
+            var tipo = tipoEl.value;
+            var autor = autorPrefixo();
+            var titulo = obraTitulo();
+            var ano = anoAtual();
+            if (!autor || !titulo) return 'Preencha ao menos o sobrenome, o nome e o título para gerar a referência.';
+            var fimAno = ano || 's.d.';
+
+            if (tipo === 'livro') {
+                var editora = val('editora') || 'Editora não informada';
+                var local = val('local-livro') || 'Local não informado';
+                var ed = val('edicao');
+                var parteEd = ed ? ed + '. ed. ' : '';
+                return autor + '. ' + titulo + '. ' + parteEd + local + ': ' + editora + ', ' + fimAno + '.';
+            }
+            if (tipo === 'site') {
+                var url = val('url');
+                var partes = autor + '. ' + titulo + '.';
+                if (ano) partes += ' ' + ano + '.';
+                if (url) partes += ' Disponível em: ' + url + '.';
+                partes += ' ' + acessoEm();
+                return partes;
+            }
+            if (tipo === 'artigo') {
+                var per = val('periodico');
+                var loc = val('local-periodico');
+                var vol = val('volume');
+                var num = val('numero');
+                var pags = val('paginas');
+                var linha = autor + '. ' + titulo + '. ' + (per || 'Periódico não informado');
+                if (loc) linha += ', ' + loc;
+                if (vol) linha += ', v. ' + vol;
+                if (num) linha += ', n. ' + num;
+                if (pags) linha += ', p. ' + pags;
+                linha += ', ' + fimAno + '.';
+                return linha;
+            }
+            // tese
+            var doc = val('tipo-doc') || 'Dissertação';
+            var inst = val('instituicao') || 'Instituição não informada';
+            var localT = val('local-tese') || 'Local não informado';
+            return autor + '. ' + titulo + '. ' + fimAno + '. ' + doc + ' \u2013 ' + inst + ', ' + localT + ', ' + fimAno + '.';
+        }
+
+        function gerarDireta() {
+            var autor = val('sobrenome').toUpperCase();
+            var texto = val('texto-citacao');
+            var pagina = paginaEl.value;
+            if (!autor) return 'Citação direta: preencha o sobrenome do autor.';
+            if (!texto) return 'Citação direta: escreva o texto exato do autor no campo acima.';
+            var ano = anoAtual() || 's.d.';
+            var ref = autor + ', ' + ano + (pagina ? ', p. ' + pagina : '');
+            return '“' + texto + '” (' + ref + ').';
+        }
+
+        function gerarIndireta() {
+            var autor = val('sobrenome');
+            var pagina = paginaEl.value;
+            if (!autor) return 'Citação indireta: preencha o sobrenome do autor.';
+            var ano = anoAtual() || 's.d.';
+            var ref = autor.toUpperCase() + ', ' + ano + (pagina ? ', p. ' + pagina : '');
+            return 'Escreva o trecho com suas palavras (' + ref + ').   —   Ex.: Segundo ' + autor + ' (' + ano + (pagina ? ', p. ' + pagina : '') + '), [sua frase parafraseada].';
+        }
+
+        function atualizar() {
+            outRef.textContent = gerarReferencia();
+            outDir.textContent = gerarDireta();
+            outInd.textContent = gerarIndireta();
+        }
+
+        function mostrarGrupo() {
+            var tipo = tipoEl.value;
+            Array.prototype.forEach.call(document.querySelectorAll('.tipo-grupo[data-tipo]'), function (g) {
+                if (g.getAttribute('data-tipo') === 'citacao') return;
+                g.hidden = g.getAttribute('data-tipo') !== tipo;
+            });
+            atualizar();
+        }
+
+        tipoEl.addEventListener('change', mostrarGrupo);
+
+        ['ano', 'sobrenome', 'nome', 'titulo', 'subtitulo', 'editora', 'local-livro', 'edicao', 'url',
+         'periodico', 'local-periodico', 'volume', 'numero', 'paginas', 'instituicao', 'local-tese',
+         'texto-citacao', 'pagina'].forEach(function (id) {
+            $(id).addEventListener('input', atualizar);
+        });
+        $('tipo-doc').addEventListener('change', atualizar);
+
+        // copiar
+        Array.prototype.forEach.call(document.querySelectorAll('[data-copy]'), function (btn) {
+            btn.addEventListener('click', function () {
+                var alvo = document.getElementById(btn.getAttribute('data-copy'));
+                var txt = alvo.textContent;
+                var ok = function () {
+                    var original = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-check"></i> Copiado!';
+                    setTimeout(function () { btn.innerHTML = original; }, 1600);
+                };
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(txt).then(ok, function () { fallback(txt, ok); });
+                } else {
+                    fallback(txt, ok);
+                }
+            });
+        });
+
+        function fallback(txt, ok) {
+            var ta = document.createElement('textarea');
+            ta.value = txt;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); ok(); } catch (e) { /* silencioso */ }
+            document.body.removeChild(ta);
+        }
+
+        mostrarGrupo();
+    })();
+    </script>
+</body>
+</html>

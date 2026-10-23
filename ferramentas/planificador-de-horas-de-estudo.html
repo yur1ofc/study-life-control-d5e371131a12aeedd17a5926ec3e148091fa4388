@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planificador de Horas de Estudo — Quantas Horas por Dia até a Prova | SLCampus</title>
+    <meta name="description" content="Descubra quantas horas por dia você precisa estudar até a prova: coloque o conteúdo que falta, os dias disponíveis e sua rotina. Grátis e sem cadastro.">
+    <meta name="theme-color" content="#0a0f1f">
+    <link rel="canonical" href="https://slcampus.vercel.app/ferramentas/planificador-de-horas-de-estudo">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SLCampus">
+    <meta property="og:locale" content="pt_BR">
+    <meta property="og:title" content="Planificador de Horas de Estudo — SLCampus">
+    <meta property="og:description" content="Simule quantas horas por dia estudar até a prova e veja se o plano fecha na sua rotina.">
+    <meta property="og:url" content="https://slcampus.vercel.app/ferramentas/planificador-de-horas-de-estudo">
+    <meta property="og:image" content="https://slcampus.vercel.app/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Planificador de Horas de Estudo — SLCampus">
+    <meta name="twitter:description" content="Horas por dia até a prova, na hora, sem cadastro.">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon-180.png">
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all';this.onload=null">
+    <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all';this.onload=null">
+    <noscript>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    </noscript>
+    <link rel="stylesheet" href="./ferramentas.css">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Planificador de Horas de Estudo",
+      "url": "https://slcampus.vercel.app/ferramentas/planificador-de-horas-de-estudo",
+      "applicationCategory": "EducationalApplication",
+      "operatingSystem": "Web",
+      "inLanguage": "pt-BR",
+      "description": "Calcula quantas horas por dia são necessárias até uma prova a partir do conteúdo restante e dos dias disponíveis, indicando se o plano cabe na rotina.",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "BRL" }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Início", "item": "https://slcampus.vercel.app/" },
+        { "@type": "ListItem", "position": 2, "name": "Ferramentas", "item": "https://slcampus.vercel.app/ferramentas/" },
+        { "@type": "ListItem", "position": 3, "name": "Planificador de Horas de Estudo" }
+      ]
+    }
+    </script>
+</head>
+<body>
+    <header class="tool-nav">
+        <a class="tool-brand" href="/">
+            <img src="/logo.png" alt="SLCampus — voltar ao início">
+            <span>SLC<em>ampus</em></span>
+        </a>
+        <a class="tool-nav-cta" href="/">Abrir o SLCampus <i class="fas fa-arrow-right"></i></a>
+    </header>
+
+    <main class="tool-main">
+        <nav class="breadcrumb" aria-label="Trilha de navegação">
+            <a href="/">Início</a><span>/</span>Ferramentas<span>/</span>Planificador de Horas de Estudo
+        </nav>
+
+        <h1>Quantas horas estudar <em>por dia</em> até a prova</h1>
+        <p class="tool-lead">Coloque o conteúdo que falta, os dias até a prova e quanto tempo você tem na rotina: o planificador calcula as horas por dia e diz se o plano fecha ou onde ele estoura.</p>
+
+        <section class="tool-card" aria-labelledby="plan-title">
+            <h2 id="plan-title"><i class="fas fa-calendar-days"></i> Seu plano até a prova</h2>
+
+            <div class="tool-grid tool-grid-2">
+                <div class="field">
+                    <label for="conteudo-h">Conteúdo que ainda falta estudar (horas)</label>
+                    <input class="input" id="conteudo-h" type="number" min="1" step="0.5" placeholder="ex.: 40" inputmode="decimal">
+                    <span class="hint">Estime pelas aulas restantes, capítulos ou lista de exercícios.</span>
+                </div>
+                <div class="field">
+                    <label for="dias">Dias até a prova</label>
+                    <input class="input" id="dias" type="number" min="1" step="1" placeholder="ex.: 14" inputmode="numeric">
+                </div>
+                <div class="field">
+                    <label for="horas-dia">Horas que você consegue estudar por dia</label>
+                    <input class="input" id="horas-dia" type="number" min="0.5" step="0.5" placeholder="ex.: 3" inputmode="decimal">
+                </div>
+                <div class="field">
+                    <label class="check-line" for="margem">
+                        <input type="checkbox" id="margem">
+                        Somar 20% extra pra revisão
+                    </label>
+                    <span class="hint">Recomendado: a véspera raramente é o melhor momento de revisar tudo.</span>
+                </div>
+            </div>
+
+            <div class="tool-result" id="result" role="status" aria-live="polite">
+                <div class="result-label">Horas por dia necessárias</div>
+                <div class="result-value" id="result-value">—</div>
+                <div class="result-note" id="result-note">Preencha os campos acima para montar o plano.</div>
+                <div class="badge-line" id="result-badges"></div>
+            </div>
+        </section>
+
+        <section class="tool-content">
+            <h2>Como calcular as horas de estudo até uma prova</h2>
+            <p>A conta é simples: divida o conteúdo que resta pelo tempo disponível. O resultado é a carga diária mínima do seu plano.</p>
+
+            <div class="formula">
+                Horas por dia = Conteúdo restante ÷ Dias até a prova
+                <span class="muted">Com a margem de revisão, o conteúdo vira Conteúdo × 1,2.</span>
+            </div>
+
+            <p><strong>Exemplo:</strong> 40 horas de conteúdo e 10 dias de prazo: 40 ÷ 10 = <strong>4 h por dia</strong>. Se sua rotina permite 5 h/dia, sobram 15 horas de folga no período — reserva ideal pra revisão e imprevistos.</p>
+
+            <h2>Quanto tempo estudar por dia na prática</h2>
+            <ul>
+                <li><strong>3 a 5 horas/dia</strong> costumam fechar a maioria das provas com 2 semanas de antecedência — desde que o foco seja real (use blocos tipo <a href="/ferramentas/pomodoro">Pomodoro</a>);</li>
+                <li><strong>Prazo curto (3 a 5 dias):</strong> o plano aponta a realidade — se não fecha, corte escopo (assuntos de maior peso na prova) em vez de virar a noite;</li>
+                <li><strong>Folga é plano, não desperdício:</strong> dias com sobra servem pra revisão ativa e exercícios;</li>
+                <li><strong>Reordene por peso:</strong> comece pelas unidades com mais questões na prova, não pelas mais fáceis.</li>
+            </ul>
+
+            <h2>O que fazer quando o plano não fecha</h2>
+            <p>Se as horas necessárias passam da sua rotina, você tem três alavancas — nessa ordem:</p>
+            <ol>
+                <li><strong>Reduzir escopo:</strong> foque no que cai mais (últimas provas, lista do professor, plano de ensino);</li>
+                <li><strong>Aumentar dias:</strong> começar uma semana antes muda a conta inteira;</li>
+                <li><strong>Aumentar qualidade:</strong> 2 h de estudo ativo valem mais que 4 h lendo de novo — treine com exercícios e explique em voz alta.</li>
+            </ol>
+        </section>
+
+        <section class="tool-cta">
+            <div>
+                <h2><i class="fas fa-tasks"></i> Transforme o plano em rotina no SLCampus</h2>
+                <p>Registre provas, matérias e horas de estudo por semana e acompanhe o andamento no dashboard.</p>
+            </div>
+            <a class="btn-primary" href="/">Começar grátis <i class="fas fa-arrow-right"></i></a>
+        </section>
+
+        <section class="tool-related">
+            <h2>Outras ferramentas de estudo</h2>
+            <div class="tool-related-grid">
+                <a href="/ferramentas/pomodoro">
+                    <strong>Cronômetro Pomodoro <i class="fas fa-arrow-right"></i></strong>
+                    <small>Foco de 25 minutos com pausas — pra cumprir o plano do dia.</small>
+                </a>
+                <a href="/ferramentas/quanto-preciso-na-prova">
+                    <strong>Quanto preciso na prova <i class="fas fa-arrow-right"></i></strong>
+                    <small>Simulador: quanto tirar na última avaliação pra fechar a média.</small>
+                </a>
+                <a href="/ferramentas/calculadora-de-frequencia">
+                    <strong>Calculadora de frequência <i class="fas fa-arrow-right"></i></strong>
+                    <small>Percentual de presença e quantas faltas ainda cabem.</small>
+                </a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="tool-footer">
+        <a href="/">SLCampus</a><span class="sep">·</span>
+        <a href="/ferramentas/pomodoro">Pomodoro</a><span class="sep">·</span>
+        <a href="/ferramentas/calculadora-de-cra">Calculadora de CRA</a><span class="sep">·</span>
+        Organize seus estudos de verdade no <a href="/">SLCampus</a><span class="sep">·</span>
+        <a href="https://link.mercadopago.com.br/slcampus" target="_blank" rel="noopener">Apoie o SLCampus <i class="fas fa-heart"></i></a>
+    </footer>
+
+    <script>
+    (function () {
+        var conteudoEl = document.getElementById('conteudo-h');
+        var diasEl = document.getElementById('dias');
+        var horasDiaEl = document.getElementById('horas-dia');
+        var margemEl = document.getElementById('margem');
+        var resultBox = document.getElementById('result');
+        var resultValue = document.getElementById('result-value');
+        var resultNote = document.getElementById('result-note');
+        var resultBadges = document.getElementById('result-badges');
+
+        function num(v) {
+            var n = parseFloat(String(v).replace(',', '.'));
+            return isNaN(n) ? null : n;
+        }
+
+        function fmt(n) {
+            var s = (Math.round(n * 10) / 10).toString().replace('.', ',');
+            return s;
+        }
+
+        function calc() {
+            var conteudo = num(conteudoEl.value);
+            var dias = num(diasEl.value);
+            var porDia = num(horasDiaEl.value);
+
+            if (conteudo == null || conteudo <= 0 || dias == null || dias < 1) {
+                resultBox.classList.remove('has-result');
+                resultValue.textContent = '—';
+                resultValue.className = 'result-value';
+                resultNote.textContent = 'Preencha os campos acima para montar o plano.';
+                resultBadges.innerHTML = '';
+                return;
+            }
+
+            var total = margemEl.checked ? conteudo * 1.2 : conteudo;
+            var necessario = total / dias;
+            var temRotina = porDia != null && porDia > 0;
+
+            resultBox.classList.add('has-result');
+            resultValue.textContent = fmt(necessario) + ' h/dia';
+
+            var badges = [];
+            badges.push('<span class="tbadge">' + fmt(total) + ' h em ' + dias + ' dia' + (dias > 1 ? 's' : '') + '</span>');
+            if (margemEl.checked) badges.push('<span class="tbadge ok">+20% de revisão</span>');
+
+            var note;
+            if (!temRotina) {
+                resultValue.className = 'result-value';
+                note = 'É essa a carga diária do plano. Preencha as horas da sua rotina pra saber se ele fecha.';
+            } else if (Math.abs(necessario - porDia) < 0.05) {
+                resultValue.className = 'result-value ok';
+                badges.push('<span class="tbadge ok">Exatamente na medida</span>');
+                note = 'O plano fecha <strong>exatamente</strong> na sua rotina de ' + fmt(porDia) + ' h/dia — sem folga pra imprevisto, vale começar cedo.';
+            } else if (necessario < porDia) {
+                resultValue.className = 'result-value ok';
+                var folga = porDia - necessario;
+                var sobra = folga * dias;
+                badges.push('<span class="tbadge ok">Cabe na rotina</span>');
+                badges.push('<span class="tbadge">Folga de ' + fmt(folga) + ' h/dia</span>');
+                note = 'Você precisa de <strong>' + fmt(necessario) + ' h/dia</strong> e tem ' + fmt(porDia) + ' h/dia: o plano fecha com <strong>' + fmt(sobra) + ' horas de sobra</strong> no período pra revisão e imprevistos.';
+            } else {
+                resultValue.className = 'result-value bad';
+                var faltam = (necessario - porDia) * dias;
+                badges.push('<span class="tbadge bad">Não fecha na rotina</span>');
+                badges.push('<span class="tbadge bad">Faltam ' + fmt(faltam) + ' h no total</span>');
+                var diasExtra = Math.ceil(faltam / porDia);
+                note = 'Faltam <strong>' + fmt(faltam) + ' horas</strong> no período. Ou você estuda <strong>' + fmt(necessario) + ' h/dia</strong> (acima das ' + fmt(porDia) + ' h da rotina), ou começa <strong>' + diasExtra + ' dia' + (diasExtra > 1 ? 's' : '') + ' a mais</strong> — ou reduz o escopo.';
+            }
+
+            resultNote.innerHTML = note;
+            resultBadges.innerHTML = badges.join('');
+        }
+
+        [conteudoEl, diasEl, horasDiaEl].forEach(function (el) { el.addEventListener('input', calc); });
+        margemEl.addEventListener('change', calc);
+        calc();
+    })();
+    </script>
+</body>
+</html>

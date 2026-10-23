@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de CRA Grátis — Coeficiente de Rendimento Acadêmico | SLCampus</title>
+    <meta name="description" content="Calcule seu CRA (Coeficiente de Rendimento Acadêmico) com nota e créditos de cada disciplina e simule quanto falta pra terminar o curso. Grátis e sem cadastro.">
+    <meta name="theme-color" content="#0a0f1f">
+    <link rel="canonical" href="https://slcampus.vercel.app/ferramentas/calculadora-de-cra">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SLCampus">
+    <meta property="og:locale" content="pt_BR">
+    <meta property="og:title" content="Calculadora de CRA Grátis — SLCampus">
+    <meta property="og:description" content="Calcule seu CRA com nota e créditos de cada disciplina e simule o CRA final do curso.">
+    <meta property="og:url" content="https://slcampus.vercel.app/ferramentas/calculadora-de-cra">
+    <meta property="og:image" content="https://slcampus.vercel.app/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Calculadora de CRA Grátis — SLCampus">
+    <meta name="twitter:description" content="Coeficiente de Rendimento Acadêmico na hora, sem cadastro.">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon-180.png">
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all';this.onload=null">
+    <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all';this.onload=null">
+    <noscript>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    </noscript>
+    <link rel="stylesheet" href="./ferramentas.css">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Calculadora de CRA",
+      "url": "https://slcampus.vercel.app/ferramentas/calculadora-de-cra",
+      "applicationCategory": "EducationalApplication",
+      "operatingSystem": "Web",
+      "inLanguage": "pt-BR",
+      "description": "Calcula o Coeficiente de Rendimento Acadêmico (CRA) a partir das notas e créditos de cada disciplina e projeta o CRA final com as disciplinas restantes.",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "BRL" }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Início", "item": "https://slcampus.vercel.app/" },
+        { "@type": "ListItem", "position": 2, "name": "Ferramentas", "item": "https://slcampus.vercel.app/ferramentas/" },
+        { "@type": "ListItem", "position": 3, "name": "Calculadora de CRA" }
+      ]
+    }
+    </script>
+</head>
+<body>
+    <header class="tool-nav">
+        <a class="tool-brand" href="/">
+            <img src="/logo.png" alt="SLCampus — voltar ao início">
+            <span>SLC<em>ampus</em></span>
+        </a>
+        <a class="tool-nav-cta" href="/">Abrir o SLCampus <i class="fas fa-arrow-right"></i></a>
+    </header>
+
+    <main class="tool-main">
+        <nav class="breadcrumb" aria-label="Trilha de navegação">
+            <a href="/">Início</a><span>/</span>Ferramentas<span>/</span>Calculadora de CRA
+        </nav>
+
+        <h1>Calculadora de <em>CRA</em></h1>
+        <p class="tool-lead">Calcule seu Coeficiente de Rendimento Acadêmico somando nota e créditos de cada disciplina concluída — e simule quanto falta pra terminar o curso com o CRA que você quer.</p>
+
+        <section class="tool-card" aria-labelledby="cra-title">
+            <h2 id="cra-title"><i class="fas fa-graduation-cap"></i> Disciplinas concluídas (nota e créditos)</h2>
+
+            <div class="grade-rows" id="grade-rows">
+                <div class="grade-row">
+                    <input class="input mini-label" type="text" placeholder="Disciplina (ex.: Cálculo I)" aria-label="Nome da disciplina">
+                    <input class="input" type="number" min="0" max="10" step="0.01" placeholder="Nota" aria-label="Nota da disciplina (0 a 10)" inputmode="decimal">
+                    <input class="input" type="number" min="1" step="1" placeholder="Créditos" aria-label="Créditos ou horas da disciplina" inputmode="numeric">
+                    <button class="icon-btn" type="button" aria-label="Remover disciplina"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="grade-row">
+                    <input class="input mini-label" type="text" placeholder="Disciplina (ex.: Física II)" aria-label="Nome da disciplina">
+                    <input class="input" type="number" min="0" max="10" step="0.01" placeholder="Nota" aria-label="Nota da disciplina (0 a 10)" inputmode="decimal">
+                    <input class="input" type="number" min="1" step="1" placeholder="Créditos" aria-label="Créditos ou horas da disciplina" inputmode="numeric">
+                    <button class="icon-btn" type="button" aria-label="Remover disciplina"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+
+            <div class="btn-row">
+                <button class="btn-ghost" type="button" id="add-row"><i class="fas fa-plus"></i> Adicionar disciplina</button>
+            </div>
+
+            <div class="tool-grid tool-grid-2" style="margin-top:18px">
+                <div class="field">
+                    <label for="cred-futuros">Créditos/horas ainda por cursar</label>
+                    <input class="input" id="cred-futuros" type="number" min="0" step="1" placeholder="ex.: 120" inputmode="numeric">
+                    <span class="hint">Deixe vazio se quiser só o CRA atual.</span>
+                </div>
+                <div class="field">
+                    <label for="media-futura">Média que pretende tirar nas próximas</label>
+                    <input class="input" id="media-futura" type="number" min="0" max="10" step="0.1" placeholder="ex.: 8" inputmode="decimal">
+                </div>
+            </div>
+
+            <div class="tool-result" id="result" role="status" aria-live="polite">
+                <div class="result-label">Seu CRA</div>
+                <div class="result-value" id="result-value">—</div>
+                <div class="result-note" id="result-note">Adicione as disciplinas concluídas com nota e créditos para ver o coeficiente.</div>
+                <div class="badge-line" id="result-badges"></div>
+            </div>
+        </section>
+
+        <section class="tool-content">
+            <h2>O que é o CRA</h2>
+            <p>O <strong>CRA (Coeficiente de Rendimento Acadêmico)</strong> é a média ponderada do seu histórico acadêmico: cada disciplina entra multiplicada pela sua carga em créditos ou horas. Diferente da média simples do semestre, o CRA reflete o curso inteiro — disciplinas com mais créditos pesam mais.</p>
+
+            <div class="formula">
+                CRA = Σ(nota × créditos) ÷ Σ(créditos)
+                <span class="muted">Em muitas instituições a escala vai de 0 a 10; outras usam 0 a 100 ou 0 a 4 — confira a sua.</span>
+            </div>
+
+            <p><strong>Exemplo:</strong> Cálculo I (nota 8, 6 créditos) e Física II (nota 6, 4 créditos): (8×6 + 6×4) ÷ (6+4) = <strong>7,2</strong> de CRA.</p>
+
+            <h2>Como ele é calculado na prática</h2>
+            <ul>
+                <li><strong>Disciplinas aprovadas entram com a nota</strong> — reprovados e disciplinas em andamento geralmente ficam de fora (confira o regulamento da sua instituição);</li>
+                <li><strong>Créditos valem como peso</strong>: uma matéria de 6 créditos pesa o triplo de uma de 2;</li>
+                <li><strong>Atestado de aproveitamento e transferência</strong> costumam entrar com a nota equivalentes registrada no histórico;</li>
+                <li>Alguns cursos têm <strong>CRA mínimo para colar grau</strong> ou para bolsas e intercâmbios — simule aqui antes de chegar no fim.</li>
+            </ul>
+
+            <h2>Simulando o CRA final</h2>
+            <p>Preencha os créditos que ainda faltam e a média que você pretende nas próximas disciplinas: a calculadora mostra o <strong>CRA projetado</strong>. É a forma mais direta de saber se uma disciplina de pouca nota ainda pode ser recuperada no coeficiente geral — e quanto as próximas precisam carregar.</p>
+        </section>
+
+        <section class="tool-cta">
+            <div>
+                <h2><i class="fas fa-chart-line"></i> Acompanhe notas e médias no SLCampus</h2>
+                <p>Registre provas, trabalhos e médias com peso por matéria e veja o andamento do semestre inteiro num painel só.</p>
+            </div>
+            <a class="btn-primary" href="/">Começar grátis <i class="fas fa-arrow-right"></i></a>
+        </section>
+
+        <section class="tool-related">
+            <h2>Outras ferramentas de estudo</h2>
+            <div class="tool-related-grid">
+                <a href="/ferramentas/calculadora-de-media">
+                    <strong>Calculadora de média com pesos <i class="fas fa-arrow-right"></i></strong>
+                    <small>Média ponderada do semestre, com soma dos pesos e complemento.</small>
+                </a>
+                <a href="/ferramentas/quanto-preciso-na-prova">
+                    <strong>Quanto preciso na prova <i class="fas fa-arrow-right"></i></strong>
+                    <small>Simulador: quanto tirar na última avaliação pra fechar a média.</small>
+                </a>
+                <a href="/ferramentas/pomodoro">
+                    <strong>Cronômetro Pomodoro <i class="fas fa-arrow-right"></i></strong>
+                    <small>Sessões de foco de 25 minutos com pausas — grátis online.</small>
+                </a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="tool-footer">
+        <a href="/">SLCampus</a><span class="sep">·</span>
+        <a href="/ferramentas/calculadora-de-media">Calculadora de média</a><span class="sep">·</span>
+        <a href="/ferramentas/pomodoro">Pomodoro</a><span class="sep">·</span>
+        Organize seus estudos de verdade no <a href="/">SLCampus</a><span class="sep">·</span>
+        <a href="https://link.mercadopago.com.br/slcampus" target="_blank" rel="noopener">Apoie o SLCampus <i class="fas fa-heart"></i></a>
+    </footer>
+
+    <script>
+    (function () {
+        var rowsEl = document.getElementById('grade-rows');
+        var addBtn = document.getElementById('add-row');
+        var credFutEl = document.getElementById('cred-futuros');
+        var mediaFutEl = document.getElementById('media-futura');
+        var resultBox = document.getElementById('result');
+        var resultValue = document.getElementById('result-value');
+        var resultNote = document.getElementById('result-note');
+        var resultBadges = document.getElementById('result-badges');
+
+        function num(v) {
+            var n = parseFloat(String(v).replace(',', '.'));
+            return isNaN(n) ? null : n;
+        }
+
+        function fmt(n, casas) {
+            return n.toFixed(casas === undefined ? 2 : casas).replace('.', ',');
+        }
+
+        function wireRow(row) {
+            row.addEventListener('input', calc);
+            var rm = row.querySelector('.icon-btn');
+            rm.addEventListener('click', function () {
+                row.remove();
+                calc();
+            });
+        }
+
+        Array.prototype.forEach.call(rowsEl.querySelectorAll('.grade-row'), wireRow);
+
+        addBtn.addEventListener('click', function () {
+            var row = rowsEl.querySelector('.grade-row').cloneNode(true);
+            row.querySelectorAll('input').forEach(function (i) { i.value = ''; });
+            rowsEl.appendChild(row);
+            wireRow(row);
+            row.querySelector('.mini-label').focus();
+            calc();
+        });
+
+        function calc() {
+            var somaNotaCred = 0, somaCred = 0, concluidas = 0;
+            Array.prototype.forEach.call(rowsEl.querySelectorAll('.grade-row'), function (row) {
+                var ins = row.querySelectorAll('input');
+                var nota = num(ins[1].value);
+                var cred = num(ins[2].value);
+                if (nota == null || cred == null || cred <= 0) return;
+                if (nota < 0 || nota > 10) return;
+                somaNotaCred += nota * cred;
+                somaCred += cred;
+                concluidas++;
+            });
+
+            if (somaCred <= 0) {
+                resultBox.classList.remove('has-result');
+                resultValue.textContent = '—';
+                resultValue.className = 'result-value';
+                resultNote.textContent = 'Adicione as disciplinas concluídas com nota e créditos para ver o coeficiente.';
+                resultBadges.innerHTML = '';
+                return;
+            }
+
+            var cra = somaNotaCred / somaCred;
+            resultBox.classList.add('has-result');
+            resultValue.textContent = fmt(cra);
+
+            var faixa, classe;
+            if (cra >= 9) { faixa = 'Excelente'; classe = 'ok'; }
+            else if (cra >= 8) { faixa = 'Muito bom'; classe = 'ok'; }
+            else if (cra >= 7) { faixa = 'Bom'; classe = 'ok'; }
+            else if (cra >= 5) { faixa = 'Regular'; classe = 'warn'; }
+            else { faixa = 'Abaixo de 5'; classe = 'bad'; }
+            resultValue.className = 'result-value ' + classe;
+
+            var badges = [];
+            badges.push('<span class="tbadge">' + concluidas + ' disciplina' + (concluidas > 1 ? 's' : '') + '</span>');
+            badges.push('<span class="tbadge">' + somaCred + ' créditos somados</span>');
+            badges.push('<span class="tbadge ' + (classe === 'bad' ? 'bad' : classe) + '">' + faixa + '</span>');
+
+            var credFut = num(credFutEl.value);
+            var mediaFut = num(mediaFutEl.value);
+            var note = 'CRA atual: média ponderada das notas pelo peso dos créditos.';
+
+            if (credFut != null && credFut > 0) {
+                var mFut = mediaFut != null ? mediaFut : 0;
+                if (mFut > 10) mFut = 10;
+                var craFinal = (somaNotaCred + mFut * credFut) / (somaCred + credFut);
+                note = 'Com ' + credFut + ' créditos restantes e média de ' + fmt(mFut, 1) + ' nelas, seu CRA final seria <strong>' + fmt(craFinal) + '</strong>.';
+                badges.push('<span class="tbadge">CRA projetado: ' + fmt(craFinal) + '</span>');
+                var delta = craFinal - cra;
+                badges.push(delta >= 0
+                    ? '<span class="tbadge ok">Sobe ' + fmt(Math.abs(delta)) + ' do atual</span>'
+                    : '<span class="tbadge warn">Cai ' + fmt(Math.abs(delta)) + ' do atual</span>');
+            }
+
+            resultNote.innerHTML = note;
+            resultBadges.innerHTML = badges.join('');
+        }
+
+        credFutEl.addEventListener('input', calc);
+        mediaFutEl.addEventListener('input', calc);
+        calc();
+    })();
+    </script>
+</body>
+</html>

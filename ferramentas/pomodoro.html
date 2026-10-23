@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cronômetro Pomodoro Online Grátis e Sem Cadastro | SLCampus</title>
+    <meta name="description" content="Timer Pomodoro grátis online: blocos de foco com pausas curtas e pausa longa. Funciona no celular e no computador, sem cadastro e sem anúncio.">
+    <meta name="theme-color" content="#0a0f1f">
+    <link rel="canonical" href="https://slcampus.vercel.app/ferramentas/pomodoro">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SLCampus">
+    <meta property="og:locale" content="pt_BR">
+    <meta property="og:title" content="Cronômetro Pomodoro Online Grátis — SLCampus">
+    <meta property="og:description" content="Foco de 25 minutos, pausas curtas e pausa longa — grátis, online e sem cadastro.">
+    <meta property="og:url" content="https://slcampus.vercel.app/ferramentas/pomodoro">
+    <meta property="og:image" content="https://slcampus.vercel.app/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Cronômetro Pomodoro Online Grátis — SLCampus">
+    <meta name="twitter:description" content="Método Pomodoro completo no navegador, sem instalar nada.">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon-180.png">
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all';this.onload=null">
+    <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all';this.onload=null">
+    <noscript>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    </noscript>
+    <link rel="stylesheet" href="./ferramentas.css">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Cronômetro Pomodoro",
+      "url": "https://slcampus.vercel.app/ferramentas/pomodoro",
+      "applicationCategory": "EducationalApplication",
+      "operatingSystem": "Web",
+      "inLanguage": "pt-BR",
+      "description": "Timer Pomodoro online com blocos de foco, pausas curtas, pausa longa e alerta sonoro. Grátis e sem cadastro.",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "BRL" }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Início", "item": "https://slcampus.vercel.app/" },
+        { "@type": "ListItem", "position": 2, "name": "Ferramentas", "item": "https://slcampus.vercel.app/ferramentas/" },
+        { "@type": "ListItem", "position": 3, "name": "Cronômetro Pomodoro" }
+      ]
+    }
+    </script>
+</head>
+<body>
+    <header class="tool-nav">
+        <a class="tool-brand" href="/">
+            <img src="/logo.png" alt="SLCampus — voltar ao início">
+            <span>SLC<em>ampus</em></span>
+        </a>
+        <a class="tool-nav-cta" href="/">Abrir o SLCampus <i class="fas fa-arrow-right"></i></a>
+    </header>
+
+    <main class="tool-main">
+        <nav class="breadcrumb" aria-label="Trilha de navegação">
+            <a href="/">Início</a><span>/</span>Ferramentas<span>/</span>Cronômetro Pomodoro
+        </nav>
+
+        <h1>Cronômetro <em>Pomodoro</em> online</h1>
+        <p class="tool-lead">Método Pomodoro completo no navegador: blocos de foco, pausas curtas e pausa longa, com alerta sonoro. Grátis, sem cadastro e funciona no celular.</p>
+
+        <section class="tool-card" aria-labelledby="pomo-title">
+            <h2 id="pomo-title"><i class="fas fa-stopwatch"></i> Timer</h2>
+
+            <div class="pomo-phase-label" id="pomo-phase">Foco · ciclo 1</div>
+            <div class="pomo-display" id="pomo-display" role="timer">25:00</div>
+            <div class="pomo-cycles" id="pomo-cycles" aria-hidden="true"></div>
+
+            <div class="pomo-controls">
+                <button class="btn-primary pomo-btn" type="button" id="pomo-start"><i class="fas fa-play"></i> Iniciar</button>
+                <button class="btn-ghost" type="button" id="pomo-skip"><i class="fas fa-forward"></i> Pular fase</button>
+                <button class="btn-ghost" type="button" id="pomo-reset"><i class="fas fa-rotate-left"></i> Reiniciar</button>
+            </div>
+
+            <div class="tool-grid tool-grid-2 pomo-config">
+                <div class="field">
+                    <label for="cfg-foco">Foco (minutos)</label>
+                    <input class="input" id="cfg-foco" type="number" min="5" max="90" step="1" value="25" inputmode="numeric">
+                </div>
+                <div class="field">
+                    <label for="cfg-pausa">Pausa curta (minutos)</label>
+                    <input class="input" id="cfg-pausa" type="number" min="1" max="30" step="1" value="5" inputmode="numeric">
+                </div>
+                <div class="field">
+                    <label for="cfg-longa">Pausa longa (minutos)</label>
+                    <input class="input" id="cfg-longa" type="number" min="5" max="45" step="1" value="15" inputmode="numeric">
+                </div>
+                <div class="field">
+                    <label for="cfg-ciclos">Focos até a pausa longa</label>
+                    <input class="input" id="cfg-ciclos" type="number" min="2" max="8" step="1" value="4" inputmode="numeric">
+                </div>
+            </div>
+        </section>
+
+        <section class="tool-content">
+            <h2>Como funciona o método Pomodoro</h2>
+            <p>O Pomodoro divide o estudo em blocos curtos de <strong>foco total</strong> intercalados com <strong>pausas rápidas</strong>. O clássico é 25 minutos de estudo e 5 de pausa; depois de 4 blocos, vem uma pausa longa de 15 a 30 minutos.</p>
+
+            <div class="formula">
+                4 × (25 min foco + 5 min pausa) + 15 min pausa longa
+                <span class="muted">≈ 2h30 de estudo com 30 min de pausas — dois ciclos fecham uma tarde.</span>
+            </div>
+
+            <h2>Por que funciona</h2>
+            <ul>
+                <li><strong>Uma tarefa por vez:</strong> o bloco é curto o suficiente pra você comprometer-se com ele;</li>
+                <li><strong>Pausa antes do cansaço:</strong> você descansa com a energia alta e volta;</li>
+                <li><strong>Ritmo sustentável:</strong> 4 a 6 blocos por dia já somam 2 a 3 horas de foco real — mais que a maioria das "sessões de 6 horas" atravessadas;</li>
+                <li><strong>Aviso sonoro:</strong> o timer toca um bipe quando a fase termina, mesmo com a aba em segundo plano.</li>
+            </ul>
+
+            <h2>Dicas pra aproveitar melhor</h2>
+            <ol>
+                <li>Antes de começar, escreva <strong>a meta do bloco</strong> (ex.: "fazer 5 exercícios de Cálculo") — foco sem meta vira distração;</li>
+                <li>Na pausa, <strong>sente-se da tela</strong>: alongue, beba água, janela;</li>
+                <li>Se a matéria estiver fluindo, <strong>não quebra o bloco</strong> — deixe rodar ou alongue o foco nas configurações;</li>
+                <li>Ligue o celular no modo silencioso antes do primeiro bloco.</li>
+            </ol>
+        </section>
+
+        <section class="tool-cta">
+            <div>
+                <h2><i class="fas fa-bullseye"></i> Modo Foco com estatísticas no SLCampus</h2>
+                <p>O SLCampus tem timer de estudo com pomodoro integrado, registro automático das sessões e estatísticas de horas por matéria.</p>
+            </div>
+            <a class="btn-primary" href="/">Começar grátis <i class="fas fa-arrow-right"></i></a>
+        </section>
+
+        <section class="tool-related">
+            <h2>Outras ferramentas de estudo</h2>
+            <div class="tool-related-grid">
+                <a href="/ferramentas/planificador-de-horas-de-estudo">
+                    <strong>Planificador de horas de estudo <i class="fas fa-arrow-right"></i></strong>
+                    <small>Quantas horas por dia estudar até a prova — com plano na hora.</small>
+                </a>
+                <a href="/ferramentas/calculadora-de-media">
+                    <strong>Calculadora de média com pesos <i class="fas fa-arrow-right"></i></strong>
+                    <small>Média ponderada do semestre, com soma dos pesos e complemento.</small>
+                </a>
+                <a href="/ferramentas/citacao-abnt">
+                    <strong>Gerador de citação ABNT <i class="fas fa-arrow-right"></i></strong>
+                    <small>Referência e citação direta prontas pra copiar.</small>
+                </a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="tool-footer">
+        <a href="/">SLCampus</a><span class="sep">·</span>
+        <a href="/ferramentas/calculadora-de-media">Calculadora de média</a><span class="sep">·</span>
+        <a href="/ferramentas/calculadora-de-cra">Calculadora de CRA</a><span class="sep">·</span>
+        Organize seus estudos de verdade no <a href="/">SLCampus</a><span class="sep">·</span>
+        <a href="https://link.mercadopago.com.br/slcampus" target="_blank" rel="noopener">Apoie o SLCampus <i class="fas fa-heart"></i></a>
+    </footer>
+
+    <script>
+    (function () {
+        var displayEl = document.getElementById('pomo-display');
+        var phaseEl = document.getElementById('pomo-phase');
+        var cyclesEl = document.getElementById('pomo-cycles');
+        var startBtn = document.getElementById('pomo-start');
+        var skipBtn = document.getElementById('pomo-skip');
+        var resetBtn = document.getElementById('pomo-reset');
+        var cfgFoco = document.getElementById('cfg-foco');
+        var cfgPausa = document.getElementById('cfg-pausa');
+        var cfgLonga = document.getElementById('cfg-longa');
+        var cfgCiclos = document.getElementById('cfg-ciclos');
+
+        var cfg = { foco: 25, pausa: 5, longa: 15, ciclos: 4 };
+        var state = { phase: 'foco', sessions: 0, running: false, deadline: 0, remainingMs: cfg.foco * 60000 };
+        var audioCtx = null;
+        var baseTitle = document.title;
+
+        function clampInt(el, min, max, fallback) {
+            var n = parseInt(el.value, 10);
+            if (isNaN(n) || n < min || n > max) n = fallback;
+            return n;
+        }
+
+        function readConfig() {
+            cfg.foco = clampInt(cfgFoco, 5, 90, 25);
+            cfg.pausa = clampInt(cfgPausa, 1, 30, 5);
+            cfg.longa = clampInt(cfgLonga, 5, 45, 15);
+            cfg.ciclos = clampInt(cfgCiclos, 2, 8, 4);
+        }
+
+        function phaseMinutes(phase) {
+            return phase === 'foco' ? cfg.foco : (phase === 'longa' ? cfg.longa : cfg.pausa);
+        }
+
+        function phaseName(phase) {
+            return phase === 'foco' ? 'Foco' : (phase === 'longa' ? 'Pausa longa' : 'Pausa curta');
+        }
+
+        function fmtMs(ms) {
+            var total = Math.max(0, Math.round(ms / 1000));
+            var m = Math.floor(total / 60);
+            var s = total % 60;
+            return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+        }
+
+        function renderCycles() {
+            var done = state.sessions % cfg.ciclos;
+            var html = '';
+            for (var i = 0; i < cfg.ciclos; i++) {
+                html += '<span class="pomo-dot' + (i < done ? ' done' : (state.phase === 'foco' && i === done ? ' current' : '')) + '"></span>';
+            }
+            cyclesEl.innerHTML = html;
+        }
+
+        function render(ms) {
+            var txt = fmtMs(ms);
+            displayEl.textContent = txt;
+            displayEl.className = 'pomo-display ' + state.phase;
+            phaseEl.textContent = state.phase === 'foco'
+                ? 'Foco · ciclo ' + (Math.min(state.sessions + 1, cfg.ciclos))
+                : phaseName(state.phase);
+            renderCycles();
+            document.title = state.running ? txt + ' · ' + phaseName(state.phase) + ' · SLCampus' : baseTitle;
+        }
+
+        function beep() {
+            try {
+                if (!audioCtx) return;
+                var o = audioCtx.createOscillator();
+                var g = audioCtx.createGain();
+                o.connect(g);
+                g.connect(audioCtx.destination);
+                o.type = 'sine';
+                o.frequency.value = 880;
+                var t0 = audioCtx.currentTime;
+                g.gain.setValueAtTime(0.0001, t0);
+                g.gain.exponentialRampToValueAtTime(0.3, t0 + 0.02);
+                g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.7);
+                o.start(t0);
+                o.stop(t0 + 0.75);
+            } catch (e) { /* sem áudio disponível — segue o estudo */ }
+        }
+
+        function advance() {
+            beep();
+            if (state.phase === 'foco') {
+                state.sessions++;
+                state.phase = (state.sessions % cfg.ciclos === 0) ? 'longa' : 'pausa';
+            } else {
+                state.phase = 'foco';
+            }
+            var mins = phaseMinutes(state.phase);
+            state.remainingMs = mins * 60000;
+            state.deadline = Date.now() + state.remainingMs;
+            render(state.remainingMs);
+        }
+
+        function tick() {
+            if (!state.running) return;
+            var remaining = state.deadline - Date.now();
+            if (remaining <= 0) {
+                advance();
+                return;
+            }
+            render(remaining);
+        }
+
+        function setRunning(on) {
+            state.running = on;
+            startBtn.innerHTML = on
+                ? '<i class="fas fa-pause"></i> Pausar'
+                : '<i class="fas fa-play"></i> Iniciar';
+            render(state.remainingMs);
+        }
+
+        startBtn.addEventListener('click', function () {
+            if (!audioCtx) {
+                try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+            }
+            if (state.running) {
+                state.remainingMs = Math.max(0, state.deadline - Date.now());
+                setRunning(false);
+            } else {
+                if (state.remainingMs <= 0) state.remainingMs = phaseMinutes(state.phase) * 60000;
+                state.deadline = Date.now() + state.remainingMs;
+                setRunning(true);
+            }
+        });
+
+        skipBtn.addEventListener('click', function () {
+            if (!audioCtx) {
+                try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+            }
+            advance();
+        });
+
+        resetBtn.addEventListener('click', function () {
+            state.phase = 'foco';
+            state.sessions = 0;
+            setRunning(false);
+            state.remainingMs = cfg.foco * 60000;
+            render(state.remainingMs);
+        });
+
+        [cfgFoco, cfgPausa, cfgLonga, cfgCiclos].forEach(function (el) {
+            el.addEventListener('change', function () {
+                readConfig();
+                if (!state.running) {
+                    state.phase = 'foco';
+                    state.sessions = 0;
+                    state.remainingMs = cfg.foco * 60000;
+                    render(state.remainingMs);
+                }
+            });
+        });
+
+        setInterval(tick, 250);
+        readConfig();
+        render(state.remainingMs);
+    })();
+    </script>
+</body>
+</html>

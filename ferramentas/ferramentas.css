@@ -305,6 +305,71 @@ a:hover { text-decoration: underline; }
 .tool-related-grid strong { display: block; font-size: .95rem; margin-bottom: 3px; }
 .tool-related-grid small { color: var(--t-muted); font-size: .82rem; line-height: 1.45; display: block; }
 
+/* ── Pomodoro ─────────────────────────────────────────────────────── */
+.pomo-phase-label {
+  text-align: center;
+  font-size: .85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--t-muted);
+  margin-bottom: 4px;
+}
+.pomo-display {
+  text-align: center;
+  font-size: clamp(3.2rem, 12vw, 5rem);
+  font-weight: 800;
+  letter-spacing: -.03em;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+  margin: 4px 0 10px;
+  color: var(--t-text);
+  transition: color .2s ease;
+}
+.pomo-display.foco { color: var(--t-accent); }
+.pomo-display.pausa { color: var(--t-ok); }
+.pomo-display.longa { color: var(--t-accent-2); }
+
+.pomo-cycles { display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; }
+.pomo-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: rgba(148, 163, 184, .25);
+  transition: background .2s ease, box-shadow .2s ease;
+}
+.pomo-dot.done { background: var(--t-ok); }
+.pomo-dot.current { background: var(--t-accent); box-shadow: 0 0 0 3px rgba(59, 130, 246, .25); }
+
+.pomo-controls { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 18px; }
+.pomo-btn { border: 0; cursor: pointer; font: inherit; }
+.pomo-config { margin-top: 6px; }
+
+/* ── Checkbox (planificador) ──────────────────────────────────────── */
+.check-line {
+  display: inline-flex; align-items: center; gap: 9px;
+  font-size: .9rem; font-weight: 700; color: var(--t-text);
+  cursor: pointer; min-height: 42px;
+}
+.check-line input[type="checkbox"] {
+  width: 18px; height: 18px; accent-color: var(--t-accent); cursor: pointer;
+}
+
+/* ── Citações ABNT ────────────────────────────────────────────────── */
+.tipo-grupo { margin-top: 14px; }
+.tipo-grupo[hidden] { display: none; }
+.cite-block { margin-top: 14px; }
+.cite-out {
+  background: rgba(2, 8, 23, .55);
+  border: 1px solid var(--t-border);
+  border-left: 3px solid var(--t-accent-2);
+  border-radius: 11px;
+  padding: 13px 16px;
+  font-size: .93rem;
+  line-height: 1.55;
+  color: var(--t-text);
+  overflow-wrap: anywhere;
+}
+.tool-result .cite-out { margin-top: 8px; text-align: left; }
+
 /* ── Rodapé ───────────────────────────────────────────────────────── */
 .tool-footer {
   border-top: 1px solid var(--t-border);
