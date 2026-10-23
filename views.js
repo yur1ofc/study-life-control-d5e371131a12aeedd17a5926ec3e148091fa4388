@@ -1822,7 +1822,9 @@ class ViewRenderer {
                     <button class="btn-secondary" id="btn-abrir-ajuda">
                         <i class="fas fa-question-circle"></i> Central de Ajuda
                     </button>
-
+                    <a class="btn-secondary" href="https://link.mercadopago.com.br/slcampus" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;text-decoration:none;color:inherit;">
+                        <i class="fas fa-heart" style="color:#f472b6"></i> Apoie o SLCampus
+                    </a>
                 </div>
             </div>`;
         }
