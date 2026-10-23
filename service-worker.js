@@ -5,7 +5,11 @@
 // adicione ele aqui também — senão ele só entra no cache dinâmico depois
 // do primeiro acesso online, e falha se o usuário abrir o app offline
 // (ou logo após instalar como PWA) antes disso acontecer.
-const CACHE_VERSION = 'slc-v65-icons-og';
+// Bump a cada deploy que mexe em JS/HTML/CSS: sem mudar ESTES bytes o
+// navegador não reinstala o SW e o cache-first serve os arquivos antigos
+// para sempre (o STATIC_CACHE pré-cacheado na instalação nunca é atualizado
+// por conta própria — só a activate com nome de cache novo o substitui).
+const CACHE_VERSION = 'slc-v66-fixes-ptbr';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 
