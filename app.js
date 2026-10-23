@@ -127,7 +127,7 @@ class StudyLifeControl {
 
         const revisoesHoje = window.reviewSystem.getRevisoesHoje();
         if (revisoesHoje.length > 0) {
-            showToast(`Você tem ${revisoesHoje.length} revisão(ões) para hoje!`, 'info');
+            showToast(`Você tem ${revisoesHoje.length} ${revisoesHoje.length === 1 ? 'revisão' : 'revisões'} para hoje!`, 'info');
         }
     }
 
@@ -3349,7 +3349,7 @@ StudyLifeControl.prototype.excluirExtraCourse = async function(id) {
         if (upcomingExam && diasAte(upcomingExam.data) <= 7) recommendation = `Focar em ${subjectName} agora: revisar conteúdo + resolver questões até ${formatarData(upcomingExam.data)}.`;
         else if (average > 0 && average < 6) recommendation = `Prioridade alta em ${subjectName}: recuperar média com revisão ativa e lista de exercícios.`;
         else if (tasks.length >= 2) recommendation = `Fechar ${tasks.length} pendências de ${subjectName} antes de abrir novos conteúdos.`;
-        else if (reviewsPending.length) recommendation = `${reviewsPending.length} revisão(ões) de ${subjectName} pendente(s) — é o caminho mais rápido pra fixar.`;
+        else if (reviewsPending.length) recommendation = `${reviewsPending.length} ${reviewsPending.length === 1 ? 'revisão pendente' : 'revisões pendentes'} de ${subjectName} — é o caminho mais rápido pra fixar.`;
         else if (!hasGrades && !hasSessions && !hasDiaries) recommendation = `${subjectName} ainda não tem registros — lance a primeira sessão ou diário pra análise ganhar forma.`;
         else if (daysWithoutStudy !== null && daysWithoutStudy >= 5) recommendation = `${daysWithoutStudy} dias sem sessão em ${subjectName} — retome com um bloco curto de revisão.`;
         else if (!hasGrades) recommendation = `Sem notas em ${subjectName} ainda — lance a primeira avaliação para acompanhar a média.`;
@@ -3473,7 +3473,7 @@ StudyLifeControl.prototype.excluirExtraCourse = async function(id) {
         const tasksTotal = (this.data.tasks || []).length;
         const reviewsToday = this.getReviewItemsForDays(0).length;
         return {
-            daily: `Hoje você concluiu ${Number(this.calcularProgressoHoje().concluido).toFixed(1)}h de estudo e tem ${reviewsToday} revisão(ões) pendente(s).`,
+            daily: `Hoje você concluiu ${Number(this.calcularProgressoHoje().concluido).toFixed(1)}h de estudo e tem ${reviewsToday} ${reviewsToday === 1 ? 'revisão pendente' : 'revisões pendentes'}.`,
             weekly: `Essa semana você estudou ${goals.weeklyHours.toFixed(1)}h. A matéria mais forte foi ${strongest} e a mais negligenciada foi ${weakest}. Você concluiu ${tasksDone} de ${tasksTotal} tarefa(s).`,
             monthly: `No mês atual você acumula ${goals.monthlyHours.toFixed(1)}h estudadas e ${goals.weeklyPomodoros} pomodoro(s) registrados nos últimos 7 dias.`
         };
