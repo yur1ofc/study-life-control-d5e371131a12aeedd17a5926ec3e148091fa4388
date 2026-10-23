@@ -1818,6 +1818,18 @@ class ViewRenderer {
                     <strong>Conta conectada</strong>
                     <p style="color:var(--text-secondary);margin-top:4px;font-size:.9rem">${email}</p>
                 </div>
+                <div class="card" style="padding:18px;">
+                    <strong><i class="fas fa-desktop" style="color:var(--accent-primary,#4f8cff)"></i> Aplicativo para PC (Windows)</strong>
+                    <p style="color:var(--text-secondary);margin-top:4px;font-size:.9rem">Instale o SLCampus no seu computador — mesma conta e mesmos dados, com bandeja, atalho global e notificações do Windows.</p>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
+                        <a class="btn-primary" href="https://github.com/yur1ofc/study-life-control-d5e371131a12aeedd17a5926ec3e148091fa4388/releases/download/desktop-v1.0.0/SLCampus-Setup-1.0.0.exe" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;text-decoration:none;">
+                            <i class="fas fa-download"></i> Baixar instalador
+                        </a>
+                        <a class="btn-secondary" href="https://github.com/yur1ofc/study-life-control-d5e371131a12aeedd17a5926ec3e148091fa4388/releases/download/desktop-v1.0.0/SLCampus-Portable-1.0.0.exe" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;text-decoration:none;color:inherit;">
+                            <i class="fas fa-hard-drive"></i> Versão portátil
+                        </a>
+                    </div>
+                </div>
                 <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;">
                     <button class="btn-secondary" id="btn-abrir-ajuda">
                         <i class="fas fa-question-circle"></i> Central de Ajuda

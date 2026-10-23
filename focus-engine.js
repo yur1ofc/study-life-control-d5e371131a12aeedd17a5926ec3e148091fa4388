@@ -390,7 +390,11 @@
 
   function notify(title, body, tag) {
     try {
-      if ('Notification' in window && Notification.permission === 'granted') {
+      if (window.slcDesktop && window.slcDesktop.isDesktop) {
+        // App desktop instalado: notificação nativa do Windows (aparece na central
+        // de notificações mesmo com o app oculto na bandeja).
+        window.slcDesktop.notify(title, body);
+      } else if ('Notification' in window && Notification.permission === 'granted') {
         if (navigator.serviceWorker?.ready) {
           navigator.serviceWorker.ready.then(reg => {
             reg.showNotification(title, {
