@@ -1830,6 +1830,16 @@ class ViewRenderer {
                         </a>
                     </div>
                 </div>
+                <div class="card" style="padding:18px;">
+                    <strong><i class="fas fa-scale-balanced" style="color:var(--accent-primary,#4f8cff)"></i> Informações legais</strong>
+                    <div style="display:flex;gap:8px 16px;flex-wrap:wrap;margin-top:10px;font-size:.88rem;">
+                        <a href="/privacidade" style="color:var(--accent-primary,#4f8cff)">Política de Privacidade</a>
+                        <a href="/termos" style="color:var(--accent-primary,#4f8cff)">Termos de Serviço</a>
+                        <a href="/cookies" style="color:var(--accent-primary,#4f8cff)">Aviso de Cookies</a>
+                        <a href="/reembolso" style="color:var(--accent-primary,#4f8cff)">Política de Reembolso</a>
+                    </div>
+                    <p style="color:var(--text-secondary);margin-top:10px;font-size:.85rem;">© 2026 SLCampus — projeto pessoal de Yuri Menezes · <a href="mailto:slcampusoficial@gmail.com" style="color:var(--text-secondary)">slcampusoficial@gmail.com</a> · <a href="https://www.instagram.com/slcampus/" target="_blank" rel="noopener" style="color:var(--text-secondary)">@slcampus</a></p>
+                </div>
                 <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;">
                     <button class="btn-secondary" id="btn-abrir-ajuda">
                         <i class="fas fa-question-circle"></i> Central de Ajuda

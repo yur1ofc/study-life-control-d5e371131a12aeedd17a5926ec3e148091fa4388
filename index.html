@@ -257,6 +257,13 @@
                 <div class="landing-brand landing-brand-footer"><img src="logo.png" alt="SLCampus"><span>SLCampus</span></div>
                 <span>Organize. Estude. Evolua.</span>
                 <a class="landing-support-link" href="https://link.mercadopago.com.br/slcampus" target="_blank" rel="noopener"><i class="fas fa-heart"></i> Apoie o SLCampus</a>
+                <nav class="landing-footer-legal" aria-label="Páginas legais">
+                    <a href="/privacidade">Política de Privacidade</a>
+                    <a href="/termos">Termos de Serviço</a>
+                    <a href="/cookies">Aviso de Cookies</a>
+                    <a href="/reembolso">Política de Reembolso</a>
+                    <span>© 2026 SLCampus · projeto pessoal de Yuri Menezes</span>
+                </nav>
             </footer>
         </section>
 
@@ -1363,5 +1370,44 @@
 <script defer src="adaptive-learning-engine.js"></script>
 <script defer src="notification-ui.js"></script>
 <script defer src="telegram-integration.js"></script>
+<!-- Aviso de cookies (item 3 / LGPD): só dados essenciais, sem rastreamento. Autocontido pra funcionar na landing e no app. -->
+<div id="cookie-notice" class="slc-cookie-notice" role="region" aria-label="Aviso de cookies" hidden>
+    <div class="slc-cookie-text">
+        <i class="fas fa-cookie-bite" aria-hidden="true"></i>
+        <p>Usamos apenas cookies essenciais para o app funcionar — <strong>sem analytics, sem anúncios, sem rastreamento</strong>. <a href="/cookies">Saiba mais</a></p>
+    </div>
+    <button type="button" id="cookie-notice-accept" class="slc-cookie-btn">Entendi</button>
+</div>
+<style>
+.slc-cookie-notice{position:fixed;left:16px;right:16px;bottom:16px;z-index:1400;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;background:rgba(11,16,27,.97);border:1px solid rgba(148,163,184,.22);border-radius:16px;padding:14px 18px;box-shadow:0 20px 50px rgba(0,0,0,.5);backdrop-filter:blur(12px);font-family:'Plus Jakarta Sans',system-ui,sans-serif;animation:slcCookieIn .35s ease both}
+.slc-cookie-notice[hidden]{display:none!important}
+.slc-cookie-text{display:flex;align-items:flex-start;gap:11px;flex:1;min-width:230px}
+.slc-cookie-text i{color:#60a5fa;font-size:16px;margin-top:3px}
+.slc-cookie-text p{margin:0;color:#9ba7bb;font-size:13px;line-height:1.55}
+.slc-cookie-text strong{color:#f7f9ff}
+.slc-cookie-text a{color:#82a8ff;font-weight:700}
+.slc-cookie-text a:hover{color:#fff}
+.slc-cookie-btn{border:0;background:linear-gradient(110deg,#2563eb,#7c3aed);color:#fff;border-radius:11px;padding:10px 22px;font:inherit;font-size:13px;font-weight:800;cursor:pointer;transition:transform .15s,filter .15s;white-space:nowrap}
+.slc-cookie-btn:hover{transform:translateY(-1px);filter:saturate(1.08)}
+.slc-cookie-btn:focus-visible{outline:2px solid #60a5fa;outline-offset:3px}
+@keyframes slcCookieIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@media (max-width:560px){.slc-cookie-notice{left:10px;right:10px;bottom:10px;padding:13px 15px}.slc-cookie-btn{width:100%}}
+@media (prefers-reduced-motion:reduce){.slc-cookie-notice{animation:none}}
+</style>
+<script>
+(function () {
+    try {
+        if (localStorage.getItem('slc_cookie_notice') === 'ok') return;
+        var box = document.getElementById('cookie-notice');
+        if (!box) return;
+        box.hidden = false;
+        var btn = document.getElementById('cookie-notice-accept');
+        if (btn) btn.addEventListener('click', function () {
+            try { localStorage.setItem('slc_cookie_notice', 'ok'); } catch (e) {}
+            box.hidden = true;
+        });
+    } catch (e) {}
+})();
+</script>
 </body>
 </html>

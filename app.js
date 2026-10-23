@@ -438,8 +438,10 @@ class StudyLifeControl {
         if (avatarEl) {
             if (user?.photoURL) {
                 avatarEl.src = user.photoURL;
+                avatarEl.alt = 'Sua foto de perfil';
                 avatarEl.style.display = 'block';
             } else {
+                avatarEl.alt = '';
                 avatarEl.style.display = 'none';
             }
         }
