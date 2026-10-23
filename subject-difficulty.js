@@ -117,7 +117,8 @@
     const manualDificuldade = clamp(Math.round(num(
         subject?.dificuldadeManual ?? (subject?.dificuldadeAutomatica === true ? null : subject?.dificuldade)
     ) ?? 3), 1, 5);
-    if (manualDificuldade >= 4 && values.length < 3) value = Math.max(value, manualDificuldade);
+    const pisoManualAplicado = manualDificuldade >= 4 && values.length < 3 && value < manualDificuldade;
+    if (pisoManualAplicado) value = manualDificuldade;
 
     value = clamp(value,1,5);
     const labels = {1:'fácil',2:'média-baixa',3:'média',4:'média-alta',5:'difícil'};
@@ -129,6 +130,7 @@
     if (evidenceAvg !== null) reasons.push(`evidência de aprendizagem ${evidenceAvg.toFixed(1)}/5`);
     if (questionAvg !== null) reasons.push(`recuperação ativa ${questionAvg.toFixed(1)}/5`);
     if (inactivityReason) reasons.push(inactivityReason);
+    if (pisoManualAplicado) reasons.push('piso da sua escolha manual — poucas notas pra contradizer você');
 
     const current = clamp(Math.round(num(subject?.dificuldade) ?? 3), 1, 5);
     const changed = current !== value;
@@ -145,7 +147,7 @@
       value,
       label: labels[value],
       confidence,
-      source: 'automática',
+      source: pisoManualAplicado ? 'manual' : 'automática',
       reason: reasons.join(', '),
       action,
       evidenceCount: evidenceValues.length,

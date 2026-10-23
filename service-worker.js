@@ -9,7 +9,7 @@
 // navegador não reinstala o SW e o cache-first serve os arquivos antigos
 // para sempre (o STATIC_CACHE pré-cacheado na instalação nunca é atualizado
 // por conta própria — só a activate com nome de cache novo o substitui).
-const CACHE_VERSION = 'slc-v67-ai-assistant-fix';
+const CACHE_VERSION = 'slc-v68-difficulty-source';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 
