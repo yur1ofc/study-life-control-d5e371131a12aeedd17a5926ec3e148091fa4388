@@ -3,21 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SLCampus — Seu sistema de estudos</title>
-    <meta name="description" content="Organize estudos, materiais, provas, tarefas e rotina em um único espaço inteligente para estudar melhor.">
+    <title>SLCampus — Organizador de estudos: materiais, notas, revisões e rotina</title>
+    <meta name="description" content="SLCampus é o organizador de estudos completo: cadastre materiais, lançe notas com peso, acompanhe revisões, estatísticas e rotina de estudos em um só lugar.">
+    <link rel="canonical" href="https://slcampus.vercel.app/">
     <meta name="theme-color" content="#0a0f1f">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta property="og:title" content="SLCampus">
-    <meta property="og:description" content="Seu espaço inteligente para estudar, organizar e evoluir.">
+    <meta property="og:title" content="SLCampus — Organizador de estudos">
+    <meta property="og:description" content="Organize materiais, notas, revisões e rotina de estudos em um só lugar. grátis e sem complicar.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://slcampus.vercel.app">
     <meta property="og:image" content="https://slcampus.vercel.app/og-image.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="SLCampus">
-    <meta name="twitter:description" content="Seu espaço inteligente para estudar, organizar e evoluir.">
+    <meta name="twitter:title" content="SLCampus — Organizador de estudos">
+    <meta name="twitter:description" content="Organize materiais, notas, revisões e rotina de estudos em um só lugar.">
     <meta name="twitter:image" content="https://slcampus.vercel.app/og-image.png">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -32,8 +33,17 @@
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="landing.css">
     <link rel="stylesheet" href="scroll-motion.css">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- CSS de terceiros NÃO bloqueia a pintura: baixa em paralelo (preload) e
+         entra como print, virando all quando pronto. Texto aparece com fonte
+         reserva (display=swap) e os ícones FA entram logo em seguida. -->
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all';this.onload=null">
+    <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all';this.onload=null">
+    <noscript>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    </noscript>
 
     <!-- Motor de tema: carrega antes de tudo para evitar flash -->
     <script src="theme-engine.js"></script>
@@ -48,6 +58,36 @@
     <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics-compat.js"></script>
     <script defer src="curriculum-catalog.js"></script>
     <link rel="stylesheet" href="launch-polish.css">
+
+    <!-- SEO: dados estruturados p/ rich results -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "SLCampus",
+      "url": "https://slcampus.vercel.app/",
+      "description": "Organizador de estudos completo: materiais, notas com peso, revisões, estatísticas e rotina em um só lugar.",
+      "inLanguage": "pt-BR",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://slcampus.vercel.app/?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "SLCampus",
+      "operatingSystem": "Web",
+      "applicationCategory": "EducationalApplication",
+      "url": "https://slcampus.vercel.app/",
+      "description": "App de organização de estudos com biblioteca de materiais, notas com peso, painel de revisões, estatísticas e diário de estudos.",
+      "inLanguage": "pt-BR",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "BRL" }
+    }
+    </script>
 </head>
 <body>
     <div id="app">
