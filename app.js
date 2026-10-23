@@ -335,6 +335,7 @@ class StudyLifeControl {
         document.getElementById('form-prova')?.addEventListener('submit', e => this.handleProvaSubmit(e));
         document.getElementById('form-topico')?.addEventListener('submit', e => this.handleTopicoSubmit(e));
         document.getElementById('form-nota')?.addEventListener('submit', e => this.handleNotaSubmit(e));
+        document.getElementById('nota-materia')?.addEventListener('change', () => this.updateNotaPesoHint());
         document.getElementById('form-material')?.addEventListener('submit', e => this.handleMaterialSubmit(e));
         document.getElementById('form-materia')?.addEventListener('submit', e => this.handleMateriaSubmit(e));
         document.getElementById('form-curriculum')?.addEventListener('submit', e => this.handleCurriculumSubmit(e));
@@ -1125,6 +1126,7 @@ class StudyLifeControl {
             document.getElementById('nota-avaliacao').value = data.avaliacao || '';
             document.getElementById('nota-valor').value = data.valor ?? '';
             document.getElementById('nota-peso').value = data.peso || 100;
+            this.updateNotaPesoHint();
         }
 
         if (modalType === 'material') {
@@ -1787,6 +1789,29 @@ class StudyLifeControl {
         }
     }
 
+    // Mostra no modal de nota quanto de peso já foi lançado na matéria
+    // (descontando a nota que está sendo editada) — evita descobrir o
+    // limite de 100% só depois do bloqueio no salvamento.
+    updateNotaPesoHint() {
+        const status = document.getElementById('nota-peso-status');
+        if (!status) return;
+        const materia = document.getElementById('nota-materia').value;
+        if (!materia) { status.textContent = ''; status.style.color = ''; return; }
+        const outras = (this.data.grades || []).filter(n => n.materia === materia && n.id !== this.editingGradeId);
+        const usados = outras.reduce((sum, n) => sum + (Number(n.peso) || 0), 0);
+        const sobra = Number((100 - usados).toFixed(1));
+        if (usados <= 0) {
+            status.textContent = `Nenhum peso lançado ainda em ${materia} — esta avaliação pode usar até 100%.`;
+            status.style.color = '';
+        } else if (sobra > 0) {
+            status.textContent = `Já lançado em ${materia}: ${Number(usados.toFixed(1))}% dos pesos — sobram ${sobra}% pra esta avaliação.`;
+            status.style.color = '';
+        } else {
+            status.textContent = `Já lançado em ${materia}: ${Number(usados.toFixed(1))}% dos pesos — não sobra peso; edite uma nota já registrada pra liberar.`;
+            status.style.color = 'var(--color-warning, #e6a23c)';
+        }
+    }
+
     async handleNotaSubmit(e) {
         e.preventDefault();
 
@@ -1806,7 +1831,8 @@ class StudyLifeControl {
         const outrasNotas = (this.data.grades || []).filter(n => n.materia === materia && n.id !== this.editingGradeId);
         const pesoTotal = outrasNotas.reduce((sum, n) => sum + (Number(n.peso) || 0), 0) + peso;
         if (pesoTotal > 100.0001) {
-            showToast(`Os pesos das avaliações de ${materia} ultrapassariam 100% (${pesoTotal.toFixed(1)}%).`, 'warning');
+            const jaLancados = Number((pesoTotal - peso).toFixed(1));
+            showToast(`Os pesos das avaliações de ${materia} ultrapassariam 100% (${pesoTotal.toFixed(1)}%). Já estão lançados ${jaLancados}% — reduza o peso desta nota ou edite uma já registrada.`, 'warning');
             return;
         }
 
