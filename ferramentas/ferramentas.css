@@ -340,7 +340,20 @@ a:hover { text-decoration: underline; }
 .pomo-dot.current { background: var(--t-accent); box-shadow: 0 0 0 3px rgba(59, 130, 246, .25); }
 
 .pomo-controls { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 18px; }
-.pomo-btn { border: 0; cursor: pointer; font: inherit; }
+.pomo-btn {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  font-size: .95rem;
+  padding: 13px 24px;
+  border-radius: 12px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--t-accent), var(--t-accent-2));
+  box-shadow: 0 12px 30px rgba(59, 130, 246, .3);
+  transition: transform .18s ease;
+}
+.pomo-btn:hover { transform: translateY(-2px); }
 .pomo-config { margin-top: 6px; }
 
 /* ── Checkbox (planificador) ──────────────────────────────────────── */
