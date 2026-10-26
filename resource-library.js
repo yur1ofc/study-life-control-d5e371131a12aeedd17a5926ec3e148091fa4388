@@ -1,14 +1,18 @@
 // resource-library.js — Biblioteca de estudos SLCampus
-// Recursos privados por padrão. PDFs são enviados ao Firebase Storage;
-// vídeos do YouTube e sites ficam como links externos.
+// Recursos privados por padrão. PDFs são enviados ao Vercel Blob (store
+// privado, plano Hobby gratuito); vídeos do YouTube e sites ficam como links.
 // Não baixa/republica conteúdo de terceiros.
 (function () {
   'use strict';
 
   const COLLECTION = 'resources';
   const MAX_PDF_BYTES = 25 * 1024 * 1024;
+  const BLOB_MARKER = 'vercel-blob:private';
 
   function uid() { return window.auth?.currentUser?.uid || null; }
+  function isBlobResource(item) {
+    return !!(item && item.storagePath && item.url === BLOB_MARKER);
+  }
   function esc(v) {
     const d = document.createElement('div'); d.textContent = v == null ? '' : String(v);
     return d.innerHTML;
@@ -46,13 +50,13 @@
     return snap.docs.map(d => ({id:d.id, ...d.data()}));
   }
 
-  async function add(data, file) {
+  async function add(data, file, onProgress) {
     const id = uid(); const firestore = db();
     if (!id || !firestore) throw new Error('Você precisa estar conectado.');
     if (!data.titulo?.trim()) throw new Error('Informe um título.');
     if (data.tipo === 'pdf') {
       if (!file) throw new Error('Selecione um PDF.');
-      if (file.type !== 'application/pdf') throw new Error('O arquivo precisa ser PDF.');
+      if (file.type && file.type !== 'application/pdf') throw new Error('O arquivo precisa ser PDF.');
       if (file.size > MAX_PDF_BYTES) throw new Error('PDF acima de 25 MB.');
     } else if (data.tipo === 'video') {
       if (!normalizeYouTube(data.url || '')) throw new Error('Informe uma URL válida do YouTube.');
@@ -66,12 +70,28 @@
     let storagePath = '';
 
     if (data.tipo === 'pdf') {
-      const st = storage();
-      if (!st) throw new Error('Armazenamento de arquivos indisponível.');
-      const safe = file.name.replace(/[^\w.\- ]/g, '_').slice(0, 120);
-      storagePath = `users/${id}/resources/${ref.id}/${safe}`;
-      const snap = await st.ref(storagePath).put(file, {contentType:'application/pdf'});
-      url = await snap.ref.getDownloadURL();
+      if (!file) throw new Error('Selecione um arquivo PDF.');
+      if (file.size > MAX_PDF_BYTES) throw new Error('O PDF deve ter no máximo 25 MB.');
+      if (file.type && file.type !== 'application/pdf') throw new Error('Envie um arquivo PDF.');
+      const upload = window.SLCBlob?.upload;
+      if (typeof upload !== 'function') throw new Error('Upload indisponível. Recarregue a página e tente novamente.');
+      const safe = String(file.name || 'documento.pdf').replace(/[^\w.\-]/g, '_').slice(0, 110) || 'documento';
+      const fileName = /\.pdf$/i.test(safe) ? safe : `${safe}.pdf`;
+      storagePath = `users/${id}/resources/${ref.id}/${fileName}`;
+      const idToken = await window.auth.currentUser.getIdToken();
+      const blob = await upload(storagePath, file, {
+        access: 'private',
+        handleUploadUrl: '/api/blob-upload',
+        clientPayload: JSON.stringify({ resourceId: ref.id }),
+        headers: { Authorization: `Bearer ${idToken}` },
+        contentType: 'application/pdf',
+        multipart: file.size > 4.5 * 1024 * 1024,
+        onUploadProgress: (event) => {
+          if (typeof onProgress === 'function') onProgress(event);
+        }
+      });
+      storagePath = blob.pathname || storagePath;
+      url = BLOB_MARKER;
     }
 
     const payload = {
@@ -86,7 +106,16 @@
       createdAt: now,
       updatedAt: now
     };
-    await ref.set(payload);
+    try {
+      await ref.set(payload);
+    } catch (err) {
+      // Não deixa um PDF órfão consumindo a cota gratuita do Blob se o
+      // Firestore recusar o registro.
+      if (storagePath && url === BLOB_MARKER) {
+        try { await deleteBlobFile(storagePath); } catch (_) {}
+      }
+      throw err;
+    }
     // Devolve o item COMPLETO (createdAt legível em vez do serverTimestamp
     // pendente) pra UI inserir na lista na hora. Sem isso, o list() imediato
     // não enxergava o registro novo: orderBy em campo com timestamp pendente
@@ -95,10 +124,75 @@
     return { id: ref.id, ...payload, createdAt: new Date().toISOString() };
   }
 
+  async function deleteBlobFile(storagePath) {
+    const user = window.auth?.currentUser;
+    if (!user || !storagePath) return;
+    const token = await user.getIdToken();
+    const res = await fetch('/api/blob-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ pathname: storagePath })
+    });
+    if (!res.ok) {
+      let message = 'Não foi possível excluir o PDF.';
+      try { const data = await res.json(); if (data?.error) message = data.error; } catch (_) {}
+      throw new Error(message);
+    }
+  }
+
+  async function openResource(item) {
+    // Abre a aba antes do await para não cair no bloqueador de pop-up.
+    const win = window.open('', '_blank');
+    if (win) {
+      try {
+        win.document.write('<!doctype html><title>Abrindo PDF...</title><p style="font-family:system-ui;padding:24px">Carregando PDF...</p>');
+        win.document.close();
+      } catch (_) {}
+    }
+    try {
+      const directUrl = !isBlobResource(item) && /^https?:\/\//i.test(item.url || '') ? item.url : '';
+      if (directUrl) {
+        if (win) win.location.href = directUrl;
+        else window.open(directUrl, '_blank', 'noopener');
+        return;
+      }
+      const user = window.auth?.currentUser;
+      if (!user) throw new Error('Sessão expirada.');
+      if (!item.storagePath) throw new Error('Este recurso não tem arquivo para abrir.');
+      let fileUrl = '';
+      if (isBlobResource(item)) {
+        const token = await user.getIdToken();
+        const res = await fetch(`/api/blob-download?pathname=${encodeURIComponent(item.storagePath)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store'
+        });
+        if (!res.ok) {
+          let message = 'Não foi possível abrir o PDF.';
+          try { const data = await res.json(); if (data?.error) message = data.error; } catch (_) {}
+          throw new Error(message);
+        }
+        const blob = await res.blob();
+        fileUrl = URL.createObjectURL(blob);
+        setTimeout(() => URL.revokeObjectURL(fileUrl), 120000);
+      } else {
+        const st = storage();
+        if (!st) throw new Error('Armazenamento de arquivos indisponível.');
+        fileUrl = await st.ref(item.storagePath).getDownloadURL();
+      }
+      if (win) win.location.href = fileUrl;
+      else window.open(fileUrl, '_blank', 'noopener');
+    } catch (err) {
+      if (win) { try { win.close(); } catch (_) {} }
+      window.showToast?.(err.message || 'Não foi possível abrir o PDF.', 'error');
+    }
+  }
+
   async function remove(item) {
     const id = uid(); const firestore = db();
     if (!id || !firestore) throw new Error('Sessão expirada.');
-    if (item.storagePath && storage()) {
+    if (isBlobResource(item) && item.storagePath) {
+      try { await deleteBlobFile(item.storagePath); } catch (e) { console.warn('[Biblioteca] PDF Blob:', e); }
+    } else if (item.storagePath && storage()) {
       try { await storage().ref(item.storagePath).delete(); } catch (e) { console.warn('[Biblioteca] arquivo:', e); }
     }
     await firestore.collection('users').doc(id).collection(COLLECTION).doc(item.id).delete();
@@ -112,6 +206,9 @@
 
   function renderCard(item) {
     const link = item.tipo === 'video' ? normalizeYouTube(item.url) : item.url;
+    const openControl = (item.tipo === 'pdf' && item.storagePath)
+      ? `<button class="btn-primary btn-resource-open" data-resource-open="${esc(item.id)}"><i class="fas fa-arrow-up-right-from-square"></i> Abrir</button>`
+      : (link ? `<a class="btn-primary btn-resource-open" href="${esc(link)}" target="_blank" rel="noopener noreferrer"><i class="fas fa-arrow-up-right-from-square"></i> Abrir</a>` : '');
     return `<article class="resource-card">
       <div class="resource-card-icon type-${esc(item.tipo)}"><i class="fas ${typeIcon(item.tipo)}"></i></div>
       <div class="resource-card-main">
@@ -123,7 +220,7 @@
         ${item.materia ? `<span class="resource-subject"><i class="fas fa-book"></i> ${esc(item.materia)}</span>` : ''}
         ${item.descricao ? `<p>${esc(item.descricao)}</p>` : ''}
         <div class="resource-actions">
-          ${link ? `<a class="btn-primary btn-resource-open" href="${esc(link)}" target="_blank" rel="noopener noreferrer"><i class="fas fa-arrow-up-right-from-square"></i> Abrir</a>` : ''}
+          ${openControl}
           <button class="btn-secondary" data-resource-delete="${esc(item.id)}"><i class="fas fa-trash"></i></button>
         </div>
       </div>
@@ -161,6 +258,9 @@
         const item=items.find(x=>x.id===btn.dataset.resourceDelete); if(!item) return;
         if (!window.SLCConfirm?.show) { if(!confirm('Excluir este recurso?')) return; } else if(!(await window.SLCConfirm.show('Excluir este recurso?'))) return;
         await remove(item); const i=items.indexOf(item); if(i>=0)items.splice(i,1); draw();
+      });
+      grid.querySelectorAll('[data-resource-open]').forEach(btn=>btn.onclick=()=>{
+        const item=items.find(x=>x.id===btn.dataset.resourceOpen); if(item) openResource(item);
       });
       grid.querySelectorAll('[data-resource-fav]').forEach(btn=>btn.onclick=async()=>{
         const item=items.find(x=>x.id===btn.dataset.resourceFav); if(!item)return;
@@ -211,7 +311,10 @@
       e.preventDefault(); const submit=e.submitter || modal.querySelector('#resource-form [type="submit"]'); if(submit){submit.disabled=true;submit.innerHTML='<i class="fas fa-spinner fa-spin"></i> Salvando...';}
       try {
         const t=type.value, data={tipo:t,titulo:modal.querySelector('#resource-title').value,materia:modal.querySelector('#resource-subject').value,descricao:modal.querySelector('#resource-description').value,url:modal.querySelector('#resource-url').value,tags:modal.querySelector('#resource-tags').value};
-        const novo=await add(data,modal.querySelector('#resource-file').files[0]);
+        const file=modal.querySelector('#resource-file').files[0];
+        const novo=await add(data,file,({percentage}={})=>{
+          if(submit) submit.innerHTML=`<i class="fas fa-spinner fa-spin"></i> Enviando ${Math.max(0,Math.min(100,Math.round(percentage||0)))}%...`;
+        });
         // Insere localmente na hora (sem depender do round-trip do Firestore)
         // e reordena por data de criação, como o list() faria.
         items.unshift(novo);
