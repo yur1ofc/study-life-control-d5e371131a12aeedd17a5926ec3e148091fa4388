@@ -2251,6 +2251,7 @@ body[data-view="mentor-ia"] .sugestoes-container {
     border-bottom: none;
 }
 
+.config-info h3,
 .config-info h4 {
     font-size: 16px;
     font-weight: 500;
@@ -2259,7 +2260,7 @@ body[data-view="mentor-ia"] .sugestoes-container {
 
 .config-info p {
     font-size: 13px;
-    color: var(--text-tertiary);
+    color: var(--text-secondary);
 }
 
 /* =========================
@@ -5204,7 +5205,7 @@ body.sidebar-open #slc-bottom-nav {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: .08em;
-    color: var(--accent-primary);
+    color: var(--text-secondary);
     margin-bottom: 14px;
     padding-bottom: 8px;
     border-bottom: 1px solid var(--border);

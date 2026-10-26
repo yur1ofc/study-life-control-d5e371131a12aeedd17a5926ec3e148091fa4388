@@ -17,8 +17,10 @@ module.exports=async function(req,res){
   if(req.method!=='POST') return res.status(405).json({error:'Método não permitido.'});
   try{
     const token=bearer(req); if(!token) return res.status(401).json({error:'Login necessário.'});
+    // getDb() inicializa o app Admin antes de usarmos admin.auth().
+    const db=getDb();
     const decoded=await admin.auth().verifyIdToken(token, true);
-    const data=(await getDb().collection('users').doc(decoded.uid).get()).data()||{};
+    const data=(await db.collection('users').doc(decoded.uid).get()).data()||{};
     const subs=Array.isArray(data.pushSubscriptions)?data.pushSubscriptions:[];
     const endpoint=req.body?.endpoint;
     const selected=endpoint?subs.filter(s=>s.endpoint===endpoint):subs;
@@ -37,5 +39,5 @@ module.exports=async function(req,res){
     const merged=subs.filter(s=>!selected.some(x=>x.endpoint===s.endpoint)||valid.some(x=>x.endpoint===s.endpoint));
     await getDb().collection('users').doc(decoded.uid).update({pushSubscriptions:merged,lastPushTestAt:new Date().toISOString()});
     return res.status(200).json({ok:true,sent});
-  }catch(e){console.error('[push-test]',e);console.error('[push-test]', e);return res.status(500).json({error:'Falha no teste de Push.'});}
+  }catch(e){console.error('[push-test]',e);return res.status(500).json({error:'Falha no teste de Push.'});}
 };

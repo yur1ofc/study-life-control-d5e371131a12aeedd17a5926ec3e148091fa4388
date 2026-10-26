@@ -196,10 +196,17 @@
     document.body.appendChild(modal);
     modal.querySelectorAll('.modal-close').forEach(b=>b.onclick=()=>modal.remove());
     const type=modal.querySelector('#resource-type');
+    const applyTypeFields=t=>{
+      const pdf=t==='pdf';
+      modal.querySelector('.resource-file-field').style.display=pdf?'block':'none';
+      modal.querySelector('.resource-url-field').style.display=pdf?'none':'block';
+    };
     modal.querySelectorAll('[data-type]').forEach(b=>b.onclick=()=>{
       modal.querySelectorAll('[data-type]').forEach(x=>x.classList.remove('active'));b.classList.add('active');type.value=b.dataset.type;
-      const pdf=b.dataset.type==='pdf'; modal.querySelector('.resource-file-field').style.display=pdf?'block':'none'; modal.querySelector('.resource-url-field').style.display=pdf?'none':'block';
+      applyTypeFields(type.value);
     });
+    // O PDF é o tipo inicial; sincroniza os campos já na abertura do modal.
+    applyTypeFields(type.value);
     modal.querySelector('#resource-form').onsubmit=async e=>{
       e.preventDefault(); const submit=e.submitter || modal.querySelector('#resource-form [type="submit"]'); if(submit){submit.disabled=true;submit.innerHTML='<i class="fas fa-spinner fa-spin"></i> Salvando...';}
       try {

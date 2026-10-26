@@ -10,9 +10,11 @@ module.exports=async function(req,res){
     const expected=process.env.CRON_SECRET||'';
     const isCron=!!expected && token===expected;
     if(!token)return res.status(401).json({error:'Autenticação necessária.'});
-    const db=admin.firestore();
+    // Inicializa o Admin antes de usar Firestore/Auth. O init também cobre o modo cron.
+    const firebaseApp=init();
+    const db=firebaseApp.firestore();
     let decoded=null;
-    if(!isCron) decoded=await init().auth().verifyIdToken(token, true);
+    if(!isCron) decoded=await firebaseApp.auth().verifyIdToken(token, true);
     const healthSnap=await db.collection('system').doc('notificationScheduler').get();
     const h=healthSnap.exists?healthSnap.data():null;
     const lastRunMs=h?.lastRunAt?new Date(h.lastRunAt).getTime():null;

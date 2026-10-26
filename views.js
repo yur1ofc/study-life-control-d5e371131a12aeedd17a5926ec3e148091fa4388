@@ -1708,11 +1708,11 @@ class ViewRenderer {
                 </p>
             ` : `
                 <div class="config-item">
-                    <div class="config-info"><h4>Ativar alarmes neste dispositivo</h4>
-                        <p>Manda uma notificação mesmo com o app fechado, perto da hora de provas, tarefas, sessões, revisões e aulas</p>
+                    <div class="config-info"><h3 id="config-push-title">Ativar alarmes neste dispositivo</h3>
+                        <p id="config-push-desc">Manda uma notificação mesmo com o app fechado, perto da hora de provas, tarefas, sessões, revisões e aulas</p>
                     </div>
                     <label class="toggle-switch">
-                        <input type="checkbox" id="config-push-enabled" ${reminders.enabled ? 'checked' : ''}>
+                        <input type="checkbox" id="config-push-enabled" aria-labelledby="config-push-title" aria-describedby="config-push-desc" ${reminders.enabled ? 'checked' : ''}>
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
@@ -1723,13 +1723,13 @@ class ViewRenderer {
                 </p>
 
                 <div style="margin-top:10px;">
-                    <label style="font-size:.8rem;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.03em;">Prova, tarefa ou trabalho</label>
+                    <label style="font-size:.8rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.03em;">Prova, tarefa ou trabalho</label>
                     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
                         ${['7 dias antes', '5 dias antes', '3 dias antes', '1 dia antes', 'No dia da entrega'].map(l => `
                             <span style="padding:6px 12px;border-radius:999px;background:var(--bg-tertiary);border:1px solid var(--border);font-size:.78rem;color:var(--text-primary);">${l}</span>
                         `).join('')}
                     </div>
-                    <p style="font-size:.78rem;color:var(--text-tertiary);margin-top:6px;">
+                    <p style="font-size:.78rem;color:var(--text-secondary);margin-top:6px;">
                         Automático e fixo — quanto mais perto da data, mais vezes você é lembrado.
                     </p>
                 </div>
@@ -1771,7 +1771,7 @@ class ViewRenderer {
                     </div>
                 </details>
 
-                <p style="font-size:.8rem;color:var(--text-tertiary);margin-top:16px;">
+                <p style="font-size:.8rem;color:var(--text-secondary);margin-top:16px;">
                     No iPhone, notificação push só funciona depois de instalar o site na tela de início
                     (Compartilhar → Adicionar à Tela de Início) — o Safari em aba comum não recebe push do iOS.
                 </p>
