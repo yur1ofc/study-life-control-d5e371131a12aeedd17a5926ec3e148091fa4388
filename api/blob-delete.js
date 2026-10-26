@@ -15,9 +15,9 @@ module.exports = async function handler(req, res) {
     try {
       await del(pathname);
     } catch (err) {
-      // Se o arquivo já não existe, o registro do Firestore ainda pode ser
-      // removido normalmente; não bloqueia a exclusão do recurso.
-      console.warn('[blob-delete] arquivo ausente ou falha ao apagar:', err?.message || err);
+      // Arquivo já ausente: o registro do Firestore ainda pode ser removido.
+      if (err?.name === 'BlobNotFoundError') return res.status(200).json({ ok: true, missing: true });
+      throw err;
     }
     return res.status(200).json({ ok: true });
   } catch (err) {

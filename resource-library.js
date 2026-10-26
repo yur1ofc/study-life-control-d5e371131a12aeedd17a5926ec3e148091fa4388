@@ -189,7 +189,9 @@
     const id = uid(); const firestore = db();
     if (!id || !firestore) throw new Error('Sessão expirada.');
     if (isBlobResource(item) && item.storagePath) {
-      try { await deleteBlobFile(item.storagePath); } catch (e) { console.warn('[Biblioteca] PDF Blob:', e); }
+      // Se o Blob não puder ser apagado, mantém o registro para o usuário
+      // tentar de novo e não deixar arquivo órfão consumindo a cota.
+      await deleteBlobFile(item.storagePath);
     } else if (item.storagePath && storage()) {
       try { await storage().ref(item.storagePath).delete(); } catch (e) { console.warn('[Biblioteca] arquivo:', e); }
     }
