@@ -107,13 +107,13 @@
     const items = progress.map(step => `
       <div class="slc-checklist-item ${step.done ? 'slc-checklist-done' : ''}"
            data-step="${step.id}" data-view="${step.view}"
-           style="display:flex;align-items:center;gap:.75rem;padding:.6rem .75rem;border-radius:8px;cursor:${step.done ? 'default' : 'pointer'};transition:background .15s;${step.done ? 'opacity:.55;' : ''}">
+           style="display:flex;align-items:center;gap:.75rem;padding:.6rem .75rem;border-radius:8px;cursor:${step.done ? 'default' : 'pointer'};transition:background .15s;">
         <div style="width:24px;height:24px;border-radius:50%;background:${step.done ? '#dcfce7' : '#f1f5f9'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <i class="${step.done ? 'fas fa-check' : step.icon}" style="font-size:.65rem;color:${step.done ? '#16a34a' : '#94a3b8'};"></i>
+          <i class="${step.done ? 'fas fa-check' : step.icon}" style="font-size:.65rem;color:${step.done ? '#15803d' : '#475569'};"></i>
         </div>
         <div style="flex:1;min-width:0;">
-          <div style="font-size:.85rem;font-weight:500;color:${step.done ? '#64748b' : '#1e293b'};${step.done ? 'text-decoration:line-through;' : ''}">${step.title}</div>
-          <div style="font-size:.75rem;color:#94a3b8;">${step.desc}</div>
+          <div style="font-size:.85rem;font-weight:500;color:${step.done ? '#475569' : '#1e293b'};${step.done ? 'text-decoration:line-through;' : ''}">${step.title}</div>
+          <div style="font-size:.75rem;color:#475569;">${step.desc}</div>
         </div>
         ${!step.done ? '<i class="fas fa-arrow-right" style="color:#cbd5e1;font-size:.75rem;"></i>' : ''}
       </div>
@@ -127,9 +127,9 @@
           </div>
           <div style="flex:1;">
             <div style="font-size:.95rem;font-weight:600;color:#1e293b;">Primeiros passos</div>
-            <div style="font-size:.78rem;color:#64748b;">${done} de ${total} concluídos</div>
+            <div style="font-size:.78rem;color:#475569;">${done} de ${total} concluídos</div>
           </div>
-          <button id="slc-checklist-dismiss" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:.8rem;padding:4px;" title="Fechar">✕</button>
+          <button id="slc-checklist-dismiss" style="background:none;border:none;color:#475569;cursor:pointer;font-size:.8rem;padding:4px;" title="Fechar">✕</button>
         </div>
 
         <div style="background:#f1f5f9;border-radius:8px;height:6px;margin-bottom:1rem;overflow:hidden;">
