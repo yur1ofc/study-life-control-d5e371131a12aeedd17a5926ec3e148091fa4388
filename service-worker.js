@@ -9,7 +9,7 @@
 // navegador não reinstala o SW e o cache-first serve os arquivos antigos
 // para sempre (o STATIC_CACHE pré-cacheado na instalação nunca é atualizado
 // por conta própria — só a activate com nome de cache novo o substitui).
-const CACHE_VERSION = 'slc-v83-android';
+const CACHE_VERSION = 'slc-v84-android';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 
@@ -105,8 +105,7 @@ const FIREBASE_CDN_ASSETS = [
   'https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js',
   'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js',
   'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js',
-  'https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js',
-  'https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics-compat.js'
+  'https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js'
 ];
 
 // Origens externas: busca sempre da rede, sem interceptar

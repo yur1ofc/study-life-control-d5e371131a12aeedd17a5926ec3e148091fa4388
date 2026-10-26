@@ -9,8 +9,7 @@ const firebaseConfig = {
   projectId:         window.__ENV?.FIREBASE_PROJECT_ID          || '',
   storageBucket:     window.__ENV?.FIREBASE_STORAGE_BUCKET      || '',
   messagingSenderId: window.__ENV?.FIREBASE_MESSAGING_SENDER_ID || '',
-  appId:             window.__ENV?.FIREBASE_APP_ID              || '',
-  measurementId:     window.__ENV?.FIREBASE_MEASUREMENT_ID      || ''
+  appId:             window.__ENV?.FIREBASE_APP_ID              || ''
 };
 
 // Disponível para páginas estáticas internas (ex.: painel administrativo).
@@ -99,14 +98,6 @@ try {
   window.db             = db;
   window.googleProvider = googleProvider;
   window.__slcOfflineEnabled = true;
-
-  if (firebaseConfig.measurementId && firebase.analytics) {
-    try {
-      window.analytics = firebase.analytics();
-    } catch (error) {
-      console.warn('Não foi possível inicializar o Firebase Analytics:', error);
-    }
-  }
 
   auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch((error) => {
     console.warn('Não foi possível ativar persistência local de login:', error);
