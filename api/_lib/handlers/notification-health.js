@@ -12,7 +12,7 @@ module.exports=async function(req,res){
     if(!token)return res.status(401).json({error:'Autenticação necessária.'});
     const db=admin.firestore();
     let decoded=null;
-    if(!isCron) decoded=await init().auth().verifyIdToken(token);
+    if(!isCron) decoded=await init().auth().verifyIdToken(token, true);
     const healthSnap=await db.collection('system').doc('notificationScheduler').get();
     const h=healthSnap.exists?healthSnap.data():null;
     const lastRunMs=h?.lastRunAt?new Date(h.lastRunAt).getTime():null;

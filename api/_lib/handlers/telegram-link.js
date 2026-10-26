@@ -9,7 +9,7 @@ module.exports=async function(req,res){
   if(req.method!=='POST')return res.status(405).json({error:'Método não permitido.'});
   try{
     const t=bearer(req);if(!t)return res.status(401).json({error:'Login necessário.'});
-    const decoded=await init().auth().verifyIdToken(t);const db=admin.firestore();const ref=db.collection('users').doc(decoded.uid);const action=req.body?.action||'create';
+    const decoded=await init().auth().verifyIdToken(t, true);const db=admin.firestore();const ref=db.collection('users').doc(decoded.uid);const action=req.body?.action||'create';
     if(action==='disconnect'){await ref.set({telegram:null},{merge:true});return res.status(200).json({ok:true,disconnected:true});}
     if(action==='notifications'){const enabled=req.body?.enabled!==false;await ref.set({telegram:{notificationsEnabled:enabled}},{merge:true});return res.status(200).json({ok:true,notificationsEnabled:enabled});}
     if(!process.env.TELEGRAM_WEBHOOK_SECRET)return res.status(503).json({error:'Telegram ainda não está configurado no servidor. Defina TELEGRAM_WEBHOOK_SECRET no Vercel.'});

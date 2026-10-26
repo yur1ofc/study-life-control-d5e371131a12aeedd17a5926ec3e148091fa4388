@@ -150,10 +150,10 @@
         </div>
 
         <!-- Landing page pública: aparece antes do login e funciona como apresentação do SLCampus. -->
-        <section id="landing-screen" class="landing-screen" aria-label="Apresentação do SLCampus" style="display:none;">
+        <div id="landing-screen" class="landing-screen" style="display:none;">
             <header class="landing-nav">
                 <a class="landing-brand" href="#landing-screen" aria-label="SLCampus início">
-                    <img src="logo.png" alt="SLCampus">
+                    <img src="logo.png" alt="">
                     <span>SLC<span>ampus</span></span>
                 </a>
                 <nav class="landing-nav-links" aria-label="Navegação">
@@ -164,7 +164,7 @@
                 <button type="button" class="landing-nav-login" id="landing-login-top">Entrar <i class="fas fa-arrow-right"></i></button>
             </header>
 
-            <main>
+            <main aria-label="Apresentação do SLCampus">
                 <section class="landing-hero">
                     <div class="landing-hero-copy">
                         <div class="landing-eyebrow"><span class="landing-eyebrow-dot"></span> Seu semestre em um só lugar</div>
@@ -265,7 +265,7 @@
                     <span>© 2026 SLCampus · projeto pessoal de Yuri Menezes</span>
                 </nav>
             </footer>
-        </section>
+        </div>
 
         <div id="login-screen" class="login-container" style="display: none;">
             <!-- Painel esquerdo: features -->

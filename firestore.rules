@@ -127,6 +127,7 @@ service cloud.firestore {
         && request.resource.data.updatedBy == request.auth.uid;
 
       allow update: if isSignedIn()
+        && resource.data.createdBy == request.auth.uid
         && validCatalogSchema(docId)
         && resource.data.key == docId
         && request.resource.data.key == resource.data.key

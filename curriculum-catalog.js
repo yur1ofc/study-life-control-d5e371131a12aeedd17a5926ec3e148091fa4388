@@ -518,7 +518,12 @@
         };
 
         if (existingData) {
-          // Atualização — preservar campos imutáveis do documento original
+          // Atualização — somente o criador pode editar (regra do Firestore).
+          // Quem não criou o catálogo continua contribuindo via community_catalog_submissions.
+          if (existingData.createdBy !== user.uid) {
+            return { skipped: true, reason: 'not-owner', existing: existingData };
+          }
+          // Preservar campos imutáveis do documento original
           payload.createdAt = existingData.createdAt || now;
           await ref.set(payload, { merge: true });
         } else {
@@ -667,12 +672,16 @@
     });
     const existing = await window.dbService.getCommunityCatalog(faculdade, curso);
     const merged = dedupeCurriculum([...(existing?.subjects || []), ...userCurriculum]).map(neutralizeForCatalog);
-    await window.dbService.saveCommunityCatalog(faculdade, curso, merged, {
+    const saved = await window.dbService.saveCommunityCatalog(faculdade, curso, merged, {
       version: app.data.user?.matrizVersion || '',
       confidence: existing?.subjects?.length ? 0.72 : 0.6,
       usersCount: (existing?.stats?.usersCount || 0) + 1
     });
-    window.showToast?.('Sua grade foi compartilhada para fortalecer o catálogo comunitário.', 'success');
+    if (saved && saved.skipped) {
+      window.showToast?.('Sua grade foi registrada como contribuição. O catálogo atual só pode ser editado por quem o criou.', 'info');
+    } else if (saved) {
+      window.showToast?.('Sua grade foi compartilhada para fortalecer o catálogo comunitário.', 'success');
+    }
   }
 
   function injectSetupShortcuts() {

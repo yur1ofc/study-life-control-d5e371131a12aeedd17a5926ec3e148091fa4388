@@ -17,7 +17,7 @@ module.exports=async function(req,res){
   if(req.method!=='POST') return res.status(405).json({error:'Método não permitido.'});
   try{
     const token=bearer(req); if(!token) return res.status(401).json({error:'Login necessário.'});
-    const decoded=await admin.auth().verifyIdToken(token);
+    const decoded=await admin.auth().verifyIdToken(token, true);
     const data=(await getDb().collection('users').doc(decoded.uid).get()).data()||{};
     const subs=Array.isArray(data.pushSubscriptions)?data.pushSubscriptions:[];
     const endpoint=req.body?.endpoint;

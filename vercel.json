@@ -13,11 +13,14 @@
       "maxDuration": 60
     }
   },
-  "rewrites": [
+  "redirects": [
     {
       "source": "/admin",
-      "destination": "/admin-ai.html"
-    },
+      "destination": "/admin-ai",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
     {
       "source": "/api/admin-ai-usage",
       "destination": "/api/admin-users?mode=ai"

@@ -28,7 +28,7 @@
     <main class="lg-main">
         <span class="lg-kicker"><i class="fas fa-shield-halved"></i> Transparência com seus dados</span>
         <h1>Política de Privacidade</h1>
-        <p class="lg-updated">Última atualização: <strong>23 de outubro de 2026</strong></p>
+        <p class="lg-updated">Última atualização: <strong>26 de outubro de 2026</strong></p>
 
         <section class="lg-panel">
             <h2><i class="fas fa-handshake"></i> Quem é responsável</h2>
@@ -38,6 +38,7 @@
                 <div><span>Instagram</span><a href="https://www.instagram.com/slcampus/" target="_blank" rel="noopener">@slcampus</a></div>
                 <div><span>Site</span><a href="https://slcampus.vercel.app">slcampus.vercel.app</a></div>
             </div>
+            <p>O encarregado pelo tratamento de dados pessoais (DPO) é o próprio responsável, <strong>Yuri Menezes</strong>, no e-mail acima.</p>
         </section>
 
         <section class="lg-panel">
@@ -50,12 +51,15 @@
             <h3>2. Dados que você cadastra (necessários)</h3>
             <ul>
                 <li>Conteúdo acadêmico que você escolhe registrar: curso, matérias, notas e pesos, frequência, tarefas, horários, sessões de estudo, rotina e preferências do app.</li>
-                <li>Mensagens que você envia pelo feedback ou pelo Mentor IA (o processamento é local, nos seus próprios dispositivos).</li>
+                <li>Mensagens que você envia pelo <strong>feedback</strong>: ficam armazenadas para análise e resposta.</li>
+                <li>Mensagens que você envia pelo <strong>Mentor IA</strong>: são processadas nos servidores do SLCampus (Vercel) e enviadas aos provedores de IA <strong>Google Gemini</strong> e <strong>Groq</strong> apenas para gerar a resposta. O SLCampus não grava o conteúdo dessas mensagens em seu banco de dados; os provedores podem tratá-las conforme as políticas deles. Não envie dados sensíveis pelo Mentor.</li>
+                <li>Se você vincular o <strong>bot do Telegram</strong>: identificador do chat, mensagens e arquivos enviados ao bot, para entregar lembretes e arquivos. O vínculo é opcional e pode ser desfeito no app.</li>
             </ul>
             <h3>3. Dados técnicos mínimos</h3>
             <ul>
-                <li>Preferências salvas no seu navegador/dispositivo (temo, idioma do tema, estado da janela do aplicativo para PC).</li>
+                <li>Preferências salvas no seu navegador/dispositivo (tema, idioma e estado da janela do aplicativo para PC).</li>
                 <li>Registros técnicos essenciais ao funcionamento e à segurança do serviço, mantidos pela infraestrutura (Firebase/Google e Vercel).</li>
+                <li>Registros de uso da IA (data, modelo, provedor, status, latência e contagem de chamadas), <strong>sem o conteúdo das mensagens</strong>, para controle de limites e segurança.</li>
             </ul>
             <div class="lg-highlight"><strong>O que NÃO coletamos:</strong> cookies de publicidade, scripts de analytics, dados de localização, dados de saúde, histórico de navegação para rastreamento, ou qualquer dado de pagamento (doações são processadas diretamente pelo Mercado Pago — nós nunca vemos seu cartão).</div>
         </section>
@@ -72,14 +76,37 @@
         </section>
 
         <section class="lg-panel">
+            <h2><i class="fas fa-scale-balanced"></i> Bases legais (LGPD)</h2>
+            <p>Tratamos seus dados com base em:</p>
+            <ul>
+                <li><strong>Execução de contrato</strong> (art. 7º, V) — criar a conta, sincronizar seus dados e entregar as funções do app;</li>
+                <li><strong>Legítimo interesse</strong> (art. 7º, IX) — segurança, prevenção a abusos, suporte e melhoria do serviço;</li>
+                <li><strong>Consentimento</strong> (art. 7º, I) — recursos opcionais, como vincular o bot do Telegram;</li>
+                <li><strong>Cumprimento de obrigação legal ou regulatória</strong> (art. 7º, II) — quando formos obrigados por lei ou ordem judicial.</li>
+            </ul>
+            <p>Você pode pedir informações sobre a base legal usada em cada tratamento pelo e-mail abaixo.</p>
+        </section>
+
+        <section class="lg-panel">
             <h2><i class="fas fa-share-nodes"></i> Com quem compartilhamos</h2>
             <p>Compartilhamos somente com quem precisa para o serviço existir:</p>
             <ul>
                 <li><strong>Google (Firebase)</strong> — autenticação, banco de dados e sincronização.</li>
-                <li><strong>Vercel</strong> — hospedagem do site.</li>
+                <li><strong>Google (Gemini)</strong> — processamento das mensagens do Mentor IA.</li>
+                <li><strong>Groq</strong> — processamento alternativo das mensagens do Mentor IA.</li>
+                <li><strong>Telegram</strong> — somente se você vincular o bot: mensagens e arquivos passam pelo Telegram para chegar ao SLCampus e receber as respostas.</li>
+                <li><strong>Vercel</strong> — hospedagem do site e execução das funções do servidor.</li>
                 <li><strong>Mercado Pago</strong> — processamento de doações (recebemos apenas a confirmação de que a doação ocorreu, nunca seus dados de cartão).</li>
+                <li><strong>Google Fonts e Cloudflare (cdnjs)</strong> — entrega de fontes e ícones da interface; esses provedores recebem dados técnicos da requisição, como endereço IP e página de origem.</li>
             </ul>
             <p>Não vendemos, não alugamos e não compartilhamos seus dados com terceiros para fins de marketing.</p>
+        </section>
+
+        <section class="lg-panel">
+            <h2><i class="fas fa-globe"></i> Transferência internacional</h2>
+            <p>O SLCampus é hospedado na Vercel e usa serviços do Google (Firebase e Gemini), da Groq e, quando você vincula o bot, do Telegram. Esses provedores podem processar dados fora do Brasil, inclusive nos Estados Unidos, para executar o serviço que você solicitou.</p>
+            <p>A transferência é feita nos termos do art. 33 da LGPD e limitada às finalidades descritas nesta política. Se você não quiser esse tratamento, basta não usar os recursos de IA nem vincular o bot do Telegram; o restante do app continua funcionando normalmente.</p>
+            <p>Para saber como cada provedor trata os dados, consulte as políticas de privacidade dele. O SLCampus não controla as práticas internas desses serviços.</p>
         </section>
 
         <section class="lg-panel">

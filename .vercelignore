@@ -13,3 +13,20 @@ node_modules/
 .vercel/
 *.log
 .DS_Store
+
+# Documentacao interna e arquivos que nao precisam ser publicos.
+# NAO remova inject-env.js, package.json, env-config.js, robots.txt
+# nem sitemap.xml: o build e o site dependem deles.
+/*.md
+/README.txt
+/LEIA-ME.txt
+/CHATGPT-GRADE-PROMPT.txt
+/SLCampus_contexto_atual_completo_para_outra_IA.txt
+/firestore.rules
+/storage.rules
+/firebase.json
+/.firebaserc
+/gemini.js
+/ai-core.js
+/gemini-admin-quota.js
+/scripts/
