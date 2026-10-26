@@ -14,6 +14,9 @@
     },
     "api/blob-download.js": {
       "maxDuration": 60
+    },
+    "api/blob-url.js": {
+      "maxDuration": 30
     }
   },
   "redirects": [

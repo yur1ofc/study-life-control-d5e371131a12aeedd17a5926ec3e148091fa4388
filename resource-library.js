@@ -162,18 +162,16 @@
       let fileUrl = '';
       if (isBlobResource(item)) {
         const token = await user.getIdToken();
-        const res = await fetch(`/api/blob-download?pathname=${encodeURIComponent(item.storagePath)}`, {
+        const res = await fetch(`/api/blob-url?pathname=${encodeURIComponent(item.storagePath)}`, {
           headers: { Authorization: `Bearer ${token}` },
           cache: 'no-store'
         });
-        if (!res.ok) {
-          let message = 'Não foi possível abrir o PDF.';
-          try { const data = await res.json(); if (data?.error) message = data.error; } catch (_) {}
-          throw new Error(message);
-        }
-        const blob = await res.blob();
-        fileUrl = URL.createObjectURL(blob);
-        setTimeout(() => URL.revokeObjectURL(fileUrl), 120000);
+        let data = null;
+        try { data = await res.json(); } catch (_) {}
+        if (!res.ok || !data?.url) throw new Error(data?.error || 'Não foi possível abrir o PDF.');
+        // URL assinada de curta duração: o Chrome/Android abre o PDF no
+        // visualizador nativo, enquanto blob: em nova aba costuma ficar em branco.
+        fileUrl = data.url;
       } else {
         const st = storage();
         if (!st) throw new Error('Armazenamento de arquivos indisponível.');

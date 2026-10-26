@@ -9,7 +9,7 @@
 // navegador não reinstala o SW e o cache-first serve os arquivos antigos
 // para sempre (o STATIC_CACHE pré-cacheado na instalação nunca é atualizado
 // por conta própria — só a activate com nome de cache novo o substitui).
-const CACHE_VERSION = 'slc-v88-blob';
+const CACHE_VERSION = 'slc-v89-blob-url';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 
