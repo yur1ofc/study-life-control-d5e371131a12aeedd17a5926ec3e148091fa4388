@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Página não encontrada — SLCampus</title>
+    <meta name="robots" content="noindex, follow">
+    <meta name="theme-color" content="#0b1020">
+    <link rel="icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" href="/icon-512.png">
+    <style>
+        :root { color-scheme: dark; }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; min-height: 100dvh; display: flex; align-items: center; justify-content: center;
+            padding: 24px; background: radial-gradient(circle at 20% 0%, #1e293b 0%, #0b1020 55%);
+            color: #e2e8f0; font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+        }
+        .card {
+            width: min(560px, 100%); padding: 40px 32px; text-align: center;
+            background: rgba(15, 23, 42, .82); border: 1px solid rgba(148, 163, 184, .22);
+            border-radius: 24px; box-shadow: 0 30px 80px rgba(0, 0, 0, .45);
+        }
+        .code { font-size: 64px; font-weight: 800; line-height: 1; color: #60a5fa; margin: 0 0 12px; }
+        h1 { font-size: 24px; margin: 0 0 10px; color: #f8fafc; }
+        p { margin: 0 0 24px; color: #94a3b8; line-height: 1.6; font-size: 15px; }
+        .actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+        a {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-height: 44px; padding: 12px 20px; border-radius: 12px;
+            text-decoration: none; font-weight: 700; font-size: 14px;
+        }
+        .primary { background: linear-gradient(110deg, #2563eb, #7c3aed); color: #fff; }
+        .secondary { border: 1px solid rgba(148, 163, 184, .35); color: #e2e8f0; }
+        a:focus-visible { outline: 2px solid #60a5fa; outline-offset: 3px; }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <p class="code" aria-hidden="true">404</p>
+        <h1>Página não encontrada</h1>
+        <p>O endereço que você abriu não existe ou foi movido. Volte para o início ou explore as ferramentas gratuitas do SLCampus.</p>
+        <div class="actions">
+            <a class="primary" href="/">Voltar ao início</a>
+            <a class="secondary" href="/ferramentas/">Ver ferramentas</a>
+        </div>
+    </main>
+</body>
+</html>

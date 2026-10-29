@@ -28,9 +28,9 @@ service cloud.firestore {
         && strLen(d.updatedAt, 30);
     }
 
-    // Validação de tamanho do documento do usuário (o limite real do Firestore é 1 MiB)
-    // Essas regras limitam crescimento dos arrays principais; o tamanho final do documento também é validado pelo Firestore.
-    // malformados antes mesmo de chegar ao servidor.
+    // Validação de tamanho do documento do usuário (o limite real do Firestore é 1 MiB).
+    // Essas regras limitam o crescimento dos arrays principais; o tamanho final
+    // do documento também é validado pelo Firestore.
     function validUserDocSize() {
       // Limita arrays principais para evitar crescimento ilimitado
       let d = request.resource.data;
@@ -56,6 +56,55 @@ service cloud.firestore {
           && (!('archivedSemesters' in d) || d.archivedSemesters.size() <= 20);
     }
 
+    // Campos gravados exclusivamente pelo servidor (Telegram/cron). O cliente
+    // não pode criá-los nem alterá-los: um chatId controlado pelo usuário
+    // transformaria o backend em proxy de spam. As assinaturas de push
+    // continuam graváveis pelo cliente (o navegador as renova), mas são
+    // validadas no servidor antes de qualquer envio.
+    // Comparações diretas de map/list com null causam erro de avaliação nas
+    // regras; por isso o tipo é checado antes de comparar os valores.
+    function changedMapField(field) {
+      let n = request.resource.data.get(field, null);
+      let o = resource.data.get(field, null);
+      return (n is map) != (o is map) || (n is map && o is map && n != o);
+    }
+
+    function changedListField(field) {
+      let n = request.resource.data.get(field, null);
+      let o = resource.data.get(field, null);
+      return (n is list) != (o is list) || (n is list && o is list && n != o);
+    }
+
+    function changedStringField(field) {
+      let n = request.resource.data.get(field, null);
+      let o = resource.data.get(field, null);
+      return (n is string) != (o is string) || (n is string && o is string && n != o);
+    }
+
+    function touchesServerOnlyUserFields() {
+      // Em create o Firestore também avalia esta regra. O método retorna
+      // false nesse caso; uma tentativa real de alterar os campos abaixo é
+      // negada (pode registrar "evaluation error" no log, sem afetar o create).
+      return request.method == 'update' && (
+           changedMapField('telegram')
+        || changedListField('telegramInbox')
+        || changedListField('sentReminders')
+        || changedListField('sentTelegramReminders')
+        || changedStringField('telegramLinkCode')
+        || changedStringField('lastPushTestAt')
+      );
+    }
+
+    function createsServerOnlyUserFields() {
+      let d = request.resource.data;
+      return ('telegram' in d && d.telegram != null)
+          || ('telegramLinkCode' in d && d.telegramLinkCode != null)
+          || ('lastPushTestAt' in d)
+          || ('telegramInbox' in d && d.telegramInbox.size() > 0)
+          || ('sentReminders' in d && d.sentReminders.size() > 0)
+          || ('sentTelegramReminders' in d && d.sentTelegramReminders.size() > 0);
+    }
+
     // ─── Presença online — somente Vercel/Firebase Admin SDK ────────────────
     // O navegador nunca pode ler, criar, alterar ou apagar presença diretamente.
     match /user_presence/{userId} {
@@ -66,7 +115,12 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isOwner(userId);
-      allow write: if isOwner(userId) && validUserDocSize();
+      allow create: if isOwner(userId)
+        && validUserDocSize()
+        && !createsServerOnlyUserFields();
+      allow update: if isOwner(userId)
+        && validUserDocSize()
+        && !touchesServerOnlyUserFields();
     }
 
     match /users/{userId}/resources/{resourceId} {

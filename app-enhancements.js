@@ -50,10 +50,41 @@
     const closeBtn = el('pwa-install-close');
     if (!card || !installBtn || !closeBtn) return;
 
+    const DISMISS_KEY = 'slc_pwa_install_dismissed';
+    const DISMISS_MS = 30 * 24 * 60 * 60 * 1000;
+
+    function recentlyDismissed() {
+      try {
+        const at = Number(localStorage.getItem(DISMISS_KEY) || 0);
+        return at && Date.now() - at < DISMISS_MS;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function cookieNoticeOpen() {
+      const notice = el('cookie-notice');
+      if (!notice) return false;
+      if (!notice.hidden) return true;
+      // Se o aviso ainda não foi aceito, considera "aberto" mesmo que o
+      // script inline ainda não tenha removido o atributo hidden.
+      try { return localStorage.getItem('slc_cookie_notice') !== 'ok'; } catch (e) { return false; }
+    }
+
+    function showCardIfAllowed() {
+      if (!deferredInstallPrompt || recentlyDismissed() || cookieNoticeOpen()) return;
+      card.hidden = false;
+    }
+
     window.addEventListener('beforeinstallprompt', (event) => {
       event.preventDefault();
       deferredInstallPrompt = event;
-      card.hidden = false;
+      showCardIfAllowed();
+      // Se o aviso de cookies estiver aberto, espera o usuário dispensá-lo
+      // para não sobrepor os botões do card de instalação no mobile.
+      el('cookie-notice-accept')?.addEventListener('click', () => {
+        setTimeout(showCardIfAllowed, 400);
+      }, { once: true });
     });
 
     installBtn.addEventListener('click', async () => {
@@ -62,6 +93,7 @@
       const choice = await deferredInstallPrompt.userChoice.catch(() => null);
       if (choice?.outcome === 'accepted') {
         window.showToast?.('App instalado com sucesso!', 'success');
+        try { localStorage.setItem(DISMISS_KEY, String(Date.now())); } catch (e) {}
       }
       deferredInstallPrompt = null;
       card.hidden = true;
@@ -69,11 +101,13 @@
 
     closeBtn.addEventListener('click', () => {
       card.hidden = true;
+      try { localStorage.setItem(DISMISS_KEY, String(Date.now())); } catch (e) {}
     });
 
     window.addEventListener('appinstalled', () => {
       card.hidden = true;
       deferredInstallPrompt = null;
+      try { localStorage.setItem(DISMISS_KEY, String(Date.now())); } catch (e) {}
       window.showToast?.('SLCampus instalado no dispositivo!', 'success');
     });
   }

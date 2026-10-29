@@ -323,10 +323,10 @@
             </div>
             <div style="flex:1;min-width:0;">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">
-                <strong style="font-size:14px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.titulo}</strong>
+                <strong style="font-size:14px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.titulo)}</strong>
                 <span style="font-size:11px;padding:2px 8px;border-radius:999px;background:${tipoBg[item.tipo]};color:${item.cor};white-space:nowrap;flex-shrink:0;">${tipoLabel[item.tipo]}</span>
               </div>
-              <span style="font-size:12px;color:var(--text-secondary);">${item.sub}</span>
+              <span style="font-size:12px;color:var(--text-secondary);">${escapeHtml(item.sub)}</span>
             </div>
             <div style="text-align:right;flex-shrink:0;">
               <div style="font-size:14px;font-weight:600;color:var(--text-primary);">${formatHora(item.hora)}</div>

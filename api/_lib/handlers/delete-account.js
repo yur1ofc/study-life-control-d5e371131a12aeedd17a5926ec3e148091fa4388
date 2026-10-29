@@ -1,4 +1,5 @@
 const admin = require('firebase-admin');
+const { list, del } = require('@vercel/blob');
 
 let initialized = false;
 function initAdmin() {
@@ -31,6 +32,21 @@ module.exports = async function handler(req,res) {
     }
 
 
+    // Remove os PDFs da Biblioteca que ficam no Vercel Blob (fora do Firebase).
+    // É feito ANTES de apagar o doc do Firestore/Auth: se o Blob falhar, a conta
+    // NÃO é excluída, evitando prometer uma exclusão total e reter os arquivos.
+    async function deleteUserBlobs() {
+      let cursor;
+      do {
+        const page = await list({ prefix: `users/${uid}/`, cursor, limit: 1000 });
+        if (page.blobs.length) {
+          await del(page.blobs.map(blob => blob.url));
+        }
+        cursor = page.hasMore ? page.cursor : undefined;
+      } while (cursor);
+    }
+    await deleteUserBlobs();
+
     // Remove recursos públicos/auxiliares que ficam fora de users/{uid}.
     // Calendar feeds são links públicos por token; sem esta limpeza um link
     // antigo poderia continuar expondo a agenda após a exclusão da conta.
@@ -45,6 +61,34 @@ module.exports = async function handler(req,res) {
     }
     await deleteQuery(db.collection('calendar_feeds').where('uid','==',uid));
     await deleteQuery(db.collection('telegramLinks').where('uid','==',uid));
+
+    // Conteúdo enviado pelo próprio usuário e que guarda o uid/email dele.
+    // Feedback e contribuições não são compartilhados com outros usuários;
+    // apagar é necessário para não reter dado pessoal após a exclusão da conta.
+    await deleteQuery(db.collection('feedback').where('uid','==',uid));
+    await deleteQuery(db.collection('community_catalog_submissions').where('sourceUserId','==',uid));
+    // Versões antigas das contribuições guardavam o e-mail em vez do uid.
+    if (decoded.email) {
+      await deleteQuery(db.collection('community_catalog_submissions').where('sourceUserEmail','==',decoded.email));
+    }
+
+    // Catálogos comunitários são conteúdo compartilhado (grade curricular) e
+    // não devem desaparecer para os outros alunos. Em vez de apagar, remove a
+    // autoria (uid) para desvincular o conteúdo da conta excluída.
+    async function anonymizeCatalogs() {
+      while (true) {
+        const snap = await db.collection('community_catalogs')
+          .where('createdBy','==',uid).limit(200).get();
+        if (snap.empty) break;
+        const batch = db.batch();
+        snap.docs.forEach(doc => batch.update(doc.ref, {
+          createdBy: admin.firestore.FieldValue.delete(),
+          updatedBy: admin.firestore.FieldValue.delete()
+        }));
+        await batch.commit();
+      }
+    }
+    await anonymizeCatalogs();
 
     await db.collection('user_presence').doc(uid).delete().catch(() => null);
 

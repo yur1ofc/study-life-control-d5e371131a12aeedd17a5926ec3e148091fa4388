@@ -42,6 +42,7 @@
 
 const AcademicIntelligence = require('./_lib/academic-intelligence-server');
 const Avail = require('./_lib/study-availability');
+const { isValidTelegramChatId, isValidPushSubscription } = require('./_lib/notification-validation');
 
 const DEDUPE_LIMIT = 500;
 const SCHEDULER_LEASE_MS = 110000; // ~1m50s: evita execuções sobrepostas de cron externo a cada 1 min.
@@ -495,9 +496,10 @@ module.exports = async function handler(req, res) {
     for (const doc of docs.values()) {
       summary.usersChecked++;
       const data = doc.data();
-      const subscriptions = Array.isArray(data.pushSubscriptions) ? data.pushSubscriptions : [];
+      const subscriptions = (Array.isArray(data.pushSubscriptions) ? data.pushSubscriptions : [])
+        .filter(isValidPushSubscription);
       const telegram = data.telegram || {};
-      const telegramEnabled = !!telegram.chatId && telegram.notificationsEnabled !== false;
+      const telegramEnabled = isValidTelegramChatId(telegram.chatId) && telegram.notificationsEnabled !== false;
       const hasPushGeneral = !!data.settings?.studyReminders?.enabled;
       const hasPushFocus = !!data.settings?.focusPushEnabled;
       if (!subscriptions.length && !telegramEnabled) continue;

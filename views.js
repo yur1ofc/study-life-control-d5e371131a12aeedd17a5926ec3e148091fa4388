@@ -1833,6 +1833,7 @@ class ViewRenderer {
                 <div class="card" style="padding:18px;">
                     <strong><i class="fas fa-scale-balanced" style="color:var(--accent-primary,#4f8cff)"></i> Informações legais</strong>
                     <div style="display:flex;gap:8px 16px;flex-wrap:wrap;margin-top:10px;font-size:.88rem;">
+                        <a href="/ferramentas/" style="color:var(--accent-primary,#4f8cff)">Ferramentas grátis</a>
                         <a href="/privacidade" style="color:var(--accent-primary,#4f8cff)">Política de Privacidade</a>
                         <a href="/termos" style="color:var(--accent-primary,#4f8cff)">Termos de Serviço</a>
                         <a href="/cookies" style="color:var(--accent-primary,#4f8cff)">Aviso de Cookies</a>

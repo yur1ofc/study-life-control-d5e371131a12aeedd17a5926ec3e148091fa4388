@@ -49,36 +49,9 @@
 
   window.checkRateLimit = checkRateLimit;
 
-  // ─── 2. Sanitização de inputs (previne XSS via innerHTML) ────────────────
-
-  function sanitizeString(value) {
-    if (typeof value !== 'string') return value;
-    return value
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#x27;')
-      .replace(/\//g, '&#x2F;');
-  }
-
-  // Sanitiza recursivamente um objeto antes de salvar no Firestore
-  function sanitizeData(obj) {
-    if (obj === null || obj === undefined) return obj;
-    if (typeof obj === 'string') return sanitizeString(obj);
-    if (Array.isArray(obj)) return obj.map(sanitizeData);
-    if (typeof obj === 'object') {
-      const clean = {};
-      for (const [key, value] of Object.entries(obj)) {
-        clean[key] = sanitizeData(value);
-      }
-      return clean;
-    }
-    return obj;
-  }
-
-  window.sanitizeData   = sanitizeData;
-  window.sanitizeString = sanitizeString;
+  // ─── 2. Sanitização de saída ─────────────────────────────────────────────
+  // O escape de HTML fica em utils.js (window.escapeHtml) e deve ser aplicado
+  // em todo ponto que interpola dados do usuário em innerHTML.
 
   // ─── 3. Patch no dbService para aplicar rate limiting automaticamente ────
   //

@@ -104,7 +104,7 @@
       const btn = (item, i) => `
         <button class="nav-search-result${i === 0 ? ' active' : ''}" data-view="${item.view}">
           <i class="fas ${item.icon}"></i>
-          <span>${item.label}${item.sub ? ` <small style="opacity:.6">· ${item.sub}</small>` : ''}</span>
+          <span>${escapeHtml(item.label)}${item.sub ? ` <small style="opacity:.6">· ${escapeHtml(item.sub)}</small>` : ''}</span>
         </button>`;
 
       results.innerHTML =

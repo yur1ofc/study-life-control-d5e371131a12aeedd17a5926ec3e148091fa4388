@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Calculadora de Média com Pesos — Média Ponderada Grátis | SLCampus</title>
     <meta name="description" content="Calcule sua média com pesos em segundos: média ponderada, soma dos pesos e quanto você precisa nas próximas provas. Grátis e sem cadastro.">
     <meta name="theme-color" content="#0a0f1f">
@@ -223,14 +223,30 @@
             var items = [];
             var allHavePeso = rows.length > 0;
             var algumPeso = false;
+            var invalidos = [];
             rows.forEach(function (r) {
                 var inputs = r.querySelectorAll('input');
                 var nota = num(inputs[1].value);
                 var peso = inputs[2] ? num(inputs[2].value) : null;
-                if (nota == null) return;
+                var notaInvalida = nota != null && (nota < 0 || nota > 10);
+                var pesoInvalido = peso != null && (peso < 0 || peso > 100);
+                inputs[1].setAttribute('aria-invalid', notaInvalida ? 'true' : 'false');
+                if (inputs[2]) inputs[2].setAttribute('aria-invalid', pesoInvalido ? 'true' : 'false');
+                if (notaInvalida) invalidos.push('nota');
+                if (pesoInvalido) invalidos.push('peso');
+                if (nota == null || notaInvalida || pesoInvalido) return;
                 if (peso != null && peso > 0) { algumPeso = true; } else { allHavePeso = false; }
-                items.push({ nota: Math.max(0, Math.min(10, nota)), peso: peso });
+                items.push({ nota: nota, peso: peso });
             });
+
+            if (invalidos.length) {
+                resultBox.classList.remove('has-result');
+                resultValue.textContent = '—';
+                resultValue.className = 'result-value';
+                resultNote.textContent = 'Corrija os campos destacados: as notas devem ficar entre 0 e 10 e os pesos entre 0 e 100.';
+                resultBadges.innerHTML = '<span class="tbadge bad">Valores fora do intervalo</span>';
+                return;
+            }
 
             if (!items.length) {
                 resultBox.classList.remove('has-result');

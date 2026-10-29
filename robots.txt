@@ -1,6 +1,7 @@
 User-agent: *
 Allow: /
 Disallow: /admin
-Disallow: /admin-ai.html
+Disallow: /admin-ai
+Disallow: /api/
 
 Sitemap: https://slcampus.vercel.app/sitemap.xml

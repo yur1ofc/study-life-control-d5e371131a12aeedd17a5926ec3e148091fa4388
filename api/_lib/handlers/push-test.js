@@ -2,6 +2,8 @@
 // Usa o Firebase ID token do usuário e a assinatura já salva no Firestore.
 const admin = require('firebase-admin');
 const webpush = require('web-push');
+const rateLimit = require('../rate-limit');
+const { isValidPushEndpoint, isValidPushSubscription } = require('../notification-validation');
 let app;
 function getDb(){
   if(!app){
@@ -20,9 +22,12 @@ module.exports=async function(req,res){
     // getDb() inicializa o app Admin antes de usarmos admin.auth().
     const db=getDb();
     const decoded=await admin.auth().verifyIdToken(token, true);
+    const rl=await rateLimit('push-test', decoded.uid, 3, 60);
+    if(!rl.ok) return res.status(429).json({error:'Muitas tentativas. Aguarde um minuto e tente de novo.'});
     const data=(await db.collection('users').doc(decoded.uid).get()).data()||{};
-    const subs=Array.isArray(data.pushSubscriptions)?data.pushSubscriptions:[];
+    const subs=(Array.isArray(data.pushSubscriptions)?data.pushSubscriptions:[]).filter(isValidPushSubscription);
     const endpoint=req.body?.endpoint;
+    if(endpoint!=null && !isValidPushEndpoint(endpoint)) return res.status(400).json({error:'Endpoint de Push inválido.'});
     const selected=endpoint?subs.filter(s=>s.endpoint===endpoint):subs;
     if(!selected.length) return res.status(404).json({error:'Assinatura deste dispositivo não foi encontrada no servidor.'});
     const {VAPID_PUBLIC_KEY,VAPID_PRIVATE_KEY,VAPID_SUBJECT}=process.env;

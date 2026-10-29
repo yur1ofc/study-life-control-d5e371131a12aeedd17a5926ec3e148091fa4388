@@ -72,6 +72,18 @@ try {
   process.exitCode = 1;
 }
 
+// Mantém o lastmod do sitemap fresco a cada build (evita data congelada).
+try {
+  const today = new Date().toISOString().slice(0, 10);
+  const sitemapPath = path.join(__dirname, 'sitemap.xml');
+  const sitemap = fs.readFileSync(sitemapPath, 'utf8')
+    .replace(/<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/g, `<lastmod>${today}</lastmod>`);
+  fs.writeFileSync(sitemapPath, sitemap, 'utf8');
+  console.log('[inject-env] sitemap.xml lastmod atualizado para', today);
+} catch (err) {
+  console.warn('[inject-env] Não foi possível atualizar o lastmod do sitemap:', err.message);
+}
+
 // Lista o diretório de saída pra conferência visual no log
 try {
   const files = fs.readdirSync(__dirname).filter(f => !f.startsWith('.') && f !== 'node_modules');

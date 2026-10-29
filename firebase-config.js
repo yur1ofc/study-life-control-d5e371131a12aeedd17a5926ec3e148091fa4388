@@ -65,7 +65,26 @@ try {
 }
 
   const auth = firebase.auth();
-  const db   = firebase.firestore();
+  // O SDK do Firestore pode não estar disponível (ex.: cache offline incompleto).
+  // Sem este guard, `firebase.firestore()` lança TypeError e derruba todo o boot.
+  const firestoreSdkAvailable = typeof firebase.firestore === 'function';
+  const db = firestoreSdkAvailable
+    ? firebase.firestore()
+    : new Proxy({}, {
+        // Falha alto em vez de fingir que salvou: o banner abaixo avisa o usuário.
+        get() { return () => { throw new Error('[SLC Offline] Firestore indisponível'); }; }
+      });
+
+  if (!firestoreSdkAvailable) {
+    console.error('[SLC Offline] SDK do Firestore indisponível. Alterações não serão sincronizadas.');
+    document.addEventListener('DOMContentLoaded', () => {
+      const banner = document.createElement('div');
+      banner.setAttribute('role', 'alert');
+      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#b45309;color:#fff;padding:12px 18px;font:600 13px/1.4 system-ui,sans-serif;text-align:center;';
+      banner.textContent = 'Sem conexão com a sincronização: suas alterações não serão salvas. Reconecte e recarregue a página.';
+      document.body.prepend(banner);
+    });
+  }
 
   // Precisa ser chamado AQUI, logo após criar o Firestore e antes de qualquer
   // outra leitura/escrita — se algo já tiver consultado o Firestore (ex.: o
@@ -79,7 +98,7 @@ try {
   // existe substituto (o substituto — FirestoreSettings.cache — só existe na
   // API modular v9+, que exigiria reescrever todo o projeto). Sem essa opção,
   // o cache offline funciona normalmente numa aba só, sem o aviso.
-  if (db.enablePersistence) {
+  if (firestoreSdkAvailable && db.enablePersistence) {
     db.enablePersistence().catch((err) => {
       if (err.code === 'failed-precondition') {
         console.warn('[SLC Offline] Múltiplas abas abertas — persistence só ativa numa aba por vez.');
@@ -97,7 +116,7 @@ try {
   window.auth           = auth;
   window.db             = db;
   window.googleProvider = googleProvider;
-  window.__slcOfflineEnabled = true;
+  window.__slcOfflineEnabled = firestoreSdkAvailable;
 
   auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch((error) => {
     console.warn('Não foi possível ativar persistência local de login:', error);

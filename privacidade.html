@@ -2,11 +2,13 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Política de Privacidade — SLCampus</title>
     <meta name="description" content="Como o SLCampus coleta, usa e protege seus dados. Sem cookies de rastreamento, sem analytics de terceiros — só o necessário para o app funcionar.">
     <meta property="og:title" content="Política de Privacidade — SLCampus">
     <meta property="og:description" content="Como o SLCampus coleta, usa e protege seus dados. Só o necessário para o app funcionar.">
+    <link rel="canonical" href="https://slcampus.vercel.app/privacidade">
+    <meta property="og:url" content="https://slcampus.vercel.app/privacidade">
     <meta property="og:image" content="https://slcampus.vercel.app/og-image.png">
     <link rel="icon" href="/favicon.ico">
     <link rel="apple-touch-icon" href="/icon-512.png">
@@ -65,6 +67,16 @@
         </section>
 
         <section class="lg-panel">
+            <h2><i class="fas fa-wand-magic-sparkles"></i> Recursos de IA e notificações</h2>
+            <h3>Importação por foto/PDF e Mentor IA</h3>
+            <p>Quando você usa a importação automática de grade, histórico ou horário, o <strong>arquivo ou foto que você seleciona</strong> é enviado aos servidores do SLCampus (Vercel) e repassado ao <strong>Google Gemini</strong> apenas para extrair as informações acadêmicas. O arquivo original não é guardado pelo SLCampus para essa finalidade; o texto extraído é usado para preencher seus dados e fica na sua conta.</p>
+            <p>O <strong>Mentor IA</strong> recebe um resumo do seu contexto acadêmico (nome, curso, instituição, semestre, matérias, notas, tarefas, provas e rotina) para gerar respostas personalizadas. Não enviamos seu e-mail nem sua foto para o modelo. Você pode usar o app sem os recursos de IA.</p>
+            <h3>Notificações push</h3>
+            <p>Se você ativar os lembretes, o navegador gera uma assinatura de push (endpoint e chaves técnicas) que fica salva na sua conta. Ela é usada exclusivamente para enviar os avisos que você configurou, por meio do serviço de push do seu navegador (Google, Mozilla, Apple ou Microsoft). Você pode desativar os lembretes ou remover a assinatura a qualquer momento nas configurações do app ou do navegador.</p>
+            <p>O <strong>Telegram</strong> é opcional: só recebe mensagens se você vincular o bot com um código gerado no app, e pode ser desvinculado a qualquer momento.</p>
+        </section>
+
+        <section class="lg-panel">
             <h2><i class="fas fa-bullseye"></i> Para que usamos os dados</h2>
             <ul>
                 <li><strong>Para o app funcionar:</strong> autenticar você, sincronizar seus dados entre dispositivos e exibir suas informações.</li>
@@ -92,8 +104,9 @@
             <p>Compartilhamos somente com quem precisa para o serviço existir:</p>
             <ul>
                 <li><strong>Google (Firebase)</strong> — autenticação, banco de dados e sincronização.</li>
-                <li><strong>Google (Gemini)</strong> — processamento das mensagens do Mentor IA.</li>
+                <li><strong>Google (Gemini)</strong> — processamento das mensagens do Mentor IA e extração de dados de arquivos/fotos enviados para importação.</li>
                 <li><strong>Groq</strong> — processamento alternativo das mensagens do Mentor IA.</li>
+                <li><strong>Serviços de push do navegador</strong> (Google, Mozilla, Apple ou Microsoft) — entrega das notificações que você ativou; recebem apenas a assinatura técnica do dispositivo e o texto do lembrete.</li>
                 <li><strong>Telegram</strong> — somente se você vincular o bot: mensagens e arquivos passam pelo Telegram para chegar ao SLCampus e receber as respostas.</li>
                 <li><strong>Vercel</strong> — hospedagem do site e execução das funções do servidor.</li>
                 <li><strong>Mercado Pago</strong> — processamento de doações (recebemos apenas a confirmação de que a doação ocorreu, nunca seus dados de cartão).</li>
@@ -111,7 +124,7 @@
 
         <section class="lg-panel">
             <h2><i class="fas fa-clock-rotate-left"></i> Por quanto tempo guardamos</h2>
-            <p>Enquanto sua conta existir. Ao pedir a exclusão da conta, removemos seus dados dos nossos sistemas (e os backups são rotacionados em até 30 dias). Registros técnicos de segurança são mantidos apenas pelo tempo necessário.</p>
+            <p>Enquanto sua conta existir. Ao pedir a exclusão da conta, removemos seus dados dos nossos sistemas, incluindo os materiais e PDFs guardados na biblioteca, e os backups são rotacionados em até 30 dias. Registros técnicos de segurança são mantidos apenas pelo tempo necessário.</p>
         </section>
 
         <section class="lg-panel">

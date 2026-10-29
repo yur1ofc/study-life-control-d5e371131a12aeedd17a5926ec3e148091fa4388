@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>SLCampus — Organizador de estudos: materiais, notas, revisões e rotina</title>
     <meta name="description" content="SLCampus é o organizador de estudos completo: cadastre materiais, lançe notas com peso, acompanhe revisões, estatísticas e rotina de estudos em um só lugar.">
     <link rel="canonical" href="https://slcampus.vercel.app/">
@@ -46,6 +46,7 @@
     <noscript>
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <style>#loading-screen{display:none!important}</style>
     </noscript>
 
     <!-- Motor de tema: carrega antes de tudo para evitar flash -->
@@ -149,8 +150,14 @@
             </div>
         </div>
 
-        <!-- Landing page pública: aparece antes do login e funciona como apresentação do SLCampus. -->
-        <div id="landing-screen" class="landing-screen" style="display:none;">
+        <!-- Landing page pública: aparece antes do login e funciona como apresentação do SLCampus.
+             Fica visível por padrão (inclusive sem JavaScript); o app a esconde quando há sessão. -->
+        <div id="landing-screen" class="landing-screen">
+            <noscript>
+                <div style="margin:12px;padding:12px 16px;border:1px solid #f59e0b;border-radius:12px;background:#fffbeb;color:#78350f;font-family:system-ui,sans-serif;font-size:14px;">
+                    O SLCampus precisa de JavaScript para entrar. Ative o JavaScript no seu navegador para continuar.
+                </div>
+            </noscript>
             <header class="landing-nav">
                 <a class="landing-brand" href="#landing-screen" aria-label="SLCampus início">
                     <img src="logo.png" alt="">
@@ -258,6 +265,7 @@
                 <span>Organize. Estude. Evolua.</span>
                 <a class="landing-support-link" href="https://link.mercadopago.com.br/slcampus" target="_blank" rel="noopener"><i class="fas fa-heart"></i> Apoie o SLCampus</a>
                 <nav class="landing-footer-legal" aria-label="Páginas legais">
+                    <a href="/ferramentas/">Ferramentas grátis</a>
                     <a href="/privacidade">Política de Privacidade</a>
                     <a href="/termos">Termos de Serviço</a>
                     <a href="/cookies">Aviso de Cookies</a>
@@ -267,14 +275,14 @@
             </footer>
         </div>
 
-        <div id="login-screen" class="login-container" style="display: none;">
+        <main id="login-screen" class="login-container" style="display: none;">
             <!-- Painel esquerdo: features -->
             <div class="login-features-panel">
                 <div class="login-brand">
                     <img src="logo.png" alt="SLCampus" class="brand-logo-img">
                     <span>SLC</span>
                 </div>
-                <h1 class="login-headline">Organize seus estudos<br><span>de verdade.</span></h1>
+                <p class="login-headline">Organize seus estudos<br><span>de verdade.</span></p>
                 <p class="login-subline">Tudo que você precisa para estudar e se organizar em um só lugar.</p>
                 <ul class="login-features-list">
                     <li><div class="feat-icon">🤖</div><span>Mentor IA que analisa seus dados e sugere o que estudar agora</span></li>
@@ -322,7 +330,7 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </main>
 
         <div id="setup-screen" class="setup-container" style="display: none;">
             <div class="setup-card">

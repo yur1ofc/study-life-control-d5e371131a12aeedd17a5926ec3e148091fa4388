@@ -66,10 +66,6 @@
     {
       "source": "/api/focus-schedule",
       "destination": "/api/account-actions?mode=focus"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
     }
   ],
   "crons": [
@@ -101,7 +97,15 @@
         },
         {
           "key": "X-XSS-Protection",
-          "value": "1; mode=block"
+          "value": "0"
+        },
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin-allow-popups"
+        },
+        {
+          "key": "Cross-Origin-Resource-Policy",
+          "value": "same-site"
         },
         {
           "key": "Referrer-Policy",
